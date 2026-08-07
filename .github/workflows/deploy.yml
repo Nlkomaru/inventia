@@ -1,0 +1,82 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    name: Check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ./pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install
+
+      - name: Check
+        run: pnpm run check
+
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    name: Deploy App and Storybook
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get secrets from Bitwarden Secrets Manager
+        uses: bitwarden/sm-action@v2
+        with:
+          access_token: ${{ secrets.BWS_ACCESS_TOKEN }}
+          secrets: |
+            2bad9e23-82af-4fba-b514-b49900e1632f > CLOUDFLARE_ACCOUNT_ID
+            f1bf4fa4-0288-4a31-b28b-b499013acdce > CLOUDFLARE_API_KEY
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ./pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install
+
+      - name: Build app and storybook
+        run: pnpm run build
+
+      # Storybook は app と同じ Worker の static assets として配信する。
+      # dist/client 配下に置くことで inventia.nikomaru.dev/storybook で公開される。
+      - name: Bundle storybook into app assets
+        run: |
+          rm -rf app/dist/client/storybook
+          cp -r storybook/storybook-static app/dist/client/storybook
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_KEY }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+          workingDirectory: app

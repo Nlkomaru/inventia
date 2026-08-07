@@ -1,0 +1,226 @@
+name: Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # R2 は S3 互換 API なので aws-cli をそのまま使う。エンドポイントとバケットは secret から取る。
+  # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY は BSM(nikomaru プロジェクト)管理のため、
+  # 実際に使う deploy-storybook-preview ジョブ内で bitwarden/sm-action 実行後に env として渡す。
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  # GitHub Actions のランナーで EC2 のメタデータ取得を試みて待たされるのを防ぐ。
+  AWS_EC2_METADATA_DISABLED: true
+  S3_URL: ${{ secrets.S3_URL }}
+  BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+  # アップロード先バケット(nikomaru-ci)が公開されているドメイン。
+  PREVIEW_BASE_URL: https://ci.nikomaru.dev/inventia
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    name: Check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ./pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install
+
+      - name: Check
+        run: pnpm run check
+
+  deploy-app-preview:
+    needs: check
+    runs-on: ubuntu-latest
+    name: Deploy App Preview
+    outputs:
+      deployment_url: ${{ steps.resolve-app-preview-url.outputs.deployment_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get secrets from Bitwarden Secrets Manager
+        uses: bitwarden/sm-action@v2
+        with:
+          access_token: ${{ secrets.BWS_ACCESS_TOKEN }}
+          secrets: |
+            2bad9e23-82af-4fba-b514-b49900e1632f > CLOUDFLARE_ACCOUNT_ID
+            f1bf4fa4-0288-4a31-b28b-b499013acdce > CLOUDFLARE_API_KEY
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ./pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install
+
+      - name: Build app
+        run: pnpm --filter ./app run build
+
+      - name: Deploy app preview
+        id: deploy-preview
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_KEY }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: versions upload --message "Deployed preview by GitHub Actions branch ${{ github.ref_name }}"
+          workingDirectory: app
+
+      - name: Resolve app preview URL
+        id: resolve-app-preview-url
+        env:
+          WRANGLER_DEPLOYMENT_URL: ${{ steps.deploy-preview.outputs.deployment-url }}
+          WRANGLER_COMMAND_OUTPUT: ${{ steps.deploy-preview.outputs.command-output }}
+          WRANGLER_COMMAND_STDERR: ${{ steps.deploy-preview.outputs.command-stderr }}
+        shell: bash
+        run: |
+          url="$WRANGLER_DEPLOYMENT_URL"
+          if [ -z "$url" ]; then
+            output="$WRANGLER_COMMAND_OUTPUT"$'\n'"$WRANGLER_COMMAND_STDERR"
+            url=$(echo "$output" | grep -Eo 'https://[^[:space:]]+' | head -n 1 || true)
+          fi
+
+          if [ -z "$url" ]; then
+            echo "Failed to resolve app preview URL from wrangler-action outputs."
+            exit 1
+          fi
+
+          echo "deployment_url=$url" >> "$GITHUB_OUTPUT"
+
+  deploy-storybook-preview:
+    needs: check
+    runs-on: ubuntu-latest
+    name: Deploy Storybook Preview
+    outputs:
+      deployment_url: ${{ steps.resolve-storybook-preview-url.outputs.deployment_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # プレビューの置き場所はコミット単位。PR ではマージコミットではなく、
+      # PR のブランチ先頭のコミットを使う(PR のコミットハッシュと一致させるため)。
+      - name: Set short commit SHA
+        id: vars
+        run: |
+          sha="${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "commit_sha=${sha:0:7}" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ./pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install
+
+      - name: Build storybook
+        run: pnpm --filter ./storybook run build
+
+      # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY は BSM(nikomaru プロジェクト)の
+      # shared/AWS_ACCESS_KEY_ID・shared/AWS_SECRET_ACCESS_KEY(nikomaru-ci バケット用の共通キー)。
+      # 以降のステップの env に入るため、Upload to R2 の env: では改めて渡す必要はない。
+      - name: Get secrets from Bitwarden Secrets Manager
+        uses: bitwarden/sm-action@v2
+        with:
+          access_token: ${{ secrets.BWS_ACCESS_TOKEN }}
+          secrets: |
+            7fca16ab-3904-4706-9849-b49900de563a > AWS_ACCESS_KEY_ID
+            769a462b-bf2d-466c-ae1f-b49900de56c8 > AWS_SECRET_ACCESS_KEY
+
+      - name: Upload to R2
+        env:
+          COMMIT_SHORT_SHA: ${{ steps.vars.outputs.commit_sha }}
+        run: |
+          aws configure set default.s3.max_concurrent_requests 50
+
+          S3_BASE="s3://${BUCKET_NAME}/inventia/${COMMIT_SHORT_SHA}"
+          S3_OPTS="--endpoint-url ${S3_URL} --only-show-errors --recursive"
+
+          aws s3 cp ./storybook/storybook-static "$S3_BASE/storybook" $S3_OPTS
+
+          # 公開ドメインはディレクトリURLから index.html を自動で解決しない。
+          # Storybook はトップページだけ「末尾スラッシュのキー」としても置く
+          # (以降の遷移はクエリ文字列で完結する)。
+          aws s3api put-object \
+            --bucket "${BUCKET_NAME}" \
+            --key "inventia/${COMMIT_SHORT_SHA}/storybook/" \
+            --body ./storybook/storybook-static/index.html \
+            --content-type "text/html" \
+            --endpoint-url "${S3_URL}" > /dev/null
+
+          echo "R2 upload completed"
+
+      - name: Resolve storybook preview URL
+        id: resolve-storybook-preview-url
+        env:
+          COMMIT_SHORT_SHA: ${{ steps.vars.outputs.commit_sha }}
+        run: |
+          echo "deployment_url=${PREVIEW_BASE_URL}/${COMMIT_SHORT_SHA}/storybook/" >> "$GITHUB_OUTPUT"
+
+  comment:
+    needs: [check, deploy-app-preview, deploy-storybook-preview]
+    if: always()
+    runs-on: ubuntu-latest
+    name: Comment Preview URLs
+    steps:
+      - name: Create comment file
+        env:
+          APP_PREVIEW_URL: ${{ needs.deploy-app-preview.outputs.deployment_url }}
+          STORYBOOK_PREVIEW_URL: ${{ needs.deploy-storybook-preview.outputs.deployment_url }}
+        run: |
+          cat << EOF > comment.md
+          ## Deploy preview
+          EOF
+
+          if [ -n "$APP_PREVIEW_URL" ]; then
+            echo "- App Preview URL: $APP_PREVIEW_URL" >> comment.md
+          else
+            echo "- App Preview URL: Not available" >> comment.md
+          fi
+
+          if [ -n "$STORYBOOK_PREVIEW_URL" ]; then
+            echo "- Storybook Preview URL: $STORYBOOK_PREVIEW_URL" >> comment.md
+          else
+            echo "- Storybook Preview URL: Not available" >> comment.md
+          fi
+
+      # push のたびにコメントが増えないよう、同じコメントを上書きしていく。
+      - name: Create PR comment
+        run: |
+          gh pr comment "${{ github.event.number }}" \
+            --body-file comment.md --edit-last --create-if-none
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # comment ジョブは checkout しないため .git が無い。gh がリポジトリを
+          # git から推測できず失敗するので、GH_REPO で対象リポジトリを明示する。
+          GH_REPO: ${{ github.repository }}
