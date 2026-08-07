@@ -1,6 +1,7 @@
 {
   "name": "inventia-workspace",
   "private": true,
+  "packageManager": "pnpm@11.18.0",
   "scripts": {
     "dev": "pnpm --parallel --filter ./app --filter ./storybook run dev",
     "build": "pnpm --filter ./app run build && pnpm --filter ./storybook run build",
