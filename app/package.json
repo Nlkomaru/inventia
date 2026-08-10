@@ -13,7 +13,7 @@
 		"format": "biome format",
 		"lint": "biome lint",
 		"check": "biome check",
-		"deploy": "pnpm run build && wrangler deploy",
+		"deploy": "VITE_DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.000Z) pnpm run build && wrangler deploy",
 		"cf-typegen": "wrangler types"
 	},
 	"dependencies": {
