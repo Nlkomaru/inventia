@@ -133,6 +133,34 @@ export const items = sqliteTable(
 	],
 );
 
+// 購入イベント。stock_movements（在庫増）と price_records（価格明細）を 1 つの
+// 購入行為として束ね、コメントと（フェーズ 2 の）レシートの結び付け先になる。
+// 合計金額は明細から導出するため持たない。レシート由来の場合はフェーズ 2 で
+// receipt_id を追加する（SQLite の ALTER ADD COLUMN は UNIQUE を付けられないため
+// 1:1 制約は別途 unique index で張る）
+export const purchases = sqliteTable(
+	"purchases",
+	{
+		id: text("id").primaryKey(),
+		// 店舗名などの購入元。店舗・価格を記録しないクイック入庫は
+		// purchases 行を作らず stock_movements 単独で記録する
+		source: text("source").notNull(),
+		purchasedAt: text("purchased_at").notNull(),
+		// 購入単位の自由コメント
+		note: text("note"),
+		// レシート承認や外部クライアント再送による購入全体の二重反映を防ぐ
+		idempotencyKey: text("idempotency_key"),
+		// 購入イベントは不変のため updated_at を持たない
+		createdAt: text("created_at").notNull(),
+	},
+	(t) => [
+		uniqueIndex("uq_purchases_idempotency_key").on(t.idempotencyKey),
+		// 購入履歴一覧の cursor paging 用
+		index("idx_purchases_purchased_at").on(t.purchasedAt, t.id),
+		check("ck_purchases_source_not_empty", sql`length(${t.source}) > 0`),
+	],
+);
+
 export const stockMovements = sqliteTable(
 	"stock_movements",
 	{
@@ -143,6 +171,11 @@ export const stockMovements = sqliteTable(
 		// 基準単位での増減量。棚卸しの絶対値入力は service 層で差分へ変換してから記録する
 		delta: integer("delta").notNull(),
 		reason: text("reason", { enum: stockMovementReasons }).notNull(),
+		// 購入イベントへの紐付け。reason = 'purchase' の行だけ設定できる。
+		// 履歴を孤児にしないため、参照されている購入の削除は restrict で禁止する
+		purchaseId: text("purchase_id").references(() => purchases.id, {
+			onDelete: "restrict",
+		}),
 		occurredAt: text("occurred_at").notNull(),
 		// 再送による二重反映を防ぐ。外部クライアントからの在庫調整では必須
 		idempotencyKey: text("idempotency_key"),
@@ -151,9 +184,19 @@ export const stockMovements = sqliteTable(
 	},
 	(t) => [
 		uniqueIndex("uq_stock_movements_idempotency_key").on(t.idempotencyKey),
+		// 同一購入内の同一商品は service 層で delta を合算し 1 movement へ統合する
+		// （price_records は包装違いなどで同一商品が複数行あってよい）。
+		// SQLite は NULL を別値扱いするため purchase_id が NULL の行には影響しない
+		uniqueIndex("uq_stock_movements_purchase_item").on(t.purchaseId, t.itemId),
 		// 履歴一覧の cursor paging 用。(occurred_at, id) で順序を一意に安定させる
 		index("idx_stock_movements_item_occurred").on(t.itemId, t.occurredAt, t.id),
 		check("ck_stock_movements_delta_not_zero", sql`${t.delta} <> 0`),
+		// 購入以外の理由の movement が購入を参照することを禁止する。
+		// 逆方向（purchase なら purchase_id 必須）はクイック入庫を許すため課さない
+		check(
+			"ck_stock_movements_purchase_reason",
+			sql`${t.purchaseId} is null or ${t.reason} = 'purchase'`,
+		),
 		check(
 			"ck_stock_movements_reason",
 			sql`${t.reason} in ('purchase', 'stocktake', 'consume', 'discard', 'other')`,
@@ -168,6 +211,12 @@ export const priceRecords = sqliteTable(
 		itemId: text("item_id")
 			.notNull()
 			.references(() => items.id, { onDelete: "cascade" }),
+		// 購入明細のとき設定する。NULL は Amazon 手動入力などの価格観測のみの行。
+		// 購入行でも source を保持するのは、価格比較を 1 テーブルで完結させるための
+		// 非正規化（service が purchases.source を転記する）
+		purchaseId: text("purchase_id").references(() => purchases.id, {
+			onDelete: "restrict",
+		}),
 		// 商品の基準単位へ正規化した 1 個あたり内容量（kg→g、L→mL 変換後の整数）
 		contentAmount: integer("content_amount").notNull(),
 		// 2 本セットなら 2。総内容量 = content_amount × set_count
@@ -186,6 +235,8 @@ export const priceRecords = sqliteTable(
 	(t) => [
 		index("idx_price_records_item_recorded").on(t.itemId, t.recordedAt, t.id),
 		index("idx_price_records_source").on(t.source),
+		// 購入 → 明細の逆引き用
+		index("idx_price_records_purchase").on(t.purchaseId),
 		check(
 			"ck_price_records_content_amount_positive",
 			sql`${t.contentAmount} > 0`,
