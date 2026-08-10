@@ -1,7 +1,7 @@
 import { StreamableHTTPTransport } from "@hono/mcp";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { apiReference } from "@scalar/hono-api-reference";
+import { Scalar } from "@scalar/hono-api-reference";
 
 const HealthSchema = z
 	.object({
@@ -12,6 +12,10 @@ const HealthSchema = z
 		service: z.literal("inventia-api").openapi({
 			description: "Service identifier",
 			example: "inventia-api",
+		}),
+		deployedAt: z.string().datetime().nullable().openapi({
+			description: "UTC time embedded in the deployment build",
+			example: "2026-08-11T00:00:00.000Z",
 		}),
 		checkedAt: z.string().datetime().openapi({
 			description: "UTC time when the health check was performed",
@@ -25,6 +29,7 @@ type Health = z.infer<typeof HealthSchema>;
 const getHealth = (): Health => ({
 	status: "ok",
 	service: "inventia-api",
+	deployedAt: import.meta.env.VITE_DEPLOYED_AT || null,
 	checkedAt: new Date().toISOString(),
 });
 
@@ -57,7 +62,7 @@ const createMcpServer = () => {
 		{
 			title: "Get API health",
 			description:
-				"Get the current health status and check time for the Inventia API.",
+				"Get the current health status, deployment time, and check time for the Inventia API.",
 			inputSchema: z.object({}),
 			outputSchema: HealthSchema,
 		},
@@ -83,7 +88,7 @@ export const apiApp = new OpenAPIHono();
 
 apiApp.openapi(healthRoute, (c) => c.json(getHealth(), 200));
 
-apiApp.doc31("/api/openapi.json", {
+apiApp.doc31("/api/openapi", {
 	openapi: "3.1.0",
 	info: {
 		title: "Inventia API",
@@ -93,12 +98,9 @@ apiApp.doc31("/api/openapi.json", {
 });
 
 apiApp.get(
-	"/api/docs",
-	apiReference({
-		pageTitle: "Inventia API Reference",
-		spec: {
-			url: "/api/openapi.json",
-		},
+	"/api/scalar",
+	Scalar({
+		url: "/api/openapi",
 	}),
 );
 

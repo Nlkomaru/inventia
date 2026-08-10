@@ -37,9 +37,9 @@ TanStack Start forwards `/api/*` to the Hono app in `app/src/api/app.ts`.
 
 | Path | Purpose |
 | --- | --- |
-| `/api/health` | Typed health response |
-| `/api/openapi.json` | OpenAPI 3.1 document |
-| `/api/docs` | Scalar API reference |
+| `/api/health` | Health status and deployment timestamp |
+| `/api/openapi` | OpenAPI 3.1 document |
+| `/api/scalar` | Scalar API reference |
 | `/api/mcp` | Stateless MCP Streamable HTTP endpoint |
 
 The MCP server exposes the `get_health` tool.
