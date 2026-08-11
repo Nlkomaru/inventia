@@ -5,9 +5,7 @@ workbench.
 
 ## Packages
 
-- `app/` — TanStack Start on Cloudflare Workers, Hono API, MCP endpoint, and
-  React Aria components
-- `storybook/` — Storybook for components implemented in `app/`
+- `app/` — TanStack Start on Cloudflare Workers, Hono API, MCP endpoint, Base UI components, and TanStack Table
 
 ## Development
 

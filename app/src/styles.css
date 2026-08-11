@@ -1,17 +1,29 @@
-
 @import "tailwindcss";
 
 * {
-  box-sizing: border-box;
+	box-sizing: border-box;
 }
 
 html,
 body,
 #app {
-  min-height: 100%;
+	min-height: 100%;
 }
 
 body {
-  margin: 0;
+	margin: 0;
+	background: #f5f7fb;
+	font-family:
+		"IBM Plex Sans",
+		"Helvetica Neue",
+		Arial,
+		"Hiragino Kaku Gothic ProN",
+		"Hiragino Sans",
+		sans-serif;
+	-webkit-font-smoothing: antialiased;
 }
 
+button,
+input {
+	font: inherit;
+}
