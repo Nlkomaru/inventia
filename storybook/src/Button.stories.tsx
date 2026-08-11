@@ -8,18 +8,18 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"A React Aria button with keyboard, focus, press, and disabled behavior provided by the platform-aware interaction model.",
+					"A shadcn-style button built on Base UI primitives with keyboard, focus, and disabled behavior.",
 			},
 		},
 	},
 	argTypes: {
 		variant: {
 			control: "inline-radio",
-			options: ["primary", "secondary"],
+			options: ["primary", "secondary", "ghost"],
 		},
 	},
 	args: {
-		children: "Create project",
+		children: "実行する",
 	},
 } satisfies Meta<typeof Button>;
 
@@ -43,7 +43,6 @@ export const Secondary: Story = {
 export const Disabled: Story = {
 	args: {
 		children: "Project created",
-		isDisabled: true,
-		variant: "primary",
+		disabled: true,
 	},
 };
