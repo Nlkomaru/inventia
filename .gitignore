@@ -12,7 +12,15 @@ storybook-static
 .vinxi
 __unconfig*
 todos.json
+.vscode/
 
 .dev.vars*
 !.dev.vars.example
 !.env.example
+
+
+# APM dependencies
+apm_modules/
+!.vscode/mcp.json
+.agents/
+.github/skills

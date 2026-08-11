@@ -1,0 +1,20 @@
+name: inventia
+version: 1.0.0
+description: APM project for inventia
+author: nikomaru
+dependencies:
+  apm:
+    - shadcn-ui/ui/skills/shadcn#HEAD
+  mcp:
+    - com.figma.mcp/mcp
+    - name: playwright
+      registry: false
+      transport: stdio
+      command: pnpm
+      args:
+        - dlx
+        - "@playwright/mcp@0.0.71"
+        - --output-dir
+        - .playwright-mcp/artifacts
+includes: auto
+scripts: {}
