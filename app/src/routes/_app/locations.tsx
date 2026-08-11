@@ -6,5 +6,10 @@ export const Route = createFileRoute("/_app/locations")({
 });
 
 function LocationsPage() {
-	return <PagePlaceholder title="保管場所" description="保管場所の階層を管理します。" />;
+	return (
+		<PagePlaceholder
+			title="保管場所"
+			description="保管場所の階層を管理します。"
+		/>
+	);
 }

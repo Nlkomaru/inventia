@@ -6,5 +6,10 @@ export const Route = createFileRoute("/_app/categories")({
 });
 
 function CategoriesPage() {
-	return <PagePlaceholder title="カテゴリ" description="品目のカテゴリを管理します。" />;
+	return (
+		<PagePlaceholder
+			title="カテゴリ"
+			description="品目のカテゴリを管理します。"
+		/>
+	);
 }

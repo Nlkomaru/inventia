@@ -1,4 +1,8 @@
-import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	Outlet,
+	useRouterState,
+} from "@tanstack/react-router";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
 	Breadcrumb,
@@ -8,12 +12,12 @@ import {
 	BreadcrumbPage,
 	BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
 import {
 	SidebarInset,
 	SidebarProvider,
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
 
 export const Route = createFileRoute("/_app")({ component: AppLayout });
 
@@ -38,7 +42,10 @@ function AppLayout() {
 			<SidebarInset>
 				<header className="sticky top-0 flex h-16 shrink-0 items-center border-b bg-background px-4">
 					<SidebarTrigger />
-					<Separator orientation="vertical" className="py-[2px] mr-4 ml-2 h-8 my-auto" />
+					<Separator
+						orientation="vertical"
+						className="py-[2px] mr-4 ml-2 h-8 my-auto"
+					/>
 					<AppBreadcrumb />
 				</header>
 				<Outlet />
@@ -57,7 +64,14 @@ function AppBreadcrumb() {
 		<Breadcrumb>
 			<BreadcrumbList>
 				<BreadcrumbItem>
-					<BreadcrumbLink render={<a href="/" />}>Inventia</BreadcrumbLink>
+					<BreadcrumbLink
+						render={
+							// biome-ignore lint/a11y/useAnchorContent: Base UI forwards BreadcrumbLink children to this anchor.
+							<a aria-label="Inventia ホーム" href="/" />
+						}
+					>
+						Inventia
+					</BreadcrumbLink>
 				</BreadcrumbItem>
 				<BreadcrumbSeparator />
 				<BreadcrumbItem>

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 function Label({ className, ...props }: React.ComponentProps<"label">) {
 	return (
+		// biome-ignore lint/a11y/noLabelWithoutControl: Consumers associate the reusable label with a control through htmlFor or nesting.
 		<label
 			data-slot="label"
 			className={cn(

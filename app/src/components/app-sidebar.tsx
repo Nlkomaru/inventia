@@ -61,7 +61,8 @@ const data = {
 	],
 };
 
-const deployedAt = import.meta.env.VITE_DEPLOYED_AT ?? "2026-08-11T04:59:26.000Z";
+const deployedAt =
+	import.meta.env.VITE_DEPLOYED_AT ?? "2026-08-11T04:59:26.000Z";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const pathname = useRouterState({
@@ -73,7 +74,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 			<SidebarHeader>
 				<SidebarMenu>
 					<SidebarMenuItem>
-						<SidebarMenuButton size="lg" render={<a href="/" />}>
+						<SidebarMenuButton
+							size="lg"
+							// biome-ignore lint/a11y/useAnchorContent: Base UI forwards SidebarMenuButton children to this anchor.
+							render={<a aria-label="Inventia ホーム" href="/" />}
+						>
 							<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
 								<WarehouseIcon className="size-4" />
 							</div>
@@ -96,7 +101,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 									<SidebarMenuItem key={item.title}>
 										<SidebarMenuButton
 											isActive={pathname === item.url}
-											render={<a href={item.url} />}
+											// biome-ignore lint/a11y/useAnchorContent: Base UI forwards SidebarMenuButton children to this anchor.
+											render={<a aria-label={item.title} href={item.url} />}
 										>
 											{item.title}
 										</SidebarMenuButton>
@@ -117,7 +123,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 								<SidebarMenuButton
 									isActive={pathname === item.url}
 									render={
+										// biome-ignore lint/a11y/useAnchorContent: Base UI forwards SidebarMenuButton children to this anchor.
 										<a
+											aria-label={item.title}
 											href={item.url}
 											rel={isExternal ? "noreferrer" : undefined}
 											target={isExternal ? "_blank" : undefined}
