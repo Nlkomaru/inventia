@@ -6,5 +6,12 @@
     "dev": "pnpm --parallel --filter ./app --filter ./storybook run dev",
     "build": "pnpm --filter ./app run build && pnpm --filter ./storybook run build",
     "check": "pnpm --filter ./app run check && pnpm --filter ./storybook run check"
+  },
+  "intent": {
+    "skills": [
+      "@tanstack/table-core",
+      "@tanstack/react-table",
+      "@tanstack/react-start"
+    ]
   }
 }

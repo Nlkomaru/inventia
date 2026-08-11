@@ -11,6 +11,7 @@ const config: StorybookConfig = {
   },
   viteFinal: async (config) =>
     mergeConfig(config, {
+		resolve: { tsconfigPaths: true },
       plugins: [tailwindcss()],
     }),
 }
