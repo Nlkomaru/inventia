@@ -1,9 +1,9 @@
+import { env } from "cloudflare:workers";
 import { createFileRoute } from "@tanstack/react-router";
 import { apiApp } from "../../api/app";
 
 const forwardToHono = ({ request }: { request: Request }) =>
-	apiApp.fetch(request);
-
+	apiApp.fetch(request, env);
 export const Route = createFileRoute("/api/$")({
 	server: {
 		handlers: {
