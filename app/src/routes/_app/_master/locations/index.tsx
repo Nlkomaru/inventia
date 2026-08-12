@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { LocationMasterPage } from "./_components/-location-master-page";
+import { LocationMasterPage } from "./-components/location-master-page";
 
 export const Route = createFileRoute("/_app/_master/locations/")({
 	staticData: {

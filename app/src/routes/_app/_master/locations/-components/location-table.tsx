@@ -15,7 +15,7 @@ import {
 	expandedLocationIdsAtom,
 	locationQueryAtom,
 	locationsAtom,
-} from "./-location-atoms";
+} from "./location-atoms";
 
 export function LocationTable({
 	onDelete,

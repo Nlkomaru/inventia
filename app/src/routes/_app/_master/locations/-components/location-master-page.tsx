@@ -5,15 +5,15 @@ import {
 	deleteLocation,
 	listLocationTree,
 	updateLocation,
-} from "./-location-api";
+} from "./location-api";
 import {
 	editingLocationAtom,
 	locationsAtom,
 	locationsErrorAtom,
 	locationsLoadingAtom,
-} from "./-location-atoms";
-import { LocationForm } from "./-location-form";
-import { LocationTable } from "./-location-table";
+} from "./location-atoms";
+import { LocationForm } from "./location-form";
+import { LocationTable } from "./location-table";
 
 export function LocationMasterPage() {
 	const [locations, setLocations] = useAtom(locationsAtom);

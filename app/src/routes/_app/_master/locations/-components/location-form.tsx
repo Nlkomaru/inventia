@@ -3,7 +3,7 @@ import { CirclePlus } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { editingLocationAtom, locationsAtom } from "./-location-atoms";
+import { editingLocationAtom, locationsAtom } from "./location-atoms";
 
 type Props = {
 	onSave: (input: {
