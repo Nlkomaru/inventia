@@ -3,10 +3,7 @@ import { PagePlaceholder } from "@/routes/_app/-page-placeholder";
 
 export const Route = createFileRoute("/_app/_master/references/")({
 	staticData: {
-		breadcrumbs: [
-			{ label: "マスタ", to: "/items" },
-			{ label: "識別子・外部リンク" },
-		],
+		breadcrumbs: [{ label: "識別子・外部リンク" }],
 	},
 	component: ReferencesPage,
 });

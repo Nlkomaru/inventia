@@ -3,7 +3,7 @@ import { PagePlaceholder } from "@/routes/_app/-page-placeholder";
 
 export const Route = createFileRoute("/_app/_master/locations/")({
 	staticData: {
-		breadcrumbs: [{ label: "マスタ", to: "/items" }, { label: "保管場所" }],
+		breadcrumbs: [{ label: "保管場所" }],
 	},
 	component: LocationsPage,
 });

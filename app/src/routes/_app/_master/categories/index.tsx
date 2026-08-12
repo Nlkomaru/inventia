@@ -3,7 +3,7 @@ import { PagePlaceholder } from "@/routes/_app/-page-placeholder";
 
 export const Route = createFileRoute("/_app/_master/categories/")({
 	staticData: {
-		breadcrumbs: [{ label: "マスタ", to: "/items" }, { label: "カテゴリ" }],
+		breadcrumbs: [{ label: "カテゴリ" }],
 	},
 	component: CategoriesPage,
 });
