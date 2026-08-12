@@ -1,8 +1,5 @@
-import {
-	createFileRoute,
-	Outlet,
-	useRouterState,
-} from "@tanstack/react-router";
+import { createFileRoute, Outlet, useMatches } from "@tanstack/react-router";
+import { Fragment } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
 	Breadcrumb,
@@ -20,20 +17,6 @@ import {
 } from "@/components/ui/sidebar";
 
 export const Route = createFileRoute("/_app")({ component: AppLayout });
-
-const pageTitleByPath: Record<string, string> = {
-	"/": "在庫一覧",
-	"/categories": "カテゴリ",
-	"/inventory/history": "在庫履歴",
-	"/inventory/issue": "出庫",
-	"/inventory/receive": "入庫",
-	"/inventory/stocktake": "棚卸・調整",
-	"/items": "品目",
-	"/license": "Licence",
-	"/locations": "保管場所",
-	"/receipts/new": "レシート取込",
-	"/references": "識別子・外部リンク",
-};
 
 function AppLayout() {
 	return (
@@ -55,28 +38,37 @@ function AppLayout() {
 }
 
 function AppBreadcrumb() {
-	const pathname = useRouterState({
-		select: (state) => state.location.pathname,
+	const breadcrumbs = useMatches({
+		select: (matches) =>
+			matches.flatMap((match) => match.staticData.breadcrumbs ?? []),
 	});
-	const pageTitle = pageTitleByPath[pathname] ?? "Inventia";
 
 	return (
 		<Breadcrumb>
 			<BreadcrumbList>
-				<BreadcrumbItem>
-					<BreadcrumbLink
-						render={
-							// biome-ignore lint/a11y/useAnchorContent: Base UI forwards BreadcrumbLink children to this anchor.
-							<a aria-label="Inventia ホーム" href="/" />
-						}
-					>
-						Inventia
-					</BreadcrumbLink>
-				</BreadcrumbItem>
-				<BreadcrumbSeparator />
-				<BreadcrumbItem>
-					<BreadcrumbPage>{pageTitle}</BreadcrumbPage>
-				</BreadcrumbItem>
+				{breadcrumbs.map((breadcrumb, index) => {
+					const isCurrent = index === breadcrumbs.length - 1;
+
+					return (
+						<Fragment key={`${breadcrumb.label}-${breadcrumb.to ?? "current"}`}>
+							{index > 0 ? <BreadcrumbSeparator /> : null}
+							<BreadcrumbItem>
+								{isCurrent || !breadcrumb.to ? (
+									<BreadcrumbPage>{breadcrumb.label}</BreadcrumbPage>
+								) : (
+									<BreadcrumbLink
+										render={
+											// biome-ignore lint/a11y/useAnchorContent: Base UI forwards BreadcrumbLink children to this anchor.
+											<a aria-label={breadcrumb.label} href={breadcrumb.to} />
+										}
+									>
+										{breadcrumb.label}
+									</BreadcrumbLink>
+								)}
+							</BreadcrumbItem>
+						</Fragment>
+					);
+				})}
 			</BreadcrumbList>
 		</Breadcrumb>
 	);

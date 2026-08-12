@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PagePlaceholder } from "../-page-placeholder";
+import { PagePlaceholder } from "@/routes/_app/-page-placeholder";
 
-export const Route = createFileRoute("/_app/inventory/history")({
+export const Route = createFileRoute("/_app/_inventory/inventory/history/")({
+	staticData: {
+		breadcrumbs: [{ label: "在庫履歴" }],
+	},
 	component: StockHistoryPage,
 });
 

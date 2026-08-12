@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PagePlaceholder } from "./-page-placeholder";
+import { PagePlaceholder } from "@/routes/_app/-page-placeholder";
 
-export const Route = createFileRoute("/_app/locations")({
+export const Route = createFileRoute("/_app/_master/locations/")({
+	staticData: {
+		breadcrumbs: [{ label: "保管場所" }],
+	},
 	component: LocationsPage,
 });
 

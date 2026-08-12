@@ -23,7 +23,7 @@ const data = {
 		{
 			title: "在庫管理",
 			items: [
-				{ title: "在庫一覧", url: "/" },
+				{ title: "在庫一覧", url: "/inventory" },
 				{ title: "入庫", url: "/inventory/receive" },
 				{ title: "出庫", url: "/inventory/issue" },
 				{ title: "棚卸・調整", url: "/inventory/stocktake" },
@@ -77,7 +77,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 						<SidebarMenuButton
 							size="lg"
 							// biome-ignore lint/a11y/useAnchorContent: Base UI forwards SidebarMenuButton children to this anchor.
-							render={<a aria-label="Inventia ホーム" href="/" />}
+							render={<a aria-label="Inventia ホーム" href="/inventory" />}
 						>
 							<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
 								<WarehouseIcon className="size-4" />

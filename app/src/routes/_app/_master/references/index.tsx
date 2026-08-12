@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PagePlaceholder } from "./-page-placeholder";
+import { PagePlaceholder } from "@/routes/_app/-page-placeholder";
 
-export const Route = createFileRoute("/_app/references")({
+export const Route = createFileRoute("/_app/_master/references/")({
+	staticData: {
+		breadcrumbs: [{ label: "識別子・外部リンク" }],
+	},
 	component: ReferencesPage,
 });
 
