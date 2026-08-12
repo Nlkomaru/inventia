@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PagePlaceholder } from "./-page-placeholder";
+import { PagePlaceholder } from "@/routes/_app/-page-placeholder";
 
-export const Route = createFileRoute("/_app/categories")({
+export const Route = createFileRoute("/_app/_master/categories/")({
 	component: CategoriesPage,
 });
 

@@ -26,7 +26,8 @@
 			"binding": "DB",
 			"database_name": "inventia",
 			"database_id": "c23f315b-0c9e-4e57-9caf-37ba3fb5a47d",
-			"migrations_dir": "migrations"
+			"migrations_dir": "migrations",
+			"remote": true
 		}
 	]
 	/**

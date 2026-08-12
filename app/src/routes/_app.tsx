@@ -22,7 +22,7 @@ import {
 export const Route = createFileRoute("/_app")({ component: AppLayout });
 
 const pageTitleByPath: Record<string, string> = {
-	"/": "在庫一覧",
+	"/inventory": "在庫一覧",
 	"/categories": "カテゴリ",
 	"/inventory/history": "在庫履歴",
 	"/inventory/issue": "出庫",
@@ -34,6 +34,15 @@ const pageTitleByPath: Record<string, string> = {
 	"/receipts/new": "レシート取込",
 	"/references": "識別子・外部リンク",
 };
+
+const sectionByPath = {
+	inventory: { title: "在庫管理", url: "/inventory" },
+	receipts: { title: "在庫管理", url: "/inventory" },
+	items: { title: "マスタ", url: "/items" },
+	categories: { title: "マスタ", url: "/items" },
+	locations: { title: "マスタ", url: "/items" },
+	references: { title: "マスタ", url: "/items" },
+} as const;
 
 function AppLayout() {
 	return (
@@ -59,19 +68,25 @@ function AppBreadcrumb() {
 		select: (state) => state.location.pathname,
 	});
 	const pageTitle = pageTitleByPath[pathname] ?? "Inventia";
+	const section =
+		sectionByPath[pathname.split("/")[1] as keyof typeof sectionByPath];
 
 	return (
 		<Breadcrumb>
 			<BreadcrumbList>
 				<BreadcrumbItem>
-					<BreadcrumbLink
-						render={
-							// biome-ignore lint/a11y/useAnchorContent: Base UI forwards BreadcrumbLink children to this anchor.
-							<a aria-label="Inventia ホーム" href="/" />
-						}
-					>
-						Inventia
-					</BreadcrumbLink>
+					{section ? (
+						<BreadcrumbLink
+							render={
+								// biome-ignore lint/a11y/useAnchorContent: Base UI forwards BreadcrumbLink children to this anchor.
+								<a aria-label={section.title} href={section.url} />
+							}
+						>
+							{section.title}
+						</BreadcrumbLink>
+					) : (
+						<BreadcrumbPage>Inventia</BreadcrumbPage>
+					)}
 				</BreadcrumbItem>
 				<BreadcrumbSeparator />
 				<BreadcrumbItem>
