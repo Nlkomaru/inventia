@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PagePlaceholder } from "@/routes/_app/-page-placeholder";
 
-export const Route = createFileRoute("/_app/inventory/issue/")({
+export const Route = createFileRoute("/_app/_inventory/inventory/issue/")({
 	staticData: {
-		breadcrumbs: [{ label: "在庫管理", to: "/inventory" }, { label: "出庫" }],
+		breadcrumbs: [{ label: "出庫" }],
 	},
 	component: IssueStockPage,
 });

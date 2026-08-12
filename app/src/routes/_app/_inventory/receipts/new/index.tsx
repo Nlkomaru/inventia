@@ -1,12 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PagePlaceholder } from "@/routes/_app/-page-placeholder";
 
-export const Route = createFileRoute("/_app/receipts/new/")({
+export const Route = createFileRoute("/_app/_inventory/receipts/new/")({
 	staticData: {
-		breadcrumbs: [
-			{ label: "在庫管理", to: "/inventory" },
-			{ label: "レシート取込" },
-		],
+		breadcrumbs: [{ label: "レシート取込" }],
 	},
 	component: ReceiptUploadPage,
 });
