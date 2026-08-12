@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PagePlaceholder } from "@/routes/_app/-page-placeholder";
+import { PagePlaceholder } from "../../-page-placeholder";
 
 export const Route = createFileRoute("/_app/_master/references/")({
 	staticData: {
@@ -12,7 +12,7 @@ function ReferencesPage() {
 	return (
 		<PagePlaceholder
 			title="識別子・外部リンク"
-			description="ISBN、JAN、SKU などの識別子と外部リンクを管理します。"
+			description="識別子用のD1スキーマとAPIの実装後に登録機能を提供します。"
 		/>
 	);
 }

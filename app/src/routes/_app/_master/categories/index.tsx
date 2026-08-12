@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PagePlaceholder } from "@/routes/_app/-page-placeholder";
+import { PagePlaceholder } from "../../-page-placeholder";
 
 export const Route = createFileRoute("/_app/_master/categories/")({
 	staticData: {
@@ -11,8 +11,8 @@ export const Route = createFileRoute("/_app/_master/categories/")({
 function CategoriesPage() {
 	return (
 		<PagePlaceholder
-			title="カテゴリ"
-			description="品目のカテゴリを管理します。"
+			title="カテゴリマスタ"
+			description="カテゴリAPIの実装後にD1のデータを表示します。"
 		/>
 	);
 }

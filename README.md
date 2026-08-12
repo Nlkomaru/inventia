@@ -62,9 +62,9 @@ Store production secrets with
 `pnpm --filter inventia exec wrangler secret put <NAME>`; keep non-secret
 variables and bindings in `app/wrangler.jsonc`.
 
-Local development uses the remote D1 database configured in
-`app/wrangler.jsonc`. When the deployed Worker is protected by Cloudflare
-Access, sign in interactively or expose a service token to Wrangler:
+Local development normally uses the remote D1 database configured in
+`app/wrangler.jsonc`, which requires Wrangler account authentication. In a
+non-interactive environment, expose a Cloudflare Access service token instead:
 
 ```bash
 export CLOUDFLARE_ACCESS_CLIENT_ID=<CLIENT_ID>
@@ -72,5 +72,9 @@ export CLOUDFLARE_ACCESS_CLIENT_SECRET=<CLIENT_SECRET>
 pnpm --filter inventia dev
 ```
 
-Keep both service-token values outside the repository and configure a Service
-Auth policy on the existing Access application that protects the Worker.
+When both variables are present, Vite proxies `/api` to the deployed Worker and
+adds the service-token headers on the server side. This avoids Wrangler's
+interactive OAuth flow; the credentials are not exposed to browser code. All
+API writes in this mode modify the deployed D1 database. Keep both values
+outside the repository and configure a Service Auth policy on the existing
+Access application that protects the Worker.
