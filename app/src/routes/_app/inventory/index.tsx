@@ -1,6 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_app/inventory/")({
+	staticData: {
+		breadcrumbs: [
+			{ label: "在庫管理", to: "/inventory" },
+			{ label: "在庫一覧" },
+		],
+	},
 	component: InventoryPage,
 });
 
