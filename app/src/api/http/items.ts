@@ -5,7 +5,7 @@ import {
     itemDtoSchema,
     itemListQuerySchema,
     itemUpdateSchema,
-} from "../domain/item";
+} from "../../domain/item";
 import {
     createItem,
     deleteItem,
@@ -13,11 +13,10 @@ import {
     ItemServiceError,
     listItems,
     updateItem,
-} from "../services/itemService";
+} from "../../services/itemService";
+import type { ApiBindings } from "../bindings";
 
-type ItemBindings = { Bindings: { DB: D1Database } };
-
-export const itemsApp = new OpenAPIHono<{ Bindings: { DB: D1Database } }>();
+export const itemsApp = new OpenAPIHono<ApiBindings>();
 
 const itemErrorSchema = z.object({
     error: z.object({ code: z.string(), message: z.string() }),
@@ -145,7 +144,7 @@ itemsApp.openAPIRegistry.registerPath({
     },
 });
 
-type ItemsContext = Context<ItemBindings>;
+type ItemsContext = Context<ApiBindings>;
 
 type ErrorResponse = {
     error: {

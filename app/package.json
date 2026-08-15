@@ -6,9 +6,10 @@
 		"#/*": "./src/*"
 	},
 	"scripts": {
-		"dev": "vite dev --port 3000 --host",
+		"dev": "pnpm run generate-licenses && vite dev --port 3000 --host",
+		"generate-licenses": "pnpm licenses list --prod --json | node scripts/generate-license-data.mjs",
 		"generate-routes": "tsr generate",
-		"build": "vite build",
+		"build": "pnpm run generate-licenses && vite build",
 		"preview": "pnpm run build && vite preview",
 		"check": "biome check --write",
 		"deploy": "VITE_DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.000Z) pnpm run build && wrangler deploy",

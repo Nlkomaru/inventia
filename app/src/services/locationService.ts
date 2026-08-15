@@ -127,10 +127,10 @@ const ensureParentExists = async (
     }
 };
 
-export interface LocationListResponse {
+export type LocationListResponse = {
     items: LocationDto[];
     nextCursor: string | null;
-}
+};
 
 export const listLocations = async (
     db: D1Database,

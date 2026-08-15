@@ -1,10 +1,13 @@
 import { OpenAPIHono, z } from "@hono/zod-openapi";
+import type { Context } from "hono";
 import {
     locationCreateInputSchema,
+    locationDeleteOutputSchema,
     locationDtoSchema,
     locationListInputSchema,
+    locationListOutputSchema,
     locationUpdateInputSchema,
-} from "../domain/location";
+} from "../../domain/location";
 import {
     createLocation,
     getLocation,
@@ -12,15 +15,12 @@ import {
     listLocations,
     removeLocation,
     updateLocation,
-} from "../services/locationService";
+} from "../../services/locationService";
+import type { ApiBindings } from "../bindings";
 
-type LocationBindings = {
-    Bindings: { DB: D1Database };
-};
+type LocationsContext = Context<ApiBindings>;
 
-type LocationsContext = Parameters<Parameters<typeof locationsApp.get>[1]>[0];
-
-export const locationsApp = new OpenAPIHono<LocationBindings>();
+export const locationsApp = new OpenAPIHono<ApiBindings>();
 
 const locationErrorSchema = z.object({
     error: z.object({ code: z.string(), message: z.string() }),
@@ -32,11 +32,6 @@ const locationIdParameter = z
         param: { name: "id", in: "path" },
         example: "019fecc7-b5ed-71d4-9ed3-fc56612cb7ae",
     });
-const locationListSchema = z.object({
-    items: z.array(locationDtoSchema),
-    nextCursor: z.string().nullable(),
-});
-const deletedSchema = z.object({ deleted: z.literal(true) });
 const responseContent = (schema: z.ZodType) => ({
     "application/json": { schema },
 });
@@ -76,7 +71,7 @@ locationsApp.openAPIRegistry.registerPath({
     responses: {
         200: {
             description: "A stable page of storage locations.",
-            content: responseContent(locationListSchema),
+            content: responseContent(locationListOutputSchema),
         },
         ...errorResponses,
     },
@@ -147,7 +142,7 @@ locationsApp.openAPIRegistry.registerPath({
     responses: {
         200: {
             description: "The location was deleted.",
-            content: responseContent(deletedSchema),
+            content: responseContent(locationDeleteOutputSchema),
         },
         ...errorResponses,
     },

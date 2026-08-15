@@ -250,7 +250,6 @@ export const updateItem = async (
         ["name", "name"],
         ["categoryId", "category_id"],
         ["locationId", "location_id"],
-        ["currentQuantity", "current_quantity"],
         ["expiryDate", "expiry_date"],
         ["lowStockThreshold", "low_stock_threshold"],
         ["memo", "memo"],

@@ -44,12 +44,12 @@ const data = {
             title: "連携・設定",
             items: [
                 { title: "API リファレンス", url: "/api/scalar" },
-                { title: "MCP エンドポイント", url: "/api/mcp" },
+                { title: "MCP エンドポイント", url: "/settings/mcp" },
             ],
         },
     ],
     resources: [
-        { title: "Licence", url: "/license" },
+        { title: "OSS ライセンス", url: "/license" },
         {
             title: "GitHub",
             url: "https://github.com/Nlkomaru/inventia",

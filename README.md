@@ -40,7 +40,13 @@ TanStack Start forwards `/api/*` to the Hono app in `app/src/api/app.ts`.
 | `/api/scalar` | Scalar API reference |
 | `/api/mcp` | Stateless MCP Streamable HTTP endpoint |
 
-The MCP server exposes the `get_health` tool.
+The MCP server exposes these tools through the same services as the HTTP API:
+
+| Area | Tools |
+| --- | --- |
+| System | `get_health` |
+| Inventory | `search_inventory`, `get_inventory_item` |
+| Locations | `list_locations`, `get_location`, `create_location`, `update_location`, `delete_location` |
 
 ## Verification
 

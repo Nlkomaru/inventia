@@ -58,6 +58,17 @@ export const locationDtoSchema = z
     })
     .strict();
 
+export const locationListOutputSchema = z
+    .object({
+        items: z.array(locationDtoSchema),
+        nextCursor: z.string().nullable(),
+    })
+    .strict();
+
+export const locationDeleteOutputSchema = z
+    .object({ deleted: z.literal(true) })
+    .strict();
+
 export type LocationId = z.infer<typeof locationIdSchema>;
 export type LocationCreateInput = z.infer<typeof locationCreateInputSchema>;
 export type LocationUpdateInput = z.infer<typeof locationUpdateInputSchema>;
