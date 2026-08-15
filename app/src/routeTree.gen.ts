@@ -20,6 +20,7 @@ import { Route as AppMasterCategoriesIndexRouteImport } from './routes/_app/_mas
 import { Route as AppMasterItemsIndexRouteImport } from './routes/_app/_master/items/index'
 import { Route as AppMasterLocationsIndexRouteImport } from './routes/_app/_master/locations/index'
 import { Route as AppMasterReferencesIndexRouteImport } from './routes/_app/_master/references/index'
+import { Route as AppSettingsMcpIndexRouteImport } from './routes/_app/settings/mcp/index'
 import { Route as AppInventoryInventoryHistoryIndexRouteImport } from './routes/_app/_inventory/inventory/history/index'
 import { Route as AppInventoryInventoryIssueIndexRouteImport } from './routes/_app/_inventory/inventory/issue/index'
 import { Route as AppInventoryInventoryReceiveIndexRouteImport } from './routes/_app/_inventory/inventory/receive/index'
@@ -81,6 +82,11 @@ const AppMasterReferencesIndexRoute =
     path: '/references/',
     getParentRoute: () => AppMasterRoute,
   } as any)
+const AppSettingsMcpIndexRoute = AppSettingsMcpIndexRouteImport.update({
+  id: '/settings/mcp/',
+  path: '/settings/mcp/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppInventoryInventoryHistoryIndexRoute =
   AppInventoryInventoryHistoryIndexRouteImport.update({
     id: '/inventory/history/',
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/items/': typeof AppMasterItemsIndexRoute
   '/locations/': typeof AppMasterLocationsIndexRoute
   '/references/': typeof AppMasterReferencesIndexRoute
+  '/settings/mcp/': typeof AppSettingsMcpIndexRoute
   '/inventory/history/': typeof AppInventoryInventoryHistoryIndexRoute
   '/inventory/issue/': typeof AppInventoryInventoryIssueIndexRoute
   '/inventory/receive/': typeof AppInventoryInventoryReceiveIndexRoute
@@ -136,6 +143,7 @@ export interface FileRoutesByTo {
   '/items': typeof AppMasterItemsIndexRoute
   '/locations': typeof AppMasterLocationsIndexRoute
   '/references': typeof AppMasterReferencesIndexRoute
+  '/settings/mcp': typeof AppSettingsMcpIndexRoute
   '/inventory/history': typeof AppInventoryInventoryHistoryIndexRoute
   '/inventory/issue': typeof AppInventoryInventoryIssueIndexRoute
   '/inventory/receive': typeof AppInventoryInventoryReceiveIndexRoute
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   '/_app/_master/items/': typeof AppMasterItemsIndexRoute
   '/_app/_master/locations/': typeof AppMasterLocationsIndexRoute
   '/_app/_master/references/': typeof AppMasterReferencesIndexRoute
+  '/_app/settings/mcp/': typeof AppSettingsMcpIndexRoute
   '/_app/_inventory/inventory/history/': typeof AppInventoryInventoryHistoryIndexRoute
   '/_app/_inventory/inventory/issue/': typeof AppInventoryInventoryIssueIndexRoute
   '/_app/_inventory/inventory/receive/': typeof AppInventoryInventoryReceiveIndexRoute
@@ -172,6 +181,7 @@ export interface FileRouteTypes {
     | '/items/'
     | '/locations/'
     | '/references/'
+    | '/settings/mcp/'
     | '/inventory/history/'
     | '/inventory/issue/'
     | '/inventory/receive/'
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/items'
     | '/locations'
     | '/references'
+    | '/settings/mcp'
     | '/inventory/history'
     | '/inventory/issue'
     | '/inventory/receive'
@@ -205,6 +216,7 @@ export interface FileRouteTypes {
     | '/_app/_master/items/'
     | '/_app/_master/locations/'
     | '/_app/_master/references/'
+    | '/_app/settings/mcp/'
     | '/_app/_inventory/inventory/history/'
     | '/_app/_inventory/inventory/issue/'
     | '/_app/_inventory/inventory/receive/'
@@ -296,6 +308,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMasterReferencesIndexRouteImport
       parentRoute: typeof AppMasterRoute
     }
+    '/_app/settings/mcp/': {
+      id: '/_app/settings/mcp/'
+      path: '/settings/mcp'
+      fullPath: '/settings/mcp/'
+      preLoaderRoute: typeof AppSettingsMcpIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/_inventory/inventory/history/': {
       id: '/_app/_inventory/inventory/history/'
       path: '/inventory/history'
@@ -382,6 +401,7 @@ interface AppRouteChildren {
   AppMasterRoute: typeof AppMasterRouteWithChildren
   AppIndexRoute: typeof AppIndexRoute
   AppLicenseIndexRoute: typeof AppLicenseIndexRoute
+  AppSettingsMcpIndexRoute: typeof AppSettingsMcpIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -389,6 +409,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppMasterRoute: AppMasterRouteWithChildren,
   AppIndexRoute: AppIndexRoute,
   AppLicenseIndexRoute: AppLicenseIndexRoute,
+  AppSettingsMcpIndexRoute: AppSettingsMcpIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
