@@ -28,8 +28,11 @@ body {
 }
 
 button,
-input {
+input,
+select,
+option {
 	font: inherit;
+	font-family: var(--font-sans);
 }
 
 @theme inline {
