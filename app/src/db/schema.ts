@@ -27,6 +27,8 @@ export const stockMovementReasons = [
     "other",
 ] as const;
 
+export const stockOperationKinds = ["adjustment", "stocktake"] as const;
+
 export const storageLocations = sqliteTable(
     "storage_locations",
     {
@@ -172,7 +174,7 @@ export const stockMovements = sqliteTable(
         id: text("id").primaryKey(),
         itemId: text("item_id")
             .notNull()
-            .references(() => items.id, { onDelete: "cascade" }),
+            .references(() => items.id, { onDelete: "restrict" }),
         // 基準単位での増減量。棚卸しの絶対値入力は service 層で差分へ変換してから記録する
         delta: integer("delta").notNull(),
         reason: text("reason", { enum: stockMovementReasons }).notNull(),
@@ -202,6 +204,8 @@ export const stockMovements = sqliteTable(
             t.occurredAt,
             t.id,
         ),
+        // 全商品の履歴一覧の cursor paging 用
+        index("idx_stock_movements_occurred").on(t.occurredAt, t.id),
         check("ck_stock_movements_delta_not_zero", sql`${t.delta} <> 0`),
         // 購入以外の理由の movement が購入を参照することを禁止する。
         // 逆方向（purchase なら purchase_id 必須）はクイック入庫を許すため課さない
@@ -212,6 +216,63 @@ export const stockMovements = sqliteTable(
         check(
             "ck_stock_movements_reason",
             sql`${t.reason} in ('purchase', 'stocktake', 'consume', 'discard', 'other')`,
+        ),
+    ],
+);
+
+// 在庫操作の受付記録。movement が 0 件になる棚卸しの no-op も記録し、
+// idempotency key の再送を同じ結果として扱えるようにする。
+// 行は service 層から追加するだけで、修正用の updated_at は持たない。
+export const stockOperations = sqliteTable(
+    "stock_operations",
+    {
+        idempotencyKey: text("idempotency_key").primaryKey(),
+        itemId: text("item_id")
+            .notNull()
+            .references(() => items.id, { onDelete: "restrict" }),
+        kind: text("kind", { enum: stockOperationKinds }).notNull(),
+        delta: integer("delta").notNull(),
+        targetQuantity: integer("target_quantity"),
+        reason: text("reason", { enum: stockMovementReasons }).notNull(),
+        occurredAt: text("occurred_at").notNull(),
+        // occurred_at が入力省略による自動値かどうか。再送比較に使う。
+        occurredAtProvided: integer("occurred_at_provided")
+            .notNull()
+            .default(0),
+        // no-op 棚卸しでは movement が存在しないため nullable
+        movementId: text("movement_id"),
+        resultingQuantity: integer("resulting_quantity").notNull(),
+        createdAt: text("created_at").notNull(),
+    },
+    (t) => [
+        index("idx_stock_operations_item_created").on(
+            t.itemId,
+            t.createdAt,
+            t.idempotencyKey,
+        ),
+        check(
+            "ck_stock_operations_kind",
+            sql`${t.kind} in ('adjustment', 'stocktake')`,
+        ),
+        check(
+            "ck_stock_operations_reason",
+            sql`${t.reason} in ('purchase', 'stocktake', 'consume', 'discard', 'other')`,
+        ),
+        check(
+            "ck_stock_operations_occurred_at_provided",
+            sql`${t.occurredAtProvided} in (0, 1)`,
+        ),
+        check(
+            "ck_stock_operations_payload",
+            sql`(${t.kind} = 'stocktake' and ${t.targetQuantity} is not null) or (${t.kind} = 'adjustment' and ${t.targetQuantity} is null and ${t.delta} <> 0)`,
+        ),
+        check(
+            "ck_stock_operations_target_quantity_non_negative",
+            sql`${t.targetQuantity} is null or ${t.targetQuantity} >= 0`,
+        ),
+        check(
+            "ck_stock_operations_resulting_quantity_non_negative",
+            sql`${t.resultingQuantity} >= 0`,
         ),
     ],
 );
@@ -262,6 +323,40 @@ export const priceRecords = sqliteTable(
         check(
             "ck_price_records_source_not_empty",
             sql`length(${t.source}) > 0`,
+        ),
+    ],
+);
+
+// 外部連携の認証情報は SETTINGS_ENCRYPTION_KEY で暗号化して保存する。
+// 平文や復号結果を D1・API response・log に含めない。
+export const integrationCredentials = sqliteTable(
+    "integration_credentials",
+    {
+        provider: text("provider", { enum: ["openrouter"] })
+            .primaryKey()
+            .notNull(),
+        ciphertext: text("ciphertext").notNull(),
+        initializationVector: text("initialization_vector").notNull(),
+        encryptionVersion: integer("encryption_version").notNull().default(1),
+        createdAt: text("created_at").notNull(),
+        updatedAt: text("updated_at").notNull(),
+    },
+    (t) => [
+        check(
+            "ck_integration_credentials_provider",
+            sql`${t.provider} = 'openrouter'`,
+        ),
+        check(
+            "ck_integration_credentials_encryption_version",
+            sql`${t.encryptionVersion} = 1`,
+        ),
+        check(
+            "ck_integration_credentials_ciphertext_not_empty",
+            sql`length(${t.ciphertext}) > 0`,
+        ),
+        check(
+            "ck_integration_credentials_iv_not_empty",
+            sql`length(${t.initializationVector}) > 0`,
         ),
     ],
 );

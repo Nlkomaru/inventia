@@ -43,6 +43,7 @@ const data = {
         {
             title: "連携・設定",
             items: [
+                { title: "AI・ベクトル検索", url: "/settings/integrations" },
                 { title: "API リファレンス", url: "/api/scalar" },
                 { title: "MCP エンドポイント", url: "/settings/mcp" },
             ],

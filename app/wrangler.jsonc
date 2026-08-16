@@ -29,7 +29,10 @@
 			"migrations_dir": "migrations",
 			"remote": true
 		}
-	]
+	],
+	"secrets": {
+		"required": ["SETTINGS_ENCRYPTION_KEY"]
+	}
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

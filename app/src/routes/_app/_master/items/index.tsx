@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PagePlaceholder } from "../../-page-placeholder";
+import { ItemMasterPage } from "./-components/item-master-page";
 
 export const Route = createFileRoute("/_app/_master/items/")({
     staticData: {
@@ -9,10 +9,5 @@ export const Route = createFileRoute("/_app/_master/items/")({
 });
 
 function ItemsPage() {
-    return (
-        <PagePlaceholder
-            title="品目マスタ"
-            description="品目は在庫登録画面からD1へ登録します。"
-        />
-    );
+    return <ItemMasterPage />;
 }

@@ -4,6 +4,7 @@ import {
     type ItemListQuery,
     type ItemUpdateInput,
     itemCreateSchema,
+    itemExpiryDateSchema,
     itemListQuerySchema,
     itemUpdateSchema,
 } from "../domain/item";
@@ -57,6 +58,15 @@ const parseOrThrow = <T>(
     return result.data;
 };
 
+const isItemDeleteForeignKeyConflict = (error: unknown): boolean =>
+    /\bforeign key constraint failed\b|\bSQLITE_CONSTRAINT_FOREIGNKEY\b/i.test(
+        error instanceof Error ? error.message : String(error),
+    );
+
+const isDocumentCategory = (
+    kind: Awaited<ReturnType<typeof getCategoryKind>>,
+): boolean => kind === "document";
+
 const toDto = (row: ItemRow): ItemDto => ({
     id: row.id,
     name: row.name,
@@ -65,7 +75,7 @@ const toDto = (row: ItemRow): ItemDto => ({
     baseUnit: row.baseUnit,
     baseDimension: row.baseDimension,
     currentQuantity: row.currentQuantity,
-    expiryDate: row.expiryDate,
+    expiryDate: itemExpiryDateSchema.parse(row.expiryDate),
     lowStockThreshold: row.lowStockThreshold,
     memo: row.memo,
     createdAt: row.createdAt,
@@ -156,13 +166,6 @@ export const updateItem = async (
         throw new ItemServiceError(400, "INVALID_ID", "id must not be empty");
     }
     const parsed = parseOrThrow(itemUpdateSchema.safeParse(input));
-    if (parsed.baseUnit !== undefined || parsed.baseDimension !== undefined) {
-        throw new ItemServiceError(
-            400,
-            "IMMUTABLE_UNIT",
-            "baseUnit and baseDimension cannot be updated",
-        );
-    }
     const existing = await getItemRecord(db, id);
     if (!existing) {
         throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
@@ -181,6 +184,22 @@ export const updateItem = async (
             "location was not found",
         );
     }
+    if (parsed.categoryId && parsed.categoryId !== existing.categoryId) {
+        const [currentCategoryKind, nextCategoryKind] = await Promise.all([
+            getCategoryKind(db, existing.categoryId),
+            getCategoryKind(db, parsed.categoryId),
+        ]);
+        if (
+            isDocumentCategory(currentCategoryKind) !==
+            isDocumentCategory(nextCategoryKind)
+        ) {
+            throw new ItemServiceError(
+                409,
+                "ITEM_CATEGORY_KIND_CONFLICT",
+                "item category cannot cross the document and non-document boundary",
+            );
+        }
+    }
     const row = await updateItemRecord(db, id, parsed);
     if (!row) {
         throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
@@ -192,8 +211,23 @@ export const deleteItem = async (db: D1Database, id: string): Promise<void> => {
     if (id.trim().length === 0) {
         throw new ItemServiceError(400, "INVALID_ID", "id must not be empty");
     }
-    if (!(await deleteItemRecord(db, id))) {
-        throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
+    try {
+        if (!(await deleteItemRecord(db, id))) {
+            throw new ItemServiceError(
+                404,
+                "ITEM_NOT_FOUND",
+                "item was not found",
+            );
+        }
+    } catch (error) {
+        if (isItemDeleteForeignKeyConflict(error)) {
+            throw new ItemServiceError(
+                409,
+                "ITEM_DELETE_CONFLICT",
+                "item cannot be deleted because it has stock history",
+            );
+        }
+        throw error;
     }
 };
 

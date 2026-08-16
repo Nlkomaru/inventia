@@ -82,4 +82,8 @@ jobs:
           apiToken: ${{ env.CLOUDFLARE_API_KEY }}
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+          secrets: |
+            SETTINGS_ENCRYPTION_KEY
           workingDirectory: app
+        env:
+          SETTINGS_ENCRYPTION_KEY: ${{ secrets.SETTINGS_ENCRYPTION_KEY }}
