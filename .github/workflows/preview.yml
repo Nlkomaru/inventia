@@ -85,14 +85,25 @@ jobs:
       - name: Build app
         run: pnpm --filter ./app run build
 
+      - name: Prepare Worker secrets
+        env:
+          SETTINGS_ENCRYPTION_KEY: ${{ secrets.SETTINGS_ENCRYPTION_KEY }}
+        run: |
+          umask 077
+          printf 'SETTINGS_ENCRYPTION_KEY=%s\n' "$SETTINGS_ENCRYPTION_KEY" > app/.secrets.ci
+
       - name: Deploy app preview
         id: deploy-preview
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ env.CLOUDFLARE_API_KEY }}
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
-          command: versions upload --message "Deployed preview by GitHub Actions branch ${{ github.ref_name }}"
+          command: versions upload --secrets-file .secrets.ci --message "Deployed preview by GitHub Actions branch ${{ github.ref_name }}"
           workingDirectory: app
+
+      - name: Remove Worker secrets file
+        if: always()
+        run: rm -f app/.secrets.ci
 
       - name: Resolve app preview URL
         id: resolve-app-preview-url

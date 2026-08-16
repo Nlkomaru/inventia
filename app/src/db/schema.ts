@@ -326,3 +326,37 @@ export const priceRecords = sqliteTable(
         ),
     ],
 );
+
+// 外部連携の認証情報は SETTINGS_ENCRYPTION_KEY で暗号化して保存する。
+// 平文や復号結果を D1・API response・log に含めない。
+export const integrationCredentials = sqliteTable(
+    "integration_credentials",
+    {
+        provider: text("provider", { enum: ["openrouter"] })
+            .primaryKey()
+            .notNull(),
+        ciphertext: text("ciphertext").notNull(),
+        initializationVector: text("initialization_vector").notNull(),
+        encryptionVersion: integer("encryption_version").notNull().default(1),
+        createdAt: text("created_at").notNull(),
+        updatedAt: text("updated_at").notNull(),
+    },
+    (t) => [
+        check(
+            "ck_integration_credentials_provider",
+            sql`${t.provider} = 'openrouter'`,
+        ),
+        check(
+            "ck_integration_credentials_encryption_version",
+            sql`${t.encryptionVersion} = 1`,
+        ),
+        check(
+            "ck_integration_credentials_ciphertext_not_empty",
+            sql`length(${t.ciphertext}) > 0`,
+        ),
+        check(
+            "ck_integration_credentials_iv_not_empty",
+            sql`length(${t.initializationVector}) > 0`,
+        ),
+    ],
+);

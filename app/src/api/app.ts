@@ -3,6 +3,7 @@ import { Scalar } from "@scalar/hono-api-reference";
 import type { ApiBindings } from "./bindings";
 import { categoriesApp } from "./http/categories";
 import { healthApp } from "./http/health";
+import { integrationsApp } from "./http/integrations";
 import { itemsApp } from "./http/items";
 import { locationsApp } from "./http/locations";
 import { pricesApp } from "./http/prices";
@@ -18,6 +19,7 @@ apiApp.route("/api/items", itemsApp);
 apiApp.route("/api/items", pricesApp);
 apiApp.route("/api/items", stockItemsApp);
 apiApp.route("/api/inventory", stockInventoryApp);
+apiApp.route("/api/settings/integrations", integrationsApp);
 
 apiApp.doc31("/api/openapi", {
     openapi: "3.1.0",

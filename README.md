@@ -39,6 +39,7 @@ TanStack Start forwards `/api/*` to the Hono app in `app/src/api/app.ts`.
 | `/api/openapi` | OpenAPI 3.1 document |
 | `/api/scalar` | Scalar API reference |
 | `/api/mcp` | Stateless MCP Streamable HTTP endpoint |
+| `/api/settings/integrations/openrouter` | OpenRouter integration status and encrypted API key configuration |
 
 The MCP server exposes these tools through the same services as the HTTP API:
 
@@ -67,6 +68,17 @@ pnpm --filter inventia deploy
 Store production secrets with
 `pnpm --filter inventia exec wrangler secret put <NAME>`; keep non-secret
 variables and bindings in `app/wrangler.jsonc`.
+
+The OpenRouter settings page stores its API key encrypted in D1. Production
+deployments sync the repository Actions secret `SETTINGS_ENCRYPTION_KEY` to the
+Worker through `cloudflare/wrangler-action`. For local development, set a
+32-byte base64 value in the same variable in an untracked `app/.dev.vars` file.
+Never commit either value. Keep this encryption key stable; after rotating it,
+save the OpenRouter API key again from the settings page.
+
+The settings API changes a shared application-wide credential. Keep the Worker
+and `/api/settings/integrations/*` behind the existing Cloudflare Access
+application.
 
 Local development normally uses the remote D1 database configured in
 `app/wrangler.jsonc`, which requires Wrangler account authentication. In a
