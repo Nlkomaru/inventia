@@ -99,7 +99,6 @@ jobs:
           apiToken: ${{ env.CLOUDFLARE_API_KEY }}
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           command: versions upload --secrets-file .secrets.ci --message "Deployed preview by GitHub Actions branch ${{ github.ref_name }}"
-          preCommands: wrangler d1 migrations apply inventia --remote
           workingDirectory: app
 
       - name: Remove Worker secrets file
