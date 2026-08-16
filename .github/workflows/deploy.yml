@@ -82,6 +82,16 @@ jobs:
           apiToken: ${{ env.CLOUDFLARE_API_KEY }}
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+          workingDirectory: app
+
+      # Worker Versionsでは未deployの最新versionがあると通常のsecret更新が拒否される。
+      # 先にcodeをdeployし、そのversionに対してsecretを別stepで同期する。
+      - name: Upload Worker secrets
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_KEY }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: whoami
           secrets: |
             SETTINGS_ENCRYPTION_KEY
           workingDirectory: app
