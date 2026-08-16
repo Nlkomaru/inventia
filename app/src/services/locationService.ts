@@ -138,10 +138,10 @@ export const listLocations = async (
 ): Promise<LocationListResponse> => {
     const query = parseListInput(input);
     const cursor = query.cursor ? decodeLocationCursor(query.cursor) : null;
-    if (query.cursor && !cursor) {
+    if (query.cursor && (!cursor || cursor.parentId !== query.parentId)) {
         throw new LocationServiceError(
             "LOCATION_INVALID_CURSOR",
-            "cursorが不正です。最後に取得したcursorを使用してください",
+            "cursorが不正です。同じ親場所の一覧で取得したcursorを使用してください",
         );
     }
     const page = await listLocationRows(db, {
@@ -155,6 +155,7 @@ export const listLocations = async (
         nextCursor:
             page.hasMore && page.rows.length > 0
                 ? encodeLocationCursor({
+                      parentId: query.parentId,
                       sortOrder: page.rows[page.rows.length - 1].sortOrder,
                       id: page.rows[page.rows.length - 1].id,
                   })

@@ -1,16 +1,23 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 import type { ApiBindings } from "./bindings";
+import { categoriesApp } from "./http/categories";
 import { healthApp } from "./http/health";
 import { itemsApp } from "./http/items";
 import { locationsApp } from "./http/locations";
+import { pricesApp } from "./http/prices";
+import { stockInventoryApp, stockItemsApp } from "./http/stock";
 import { handleMcpRequest } from "./mcp/handler";
 
 export const apiApp = new OpenAPIHono<ApiBindings>();
 
 apiApp.route("/api/health", healthApp);
+apiApp.route("/api/categories", categoriesApp);
 apiApp.route("/api/locations", locationsApp);
 apiApp.route("/api/items", itemsApp);
+apiApp.route("/api/items", pricesApp);
+apiApp.route("/api/items", stockItemsApp);
+apiApp.route("/api/inventory", stockInventoryApp);
 
 apiApp.doc31("/api/openapi", {
     openapi: "3.1.0",

@@ -2,6 +2,15 @@ import { z } from "zod";
 
 export const itemBaseDimensionSchema = z.enum(["mass", "volume", "count"]);
 
+const isoDateTimeSchema = z.iso.datetime({ offset: true });
+
+const normalizeUtcDateTime = (value: string): string =>
+    new Date(value).toISOString();
+
+export const itemExpiryDateSchema = isoDateTimeSchema
+    .transform(normalizeUtcDateTime)
+    .nullable();
+
 export const itemDtoSchema = z.object({
     id: z.string().min(1),
     name: z.string(),
@@ -10,14 +19,12 @@ export const itemDtoSchema = z.object({
     baseUnit: z.string(),
     baseDimension: itemBaseDimensionSchema,
     currentQuantity: z.int().min(0),
-    expiryDate: z.string().datetime().nullable(),
+    expiryDate: itemExpiryDateSchema,
     lowStockThreshold: z.int().min(0).nullable(),
     memo: z.string().nullable(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
 });
-
-const isoDateTimeSchema = z.iso.datetime({ offset: true });
 
 const itemFields = {
     name: z.string().trim().min(1).max(200),
@@ -26,7 +33,7 @@ const itemFields = {
     baseUnit: z.string().trim().min(1).max(50),
     baseDimension: itemBaseDimensionSchema,
     currentQuantity: z.int().min(0),
-    expiryDate: isoDateTimeSchema.nullable(),
+    expiryDate: itemExpiryDateSchema,
     lowStockThreshold: z.int().min(0).nullable(),
     memo: z.string().max(2000).nullable(),
 };
@@ -59,10 +66,6 @@ export const itemUpdateSchema = z
         name: itemFields.name.optional(),
         categoryId: itemFields.categoryId.optional(),
         locationId: itemFields.locationId.optional(),
-        // Base unit and current quantity are immutable through item CRUD.
-        // Stock changes must go through the stock-adjustment service.
-        baseUnit: itemFields.baseUnit.optional(),
-        baseDimension: itemFields.baseDimension.optional(),
         expiryDate: itemFields.expiryDate.optional(),
         lowStockThreshold: itemFields.lowStockThreshold.optional(),
         memo: itemFields.memo.optional(),

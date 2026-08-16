@@ -242,7 +242,7 @@ export const createItem = async (
 export const updateItem = async (
     db: D1Database,
     id: string,
-    input: Omit<ItemUpdateInput, "baseUnit" | "baseDimension">,
+    input: ItemUpdateInput,
 ): Promise<ItemRow | null> => {
     const assignments: string[] = [];
     const bindings: unknown[] = [];

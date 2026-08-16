@@ -42,10 +42,13 @@ export const locationListInputSchema = z.object({
     cursor: z.string().trim().min(1).max(512).optional(),
 });
 
-export const locationCursorSchema = z.object({
-    sortOrder: locationSortOrderSchema,
-    id: locationIdSchema,
-});
+export const locationCursorSchema = z
+    .object({
+        parentId: locationIdSchema.nullable(),
+        sortOrder: locationSortOrderSchema,
+        id: locationIdSchema,
+    })
+    .strict();
 
 export const locationDtoSchema = z
     .object({
