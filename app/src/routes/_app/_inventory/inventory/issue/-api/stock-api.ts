@@ -2,9 +2,10 @@ import { z } from "zod";
 import { type ItemDto, itemDtoSchema } from "@/domain/item";
 import { type ItemLotDto, itemLotListDtoSchema } from "@/domain/lot";
 import {
+    type StockMovementReason,
     type StockOperationResult,
+    stockAdjustmentSchema,
     stockOperationResultSchema,
-    stocktakeSchema,
 } from "@/domain/stock";
 
 const itemListOutputSchema = z.object({
@@ -57,7 +58,7 @@ export const listItems = async (): Promise<ItemDto[]> => {
     return items;
 };
 
-/** 棚卸しの初期値は数量 > 0 のロットから作るため、既定の一覧を FEFO 順で取得する。 */
+/** 出庫候補は数量 > 0 のロットだけなので、既定の一覧（数量 0 を除く）を FEFO 順で取得する。 */
 export const listItemLots = async (itemId: string): Promise<ItemLotDto[]> => {
     const result = await request(
         `/api/items/${encodeURIComponent(itemId)}/lots`,
@@ -67,24 +68,28 @@ export const listItemLots = async (itemId: string): Promise<ItemLotDto[]> => {
     return result.lots;
 };
 
-export interface StocktakeRequestInput {
-    // 棚卸し後の全数状態。ここに現れない既存ロットは 0 になる
-    lots: { expiryDate: string | null; quantity: number }[];
+export interface IssueStockInput {
+    quantity: number;
+    // 未指定なら API が FEFO で自動配分する
+    lotId: string | null;
+    reason: StockMovementReason;
     idempotencyKey: string;
 }
 
-export const recordStocktake = (
+export const issueStock = (
     itemId: string,
-    input: StocktakeRequestInput,
+    input: IssueStockInput,
 ): Promise<StockOperationResult> => {
-    const body = stocktakeSchema.parse({
-        lots: input.lots,
+    const body = stockAdjustmentSchema.parse({
+        delta: -input.quantity,
+        reason: input.reason,
+        ...(input.lotId === null ? {} : { lotId: input.lotId }),
         idempotencyKey: input.idempotencyKey,
     });
     return request(
-        `/api/items/${encodeURIComponent(itemId)}/stocktake`,
+        `/api/items/${encodeURIComponent(itemId)}/adjustments`,
         stockOperationResultSchema,
-        "棚卸しを記録できませんでした",
+        "出庫を記録できませんでした",
         {
             method: "POST",
             headers: { "content-type": "application/json" },

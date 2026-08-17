@@ -36,6 +36,13 @@
       "when": 1786885785346,
       "tag": "0004_bright_ken_ellis",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1786973695396,
+      "tag": "0005_expiry_lots",
+      "breakpoints": true
     }
   ]
 }
