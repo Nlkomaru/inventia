@@ -5,6 +5,7 @@ import { z } from "zod";
 // nullable にする（構造化出力では全フィールド必須のプロバイダーがあるため）。
 // 金額は円の整数、日時はレシート表記のままのタイムゾーンなし ISO 8601 とし、
 // UTC への変換・商品照合・基準単位への正規化は service 層で行う。
+// 期限関連フィールドは #13 のレシート取込パイプライン向けの契約であり、現時点で呼び出し元はない。
 
 export const receiptOcrLineSchema = z.object({
     name: z
@@ -20,6 +21,36 @@ export const receiptOcrLineSchema = z.object({
         .nullable()
         .describe(
             "その行の金額（円、整数、数量分の小計）。読み取れない場合は null",
+        ),
+    printedExpiryDate: z.iso
+        .date()
+        .nullable()
+        .describe(
+            "レシートに消費期限・賞味期限が印字されている稀なケースでのその値（タイムゾーンなしの ISO 8601 日付、例: 2026-04-15）。印字を読み取れた場合だけ設定し、推測値をここへ入れない。印字がなければ null",
+        ),
+    estimatedExpiryDate: z.iso
+        .date()
+        .nullable()
+        .describe(
+            "印字がない場合に購入日と商品種別（生鮮 / 冷蔵 / 冷凍 / 常温加工品 / 非食品）から推測した期限（タイムゾーンなしの ISO 8601 日付）。印字がある場合は null。非食品や期限の概念がない品も null。推測値は確認画面でユーザーが必ず修正・削除できる前提の参考値であり、商品種別を絞れず推測できない場合は必ず null とし、値を捏造しない",
+        ),
+    expirySource: z
+        .enum(["printed", "estimated", "unknown"])
+        .describe(
+            "期限の由来。印字を読み取れた場合は printed、推測した場合は estimated、どちらもできない場合は unknown。unknown のときは printedExpiryDate と estimatedExpiryDate の両方を null にする",
+        ),
+    expiryConfidence: z
+        .enum(["high", "medium", "low"])
+        .nullable()
+        .describe(
+            "推測の確度。商品種別が明確で一般的な保存期間が定まるなら high、種別の推定に幅があるなら medium、商品名から種別をほとんど絞れないなら low。expirySource が printed または unknown のときは推測がないため null",
+        ),
+    expiryEstimateReason: z
+        .string()
+        .min(1)
+        .nullable()
+        .describe(
+            "推測根拠の短い日本語（例: 「常温の小麦粉は購入から約 12 か月」）。expirySource が estimated のときだけ設定し、それ以外は null",
         ),
 });
 
