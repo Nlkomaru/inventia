@@ -66,14 +66,19 @@ locationsApp.openAPIRegistry.registerPath({
     tags: ["Locations"],
     summary: "List storage locations",
     description:
-        "Lists one level of the storage tree with stable cursor pagination.",
+        "Lists one level of the storage tree with stable cursor pagination, ordered by sortOrder then id. parentId selects the level and defaults to the roots. q filters that level by name with a case-insensitive partial match; % and _ in q are matched literally, and the filter never reaches into other levels. A cursor is only valid for the parentId and q it was made with.",
     request: { query: locationListInputSchema },
     responses: {
         200: {
             description: "A stable page of storage locations.",
             content: responseContent(locationListOutputSchema),
         },
-        ...errorResponses,
+        400: {
+            description:
+                "The request is invalid; correct the reported input. Codes: LOCATION_INVALID_INPUT, LOCATION_INVALID_CURSOR (the cursor was made for a different parentId or q; restart from the first page).",
+            content: responseContent(locationErrorSchema),
+        },
+        500: errorResponses[500],
     },
 });
 locationsApp.openAPIRegistry.registerPath({

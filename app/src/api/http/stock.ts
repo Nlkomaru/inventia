@@ -1,6 +1,8 @@
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import {
+    staleStocktakeListDtoSchema,
+    staleStocktakeQuerySchema,
     stockAdjustmentSchema,
     stockHistoryQuerySchema,
     stockHistoryResultSchema,
@@ -9,6 +11,7 @@ import {
 } from "../../domain/stock";
 import {
     adjustStock,
+    listStaleStocktakeItems,
     listStockHistory,
     StockServiceError,
     stocktake,
@@ -43,6 +46,15 @@ const itemIdParameter = z
 
 const stockHistoryItemQuerySchema = stockHistoryQuerySchema.omit({
     itemId: true,
+});
+
+// 文字列を数値へ変換する query は入力型が unknown になり、生成される OpenAPI では
+// 省略可能に見える。実装は staleAfterDays を必須で検証するため、文書側で明示する
+const staleStocktakeQueryDocSchema = staleStocktakeQuerySchema.extend({
+    staleAfterDays: staleStocktakeQuerySchema.shape.staleAfterDays.openapi({
+        param: { name: "staleAfterDays", in: "query", required: true },
+        example: 90,
+    }),
 });
 
 const responseContent = (schema: z.ZodType) => ({
@@ -184,6 +196,28 @@ stockInventoryApp.openAPIRegistry.registerPath({
     },
 });
 
+stockInventoryApp.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/stale-stocktake",
+    tags: ["Inventory"],
+    summary: "List items whose stocktake is stale",
+    operationId: "listStaleStocktakeItems",
+    description:
+        "Lists items that have not been counted recently, so they can be scheduled for a stocktake. This endpoint only reads data and changes no stock. An item qualifies when its most recent stocktake happened strictly earlier than staleAfterDays before now, or when the item has never been counted at all; lastStocktakeAt is that timestamp and is null for an item that was never counted. A stocktake that confirmed the recorded quantity counts as a count even though it records no stock movement. staleAfterDays=0 therefore returns every item whose last count is in the past plus every item that was never counted. Creating an item with an initial quantity records a stocktake movement, so a newly created item counts as just stocktaken. Results are ordered never-counted first, then by lastStocktakeAt ascending and id ascending, and are paged with a cursor that is only valid for the same staleAfterDays.",
+    request: { query: staleStocktakeQueryDocSchema },
+    responses: {
+        200: {
+            description:
+                "A stable page of items whose last stocktake is older than the requested age.",
+            content: responseContent(staleStocktakeListDtoSchema),
+        },
+        400: jsonError(
+            "The request is invalid; correct the reported input. Codes: VALIDATION_ERROR, INVALID_CURSOR (the cursor was made for a different staleAfterDays; restart from the first page).",
+        ),
+        ...serverErrorResponses,
+    },
+});
+
 const errorResponse = (c: StockContext, error: unknown): Response => {
     if (error instanceof StockServiceError) {
         return c.json(
@@ -266,6 +300,17 @@ stockItemsApp.get("/:itemId/history", async (c) => {
 stockInventoryApp.get("/history", async (c) => {
     try {
         return c.json(await listStockHistory(c.env.DB, c.req.query()), 200);
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+stockInventoryApp.get("/stale-stocktake", async (c) => {
+    try {
+        return c.json(
+            await listStaleStocktakeItems(c.env.DB, c.req.query()),
+            200,
+        );
     } catch (error) {
         return errorResponse(c, error);
     }

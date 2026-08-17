@@ -8,23 +8,29 @@ import {
     resolveTotalStocktakeTarget,
 } from "../domain/lot";
 import {
+    type StaleStocktakeListDto,
+    type StaleStocktakeQuery,
     type StockAdjustmentInput,
     type StockHistoryQuery,
     type StockLotSelector,
     type StockMovementDto,
     type StockOperationResult,
     type StocktakeInput,
+    staleStocktakeQuerySchema,
+    staleStocktakeThreshold,
     stockAdjustmentSchema,
     stockHistoryQuerySchema,
     stockRequestDigest,
     stocktakeSchema,
 } from "../domain/stock";
 import { type ItemLotRow, listItemLots } from "../repositories/lotRepository";
+import { listReadingStatesByItemIds } from "../repositories/readingRepository";
 import {
     appendStockOperation,
     InvalidStockCursorError,
     itemExists,
     type LotPlanEntry,
+    listStaleStocktakeItems as listStaleStocktakeRows,
     listStockMovements,
     type StockHistoryResult as RepositoryHistoryResult,
     replayStockOperation,
@@ -37,6 +43,7 @@ import {
     type StockOperationIdentity,
     type StockWriteResult,
 } from "../repositories/stockRepository";
+import { toItemDto } from "./itemService";
 
 export class StockServiceError extends Error {
     readonly status: 400 | 404 | 409;
@@ -470,6 +477,41 @@ const toHistoryResult = (
     ),
     nextCursor: result.nextCursor,
 });
+
+/**
+ * 最後の棚卸しから `staleAfterDays` 日より長く棚卸ししていない品目を返す。
+ * 一度も棚卸ししていない品目を先頭にし、最終棚卸しの古い順で安定させる。
+ * 判定に使うのは `reason = 'stocktake'` の movement だけで、在庫は変更しない。
+ */
+export const listStaleStocktakeItems = async (
+    db: D1Database,
+    input: unknown,
+): Promise<StaleStocktakeListDto> => {
+    const parsed: StaleStocktakeQuery = parseOrThrow(
+        staleStocktakeQuerySchema.safeParse(input),
+    );
+    try {
+        const page = await listStaleStocktakeRows(
+            db,
+            parsed,
+            staleStocktakeThreshold(parsed.staleAfterDays),
+        );
+        // 読書状態はページに並んだ品目 id の IN 句 1 回で解決する（N+1 禁止）
+        const readingStates = await listReadingStatesByItemIds(
+            db,
+            page.rows.map((row) => row.id),
+        );
+        return {
+            items: page.rows.map((row) => ({
+                ...toItemDto(row, readingStates.get(row.id)?.status ?? null),
+                lastStocktakeAt: row.lastStocktakeAt,
+            })),
+            nextCursor: page.nextCursor,
+        };
+    } catch (error) {
+        return mapRepositoryError(error);
+    }
+};
 
 export const listStockHistory = async (
     db: D1Database,

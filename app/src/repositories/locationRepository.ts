@@ -15,6 +15,8 @@ export interface LocationRecord {
 
 export interface LocationListQuery {
     parentId: LocationId | null;
+    /** 名前の部分一致で絞る検索語。絞り込まない場合は null。 */
+    q: string | null;
     limit: number;
     cursor: LocationCursor | null;
 }
@@ -52,6 +54,14 @@ const locationSelect = `
 		updated_at AS updatedAt
 	FROM storage_locations`;
 
+// LIKE のワイルドカードとエスケープ文字自体を無効化し、検索語を literal として扱う
+// （品目名検索と同じ規則）
+const escapeLike = (value: string): string =>
+    value
+        .replaceAll("\\", "\\\\")
+        .replaceAll("%", "\\%")
+        .replaceAll("_", "\\_");
+
 const toLocationRecord = (row: LocationSelectRow): LocationRecord => ({
     id: row.id,
     name: row.name,
@@ -74,13 +84,15 @@ export const listLocations = async (
 					OR sort_order > ?2
 					OR (sort_order = ?2 AND id > ?3)
 				)
+				AND (?4 IS NULL OR name LIKE ?4 ESCAPE char(92) COLLATE NOCASE)
 			ORDER BY sort_order ASC, id ASC
-			LIMIT ?4`,
+			LIMIT ?5`,
         )
         .bind(
             query.parentId,
             query.cursor?.sortOrder ?? null,
             query.cursor?.id ?? null,
+            query.q === null ? null : `%${escapeLike(query.q)}%`,
             query.limit + 1,
         );
     const result = await statement.all<LocationSelectRow>();

@@ -1,11 +1,13 @@
 import { newId } from "../domain/id";
 import {
+    type StaleStocktakeQuery,
     type StockHistoryQuery,
     type StockMovementReason,
     type StockOperationKind,
     stockMovementReasons,
     stockOccurredAtSchema,
 } from "../domain/stock";
+import { type ItemRow, itemColumns } from "./itemRepository";
 
 export interface StockMovementRow {
     id: string;
@@ -162,19 +164,23 @@ const isCursorItemId = (value: unknown): value is string | null =>
 const isCursorReason = (value: unknown): value is StockMovementReason | null =>
     value === null || isStockMovementReason(value);
 
-const encodeCursor = (cursor: Cursor): string =>
-    btoa(encodeURIComponent(JSON.stringify(cursor)))
+const encodeCursorPayload = (payload: unknown): string =>
+    btoa(encodeURIComponent(JSON.stringify(payload)))
         .replaceAll("+", "-")
         .replaceAll("/", "_")
         .replaceAll("=", "");
 
+const parseCursorPayload = (value: string): unknown => {
+    const unpadded = value.replaceAll("-", "+").replaceAll("_", "/");
+    const padding = "=".repeat((4 - (unpadded.length % 4)) % 4);
+    return JSON.parse(decodeURIComponent(atob(`${unpadded}${padding}`)));
+};
+
+const encodeCursor = (cursor: Cursor): string => encodeCursorPayload(cursor);
+
 const decodeCursor = (value: string): Cursor => {
     try {
-        const unpadded = value.replaceAll("-", "+").replaceAll("_", "/");
-        const padding = "=".repeat((4 - (unpadded.length % 4)) % 4);
-        const parsed: unknown = JSON.parse(
-            decodeURIComponent(atob(`${unpadded}${padding}`)),
-        );
+        const parsed: unknown = parseCursorPayload(value);
         if (typeof parsed !== "object" || parsed === null) {
             throw new Error("invalid cursor");
         }
@@ -646,6 +652,145 @@ export const appendStockOperation = async (
         movement,
         allocations: await getMovementAllocations(db, operation.movementId),
         replayed: false,
+    };
+};
+
+export interface StaleStocktakeRow extends ItemRow {
+    // 最後の棚卸し movement の occurred_at。一度も棚卸ししていない品目は null
+    lastStocktakeAt: string | null;
+}
+
+export interface StaleStocktakeResult {
+    rows: StaleStocktakeRow[];
+    nextCursor: string | null;
+}
+
+type StaleCursor = {
+    lastStocktakeAt: string | null;
+    id: string;
+    staleAfterDays: number;
+};
+
+const isStaleCursorTimestamp = (value: unknown): value is string | null =>
+    value === null || stockOccurredAtSchema.safeParse(value).success;
+
+const decodeStaleCursor = (value: string): StaleCursor => {
+    try {
+        const parsed: unknown = parseCursorPayload(value);
+        if (typeof parsed !== "object" || parsed === null) {
+            throw new Error("invalid cursor");
+        }
+        const candidate = parsed as {
+            lastStocktakeAt?: unknown;
+            id?: unknown;
+            staleAfterDays?: unknown;
+        };
+        if (
+            !isStaleCursorTimestamp(candidate.lastStocktakeAt) ||
+            typeof candidate.id !== "string" ||
+            candidate.id.length === 0 ||
+            typeof candidate.staleAfterDays !== "number" ||
+            !Number.isInteger(candidate.staleAfterDays)
+        ) {
+            throw new Error("invalid cursor");
+        }
+        return {
+            lastStocktakeAt: candidate.lastStocktakeAt,
+            id: candidate.id,
+            staleAfterDays: candidate.staleAfterDays,
+        };
+    } catch {
+        throw new InvalidStockCursorError();
+    }
+};
+
+/**
+ * 最終棚卸しが `threshold` より前の品目と、一度も棚卸ししていない品目を返す。
+ * 棚卸し履歴の集約はサブクエリ 1 つに閉じ、items との LEFT JOIN で 1 クエリにする。
+ *
+ * 並び順は「未棚卸し → 最終棚卸し昇順 → id 昇順」で一意に定まり、cursor はこの
+ * キーで進める。ページ間で threshold が進んでも、新たに該当する品目の
+ * `lastStocktakeAt` は必ず前ページの cursor キーより後ろに並ぶため、
+ * 取りこぼしも重複も起きない。
+ */
+export const listStaleStocktakeItems = async (
+    db: D1Database,
+    query: StaleStocktakeQuery,
+    threshold: string,
+): Promise<StaleStocktakeResult> => {
+    const where: string[] = [
+        "(stocktakes.lastStocktakeAt IS NULL OR stocktakes.lastStocktakeAt < ?)",
+    ];
+    const bindings: unknown[] = [threshold];
+    if (query.cursor) {
+        const cursor = decodeStaleCursor(query.cursor);
+        // 判定日数が違う cursor は別の一覧の続きになるため拒否する
+        if (cursor.staleAfterDays !== query.staleAfterDays) {
+            throw new InvalidStockCursorError();
+        }
+        if (cursor.lastStocktakeAt === null) {
+            // 未棚卸しの途中。残りの未棚卸しと、その後ろに並ぶ棚卸し済みが続く
+            where.push(
+                `((stocktakes.lastStocktakeAt IS NULL AND items.id > ?)
+                     OR stocktakes.lastStocktakeAt IS NOT NULL)`,
+            );
+            bindings.push(cursor.id);
+        } else {
+            where.push(
+                `(stocktakes.lastStocktakeAt IS NOT NULL
+                     AND (stocktakes.lastStocktakeAt > ?
+                          OR (stocktakes.lastStocktakeAt = ? AND items.id > ?)))`,
+            );
+            bindings.push(
+                cursor.lastStocktakeAt,
+                cursor.lastStocktakeAt,
+                cursor.id,
+            );
+        }
+    }
+    const result = await db
+        .prepare(
+            `SELECT ${itemColumns},
+                    stocktakes.lastStocktakeAt AS lastStocktakeAt
+             FROM items
+             LEFT JOIN (
+                 -- 数量が合っていた棚卸しは movement を作らないため operation 側にしか残らず、
+                 -- 商品作成時の初期在庫は operation を伴わない movement として残る。
+                 -- どちらも「棚卸しした」事実なので両方から最新時刻を取る
+                 SELECT item_id, MAX(occurred_at) AS lastStocktakeAt
+                 FROM (
+                     SELECT item_id, occurred_at
+                     FROM stock_movements
+                     WHERE reason = 'stocktake'
+                     UNION ALL
+                     SELECT item_id, occurred_at
+                     FROM stock_operations
+                     WHERE kind = 'stocktake'
+                 )
+                 GROUP BY item_id
+             ) AS stocktakes ON stocktakes.item_id = items.id
+             WHERE ${where.join(" AND ")}
+             ORDER BY (stocktakes.lastStocktakeAt IS NOT NULL) ASC,
+                      stocktakes.lastStocktakeAt ASC,
+                      items.id ASC
+             LIMIT ?`,
+        )
+        .bind(...bindings, query.limit + 1)
+        .all<StaleStocktakeRow>();
+    const rows = result.results;
+    const hasMore = rows.length > query.limit;
+    const items = hasMore ? rows.slice(0, query.limit) : rows;
+    const last = items.at(-1);
+    return {
+        rows: items,
+        nextCursor:
+            hasMore && last
+                ? encodeCursorPayload({
+                      lastStocktakeAt: last.lastStocktakeAt,
+                      id: last.id,
+                      staleAfterDays: query.staleAfterDays,
+                  } satisfies StaleCursor)
+                : null,
     };
 };
 

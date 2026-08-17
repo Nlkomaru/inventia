@@ -31,7 +31,7 @@ export const registerLocationTools = (
         {
             title: "List storage locations",
             description:
-                "List one level of the storage location tree. Use parentId null for root locations and nextCursor to continue pagination.",
+                "List one level of the storage location tree, ordered by sortOrder then by id. parentId selects the level and null lists the root locations. q filters that level by name with a case-insensitive partial match, where % and _ in q are matched literally rather than as wildcards, and the filter never reaches into other levels. Results return at most limit locations (default 50, maximum 100), and pass nextCursor back as cursor to continue; a cursor is only valid for the parentId and q it was made with, and reusing it with a different parentId or q is rejected as an invalid cursor.",
             inputSchema: locationListInputSchema,
             outputSchema: locationListOutputSchema,
         },
