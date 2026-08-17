@@ -34,6 +34,34 @@ const toCredentialRecord = (
     };
 };
 
+export interface IntegrationSettingsRecord {
+    provider: typeof openRouterProvider;
+    chatModel: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+interface IntegrationSettingsRow {
+    provider: string;
+    chatModel: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+const toSettingsRecord = (
+    row: IntegrationSettingsRow,
+): IntegrationSettingsRecord | null => {
+    if (row.provider !== openRouterProvider || row.chatModel.length === 0) {
+        return null;
+    }
+    return {
+        provider: openRouterProvider,
+        chatModel: row.chatModel,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+    };
+};
+
 export const getOpenRouterCredential = async (
     db: D1Database,
 ): Promise<IntegrationCredentialRecord | null> => {
@@ -83,6 +111,50 @@ export const upsertOpenRouterCredential = async (
             credential.initializationVector,
             credential.createdAt,
             credential.updatedAt,
+        )
+        .run();
+};
+
+// 認証情報とは別テーブル。API key 未設定でもモデル選択だけ保存できる。
+export const getOpenRouterSettings = async (
+    db: D1Database,
+): Promise<IntegrationSettingsRecord | null> => {
+    const row = await db
+        .prepare(
+            `SELECT
+                provider,
+                chat_model AS chatModel,
+                created_at AS createdAt,
+                updated_at AS updatedAt
+            FROM integration_settings
+            WHERE provider = ?1`,
+        )
+        .bind(openRouterProvider)
+        .first<IntegrationSettingsRow>();
+    return row ? toSettingsRecord(row) : null;
+};
+
+export const upsertOpenRouterSettings = async (
+    db: D1Database,
+    settings: Omit<IntegrationSettingsRecord, "provider">,
+): Promise<void> => {
+    await db
+        .prepare(
+            `INSERT INTO integration_settings (
+                provider,
+                chat_model,
+                created_at,
+                updated_at
+            ) VALUES (?1, ?2, ?3, ?4)
+            ON CONFLICT(provider) DO UPDATE SET
+                chat_model = excluded.chat_model,
+                updated_at = excluded.updated_at`,
+        )
+        .bind(
+            openRouterProvider,
+            settings.chatModel,
+            settings.createdAt,
+            settings.updatedAt,
         )
         .run();
 };
