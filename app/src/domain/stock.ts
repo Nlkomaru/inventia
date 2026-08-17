@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { itemDtoSchema } from "./item";
 import {
     itemLotDtoSchema,
     type LotStocktakeEntry,
@@ -132,6 +133,39 @@ export const stockHistoryResultSchema = z
     })
     .strict();
 
+export const staleStocktakeQuerySchema = z
+    .object({
+        // 最後の棚卸しからの経過日数のしきい値。0 は「今より前に棚卸しした品目すべて」を意味する
+        staleAfterDays: z.coerce.number().int().min(0).max(3650),
+        limit: z.coerce.number().int().min(1).max(100).default(50),
+        cursor: z.string().min(1).optional(),
+    })
+    .strict();
+
+// 棚卸しの movement が 1 件も無い品目は lastStocktakeAt = null になる
+export const staleStocktakeItemDtoSchema = itemDtoSchema.extend({
+    lastStocktakeAt: z.string().datetime().nullable(),
+});
+
+export const staleStocktakeListDtoSchema = z
+    .object({
+        items: z.array(staleStocktakeItemDtoSchema),
+        nextCursor: z.string().nullable(),
+    })
+    .strict();
+
+const dayInMilliseconds = 24 * 60 * 60 * 1000;
+
+/**
+ * 棚卸しが古いと判定する境界時刻。この時刻より前の最終棚卸しだけを古いとみなす
+ * （境界と同時刻の棚卸しは古くない）。
+ */
+export const staleStocktakeThreshold = (
+    staleAfterDays: number,
+    now: Date = new Date(),
+): string =>
+    new Date(now.getTime() - staleAfterDays * dayInMilliseconds).toISOString();
+
 /** 在庫操作が対象とするロットの指定方法。`unspecified` の出庫は FEFO で配分する。 */
 export type StockLotSelector =
     | { mode: "unspecified" }
@@ -211,3 +245,6 @@ export type StockMovementDto = z.infer<typeof stockMovementDtoSchema>;
 export type StockOperationResult = z.infer<typeof stockOperationResultSchema>;
 export type StockHistoryQuery = z.infer<typeof stockHistoryQuerySchema>;
 export type StockHistoryResult = z.infer<typeof stockHistoryResultSchema>;
+export type StaleStocktakeQuery = z.infer<typeof staleStocktakeQuerySchema>;
+export type StaleStocktakeItemDto = z.infer<typeof staleStocktakeItemDtoSchema>;
+export type StaleStocktakeListDto = z.infer<typeof staleStocktakeListDtoSchema>;

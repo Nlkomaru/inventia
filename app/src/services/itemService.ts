@@ -13,6 +13,7 @@ import {
     type ItemLotDto,
     lotExpiryDateSchema,
 } from "../domain/lot";
+import { type ReadingStatus, toReadingStateDto } from "../domain/reading";
 import {
     categoryExists,
     createItem as createItemRecord,
@@ -26,6 +27,11 @@ import {
     updateItem as updateItemRecord,
 } from "../repositories/itemRepository";
 import { type ItemLotRow, listItemLots } from "../repositories/lotRepository";
+import {
+    getReadingState as getReadingStateRecord,
+    listReadingStatesByItemIds,
+    type ReadingStateRow,
+} from "../repositories/readingRepository";
 
 export class ItemServiceError extends Error {
     readonly status: 400 | 404 | 409;
@@ -73,7 +79,12 @@ const isDocumentCategory = (
     kind: Awaited<ReturnType<typeof getCategoryKind>>,
 ): boolean => kind === "document";
 
-const toDto = (row: ItemRow): ItemDto => ({
+// 読書状態一覧など他 service でも同じ公開モデルへ変換するため export する。
+// readingStatus は品目行に無いため、呼び出し側が解決した値を渡す
+export const toItemDto = (
+    row: ItemRow,
+    readingStatus: ReadingStatus | null,
+): ItemDto => ({
     id: row.id,
     name: row.name,
     categoryId: row.categoryId,
@@ -85,6 +96,7 @@ const toDto = (row: ItemRow): ItemDto => ({
     lotCount: row.lotCount,
     lowStockThreshold: row.lowStockThreshold,
     memo: row.memo,
+    readingStatus,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
 });
@@ -99,11 +111,16 @@ const toLotDto = (row: ItemLotRow): ItemLotDto => ({
 });
 
 // 詳細では同梱したロットから期限集計を導き、内訳と要約が食い違わないようにする
-const toDetailDto = (row: ItemRow, lots: ItemLotRow[]): ItemDetailDto => ({
-    ...toDto(row),
+const toDetailDto = (
+    row: ItemRow,
+    lots: ItemLotRow[],
+    reading: ReadingStateRow | null,
+): ItemDetailDto => ({
+    ...toItemDto(row, reading?.status ?? null),
     earliestExpiryDate: earliestExpiryDate(lots),
     lotCount: lots.length,
     lots: lots.map(toLotDto),
+    readingState: reading ? toReadingStateDto(reading) : null,
 });
 
 export const listItems = async (
@@ -113,8 +130,15 @@ export const listItems = async (
     const query = parseOrThrow(itemListQuerySchema.safeParse(input));
     try {
         const result = await listItemRecords(db, query);
+        // 読書状態はページに並んだ品目 id の IN 句 1 回で解決する（N+1 禁止）
+        const readingStates = await listReadingStatesByItemIds(
+            db,
+            result.items.map((row) => row.id),
+        );
         return {
-            items: result.items.map(toDto),
+            items: result.items.map((row) =>
+                toItemDto(row, readingStates.get(row.id)?.status ?? null),
+            ),
             nextCursor: result.nextCursor,
         };
     } catch (error) {
@@ -141,8 +165,11 @@ export const getItem = async (
         throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
     }
     // 数量 0 のロットは既定の表示対象外のため詳細にも含めない
-    const lots = await listItemLots(db, id, { includeEmpty: false });
-    return toDetailDto(row, lots);
+    const [lots, reading] = await Promise.all([
+        listItemLots(db, id, { includeEmpty: false }),
+        getReadingStateRecord(db, id),
+    ]);
+    return toDetailDto(row, lots, reading);
 };
 
 export const createItem = async (
@@ -183,7 +210,8 @@ export const createItem = async (
         baseDimension,
         currentQuantity,
     });
-    return toDto(row);
+    // 作成直後の品目は読書状態を持たない
+    return toItemDto(row, null);
 };
 
 export const updateItem = async (
@@ -228,12 +256,28 @@ export const updateItem = async (
                 "item category cannot cross the document and non-document boundary",
             );
         }
+        // 読書状態は書籍カテゴリーの品目だけが持つ。保存済みのまま書籍から外れる
+        // 移動を許すと、書籍以外の品目が readingStatus を返し続けて
+        // readingStatus での絞り込みにも現れ、書籍以外を拒否する upsert では
+        // その行を直せなくなるため、先に読書状態の削除を求める
+        if (
+            currentCategoryKind === "book" &&
+            nextCategoryKind !== "book" &&
+            (await getReadingStateRecord(db, id)) !== null
+        ) {
+            throw new ItemServiceError(
+                409,
+                "ITEM_READING_STATE_CONFLICT",
+                "clear the reading state before moving the item out of a book category",
+            );
+        }
     }
     const row = await updateItemRecord(db, id, parsed);
     if (!row) {
         throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
     }
-    return toDto(row);
+    const reading = await getReadingStateRecord(db, id);
+    return toItemDto(row, reading?.status ?? null);
 };
 
 export const deleteItem = async (db: D1Database, id: string): Promise<void> => {

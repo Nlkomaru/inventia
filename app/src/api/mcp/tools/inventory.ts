@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
+    bookReadingListDtoSchema,
     itemDetailDtoSchema,
     itemDtoSchema,
     itemListQuerySchema,
@@ -10,6 +11,11 @@ import {
     priceRecordListInputSchema,
     priceRecordListOutputSchema,
 } from "../../../domain/price";
+import { bookReadingListQuerySchema } from "../../../domain/reading";
+import {
+    staleStocktakeListDtoSchema,
+    staleStocktakeQuerySchema,
+} from "../../../domain/stock";
 import {
     getItem,
     ItemServiceError,
@@ -20,6 +26,14 @@ import {
     listPriceRecords,
     PriceServiceError,
 } from "../../../services/priceService";
+import {
+    listBookReadingStates,
+    ReadingServiceError,
+} from "../../../services/readingService";
+import {
+    listStaleStocktakeItems,
+    StockServiceError,
+} from "../../../services/stockService";
 import { mcpError, mcpSuccess } from "../result";
 
 const itemListOutputSchema = z.object({
@@ -50,6 +64,20 @@ const priceError = (error: unknown, fallback: string) =>
             : `INTERNAL_ERROR: ${fallback}`,
     );
 
+const readingError = (error: unknown, fallback: string) =>
+    mcpError(
+        error instanceof ReadingServiceError
+            ? `${error.code}: ${error.message}`
+            : `INTERNAL_ERROR: ${fallback}`,
+    );
+
+const stockError = (error: unknown, fallback: string) =>
+    mcpError(
+        error instanceof StockServiceError
+            ? `${error.code}: ${error.message}`
+            : `INTERNAL_ERROR: ${fallback}`,
+    );
+
 export const registerInventoryTools = (
     server: McpServer,
     db: D1Database,
@@ -59,7 +87,7 @@ export const registerInventoryTools = (
         {
             title: "Search inventory",
             description:
-                "Search inventory item names and filter by category, storage location, low-stock state, or expiry within a number of days (expiringWithinDays). Each item carries its total quantity plus the expiry summary of its lots: earliestExpiryDate is the earliest expiry among lots that still have stock (null when none of them has an expiry date) and lotCount is how many lots have stock. Use get_inventory_item for the per-expiry lot breakdown. Results are ordered by item name, return at most limit items (default 50, maximum 100), and pass nextCursor back as cursor to continue.",
+                "Search inventory item names and filter by category, storage location, low-stock state, expiry within a number of days (expiringWithinDays), or stored reading state (readingStatus: unread, reading, or finished). readingStatus matches stored reading states only, so an item without a stored reading state never matches any value and an unset state is not treated as unread. Each item carries its total quantity, its readingStatus (null when no reading state is stored for it), plus the expiry summary of its lots: earliestExpiryDate is the earliest expiry among lots that still have stock (null when none of them has an expiry date) and lotCount is how many lots have stock. Use get_inventory_item for the per-expiry lot breakdown. Results are ordered by item name, return at most limit items (default 50, maximum 100), and pass nextCursor back as cursor to continue.",
             inputSchema: itemListQuerySchema,
             outputSchema: itemListOutputSchema,
         },
@@ -77,7 +105,7 @@ export const registerInventoryTools = (
         {
             title: "Get inventory item",
             description:
-                "Get one inventory item by its system ID, including its base unit, total quantity, low-stock threshold, and the expiry-lot breakdown. lots lists one entry per expiry date in FEFO order (earliest expiry first, the lot without an expiry date last); lots holding no stock are omitted, and currentQuantity is maintained as the sum of the item's lot quantities. The storage location is a property of the item, not of a lot.",
+                "Get one inventory item by its system ID, including its base unit, total quantity, low-stock threshold, the expiry-lot breakdown, and its reading state. lots lists one entry per expiry date in FEFO order (earliest expiry first, the lot without an expiry date last); lots holding no stock are omitted, and currentQuantity is maintained as the sum of the item's lot quantities. readingStatus and readingState report the stored reading state, where readingState also carries startedAt and finishedAt; both are null when no reading state is stored for the item. The storage location is a property of the item, not of a lot.",
             inputSchema: z.object({ id: z.string().min(1) }),
             outputSchema: itemDetailDtoSchema,
         },
@@ -113,6 +141,45 @@ export const registerInventoryTools = (
                     error,
                     "expiring inventory listing failed",
                 );
+            }
+        },
+    );
+
+    server.registerTool(
+        "list_book_reading_status",
+        {
+            title: "List book reading status",
+            description:
+                "List the inventory items that belong to a book category together with their reading state. Each item carries readingStatus plus readingState, which adds startedAt and finishedAt; both are null when no reading state is stored for that item, so books that were never marked are still listed. The optional status filter (unread, reading, or finished) matches stored reading states only, so a book without a stored state never matches any value and an unset state is not treated as unread. Results are ordered by item name, return at most limit items (default 50, maximum 100), and pass nextCursor back as cursor to continue.",
+            inputSchema: bookReadingListQuerySchema,
+            outputSchema: bookReadingListDtoSchema,
+        },
+        async (input) => {
+            try {
+                return mcpSuccess(await listBookReadingStates(db, input));
+            } catch (error) {
+                return readingError(
+                    error,
+                    "book reading status listing failed",
+                );
+            }
+        },
+    );
+
+    server.registerTool(
+        "list_stale_stocktake_items",
+        {
+            title: "List items whose stocktake is stale",
+            description:
+                "List the inventory items that have not been counted recently, so they can be scheduled for a stocktake. This tool only reads data and changes no stock. An item qualifies when its most recent stocktake happened strictly earlier than staleAfterDays days before now, or when the item was never counted at all; lastStocktakeAt reports that timestamp and is null for an item that was never counted. A stocktake that confirmed the recorded quantity counts as a count even though it records no stock movement. staleAfterDays 0 therefore returns every item whose last count is in the past plus every item that was never counted. Creating an item with an initial quantity records a stocktake movement, so a newly created item counts as just stocktaken. Results are ordered never-counted first, then by lastStocktakeAt ascending with the item ID breaking ties, return at most limit items (default 50, maximum 100), and pass nextCursor back as cursor to continue, which is only valid for the same staleAfterDays.",
+            inputSchema: staleStocktakeQuerySchema,
+            outputSchema: staleStocktakeListDtoSchema,
+        },
+        async (input) => {
+            try {
+                return mcpSuccess(await listStaleStocktakeItems(db, input));
+            } catch (error) {
+                return stockError(error, "stale stocktake listing failed");
             }
         },
     );

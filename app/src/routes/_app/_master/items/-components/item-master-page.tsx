@@ -1,5 +1,5 @@
 import { Plus, RefreshCw, Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -14,12 +14,21 @@ import {
 import type { CategoryDto } from "@/domain/category";
 import type { ItemCreateInput, ItemDto, ItemUpdateInput } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
+import type {
+    ReadingStateDto,
+    ReadingStateUpsertInput,
+    ReadingStatus,
+} from "@/domain/reading";
+import type { ReadingStateChange } from "../-functions/reading-state-form";
 import {
+    clearReadingState,
     createItem,
     deleteItem,
+    getItem,
     listCategories,
     listItems,
     listLocations,
+    setReadingState,
     updateItem,
 } from "./item-api";
 import { ItemForm } from "./item-form";
@@ -40,7 +49,13 @@ export function ItemMasterPage() {
     const [locationFilter, setLocationFilter] = useState("all");
     const [formOpen, setFormOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<ItemDto | null>(null);
+    const [editingReadingState, setEditingReadingState] =
+        useState<ReadingStateDto | null>(null);
+    const [readingStateLoading, setReadingStateLoading] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    // 読書状態の取得が返る頃にシートが閉じている・別の品目に切り替わっている
+    // 場合があるため、開いている品目を参照で追う
+    const editingItemIdRef = useRef<string | null>(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -88,40 +103,112 @@ export function ItemMasterPage() {
     }, [categoryFilter, items, locationFilter, query]);
 
     const openCreate = () => {
+        editingItemIdRef.current = null;
         setEditingItem(null);
+        setEditingReadingState(null);
+        setReadingStateLoading(false);
         setFormOpen(true);
     };
 
     const openEdit = (item: ItemDto) => {
+        editingItemIdRef.current = item.id;
         setEditingItem(item);
+        setEditingReadingState(null);
         setFormOpen(true);
+        // readingStatus が null の品目は読書状態の行を持たないため詳細を取りに行かない
+        if (item.readingStatus === null) {
+            setReadingStateLoading(false);
+            return;
+        }
+        setReadingStateLoading(true);
+        void (async () => {
+            try {
+                const detail = await getItem(item.id);
+                if (editingItemIdRef.current !== item.id) return;
+                setEditingReadingState(detail.readingState);
+            } catch (cause) {
+                if (editingItemIdRef.current !== item.id) return;
+                setError(errorMessage(cause, "読書状態を読み込めませんでした"));
+            } finally {
+                if (editingItemIdRef.current === item.id) {
+                    setReadingStateLoading(false);
+                }
+            }
+        })();
     };
 
-    const saveCreate = async (input: ItemCreateInput) => {
+    const applyReadingStatus = (id: string, status: ReadingStatus | null) => {
+        setItems((current) =>
+            current.map((item) =>
+                item.id === id ? { ...item, readingStatus: status } : item,
+            ),
+        );
+    };
+
+    const saveCreate = async (
+        input: ItemCreateInput,
+        readingState: ReadingStateUpsertInput | null,
+    ) => {
         setError(null);
+        let created: ItemDto;
         try {
-            const created = await createItem(input);
-            setItems((current) => [created, ...current]);
+            created = await createItem(input);
         } catch (cause) {
             const message = errorMessage(cause, "品目を登録できませんでした");
             setError(message);
             throw new Error(message);
         }
+        setItems((current) => [created, ...current]);
+        if (!readingState) return;
+        try {
+            const saved = await setReadingState(created.id, readingState);
+            applyReadingStatus(created.id, saved.status);
+        } catch (cause) {
+            // 品目の登録は確定しているため、再送で品目が二重に増えないよう
+            // 例外を投げ直さず、読書状態だけをやり直せる案内にする
+            setError(
+                `品目は登録しましたが、読書状態を保存できませんでした（${errorMessage(
+                    cause,
+                    "原因不明のエラー",
+                )}）。編集から設定し直してください`,
+            );
+        }
     };
 
-    const saveUpdate = async (id: string, input: ItemUpdateInput) => {
+    const saveUpdate = async (
+        id: string,
+        input: ItemUpdateInput,
+        readingState: ReadingStateChange,
+    ) => {
         setError(null);
+        let updated: ItemDto;
         try {
-            const updated = await updateItem(id, input);
-            setItems((current) =>
-                current.map((item) =>
-                    item.id === updated.id ? updated : item,
-                ),
-            );
+            updated = await updateItem(id, input);
         } catch (cause) {
             const message = errorMessage(cause, "品目を更新できませんでした");
             setError(message);
             throw new Error(message);
+        }
+        setItems((current) =>
+            current.map((item) => (item.id === updated.id ? updated : item)),
+        );
+        if (readingState.kind === "unchanged") return;
+        try {
+            if (readingState.kind === "clear") {
+                await clearReadingState(id);
+                applyReadingStatus(id, null);
+                return;
+            }
+            const saved = await setReadingState(id, readingState.input);
+            applyReadingStatus(id, saved.status);
+        } catch (cause) {
+            // 品目の更新は確定しているため、こちらも例外を投げ直さない
+            setError(
+                `品目は更新しましたが、読書状態を保存できませんでした（${errorMessage(
+                    cause,
+                    "原因不明のエラー",
+                )}）。編集から設定し直してください`,
+            );
         }
     };
 
@@ -317,10 +404,16 @@ export function ItemMasterPage() {
                 onCreate={saveCreate}
                 onOpenChange={(open) => {
                     setFormOpen(open);
-                    if (!open) setEditingItem(null);
+                    if (open) return;
+                    editingItemIdRef.current = null;
+                    setEditingItem(null);
+                    setEditingReadingState(null);
+                    setReadingStateLoading(false);
                 }}
                 onUpdate={saveUpdate}
                 open={formOpen}
+                readingState={editingReadingState}
+                readingStateLoading={readingStateLoading}
             />
         </main>
     );

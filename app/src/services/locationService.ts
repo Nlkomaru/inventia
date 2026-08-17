@@ -101,10 +101,14 @@ const parseLocationId = (id: unknown): LocationId => {
 const parseListInput = (input: unknown): LocationListInput => {
     const result = locationListInputSchema.safeParse(input);
     if (!result.success) {
-        throw invalidInput("parentId、limit、cursorを確認してください");
+        throw invalidInput("parentId、q、limit、cursorを確認してください");
     }
     return result.data;
 };
+
+// 空文字の検索語は絞り込みなしとして扱う。cursorのスコープ判定も同じ正規化値で行う
+const normalizeSearch = (q: string | undefined): string | null =>
+    q !== undefined && q.length > 0 ? q : null;
 
 const toDto = (row: LocationRecord): LocationDto => ({
     id: row.id,
@@ -137,15 +141,21 @@ export const listLocations = async (
     input: unknown = {},
 ): Promise<LocationListResponse> => {
     const query = parseListInput(input);
+    const search = normalizeSearch(query.q);
     const cursor = query.cursor ? decodeLocationCursor(query.cursor) : null;
-    if (query.cursor && (!cursor || cursor.parentId !== query.parentId)) {
+    // 親場所と検索語のどちらかが違う cursor は別の一覧の続きになるため拒否する
+    if (
+        query.cursor &&
+        (!cursor || cursor.parentId !== query.parentId || cursor.q !== search)
+    ) {
         throw new LocationServiceError(
             "LOCATION_INVALID_CURSOR",
-            "cursorが不正です。同じ親場所の一覧で取得したcursorを使用してください",
+            "cursorが不正です。同じ親場所と同じ検索語の一覧で取得したcursorを使用してください",
         );
     }
     const page = await listLocationRows(db, {
         parentId: query.parentId,
+        q: search,
         limit: query.limit,
         cursor,
     });
@@ -156,6 +166,7 @@ export const listLocations = async (
             page.hasMore && page.rows.length > 0
                 ? encodeLocationCursor({
                       parentId: query.parentId,
+                      q: search,
                       sortOrder: page.rows[page.rows.length - 1].sortOrder,
                       id: page.rows[page.rows.length - 1].id,
                   })

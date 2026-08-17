@@ -29,6 +29,8 @@ export const stockMovementReasons = [
 
 export const stockOperationKinds = ["adjustment", "stocktake"] as const;
 
+export const readingStatuses = ["unread", "reading", "finished"] as const;
+
 export const storageLocations = sqliteTable(
     "storage_locations",
     {
@@ -168,6 +170,50 @@ export const itemLots = sqliteTable(
         index("idx_item_lots_expiry").on(t.expiryDate, t.itemId),
         // 負在庫は許可しない。出庫時の在庫不足はこの CHECK で batch 全体を rollback させる
         check("ck_item_lots_quantity_non_negative", sql`${t.quantity} >= 0`),
+    ],
+);
+
+// 書籍カテゴリーの品目だけが持つ読書状態。品目と 1:1 で、items へ列を足さずに
+// 別テーブルへ分離している。ISBN などの識別子も将来 item_identifiers として
+// 別エンティティで追加する方針のため、この分離により書籍固有の情報が増えても
+// items のスキーマと既存の在庫契約は変わらない。
+// 品目を消す前に読書状態を消す運用にするため FK は restrict とする
+export const itemReadingStates = sqliteTable(
+    "item_reading_states",
+    {
+        itemId: text("item_id")
+            .primaryKey()
+            .references(() => items.id, { onDelete: "restrict" }),
+        status: text("status", { enum: readingStatuses }).notNull(),
+        // ISO 8601 UTC。未読・読書中では未設定になり得るため nullable
+        startedAt: text("started_at"),
+        finishedAt: text("finished_at"),
+        createdAt: text("created_at").notNull(),
+        updatedAt: text("updated_at").notNull(),
+    },
+    (t) => [
+        // 状態での絞り込みと (status, item_id) による安定順のため
+        index("idx_item_reading_states_status").on(t.status, t.itemId),
+        check(
+            "ck_item_reading_states_status",
+            sql`${t.status} in ('unread', 'reading', 'finished')`,
+        ),
+        // 状態と日付の矛盾を規則ごとに別 CHECK で禁止する。
+        // 未読なら開始日・読了日は持たない
+        check(
+            "ck_item_reading_states_unread_dates",
+            sql`${t.status} <> 'unread' or (${t.startedAt} is null and ${t.finishedAt} is null)`,
+        ),
+        // 読書中なら読了日は持たない
+        check(
+            "ck_item_reading_states_reading_dates",
+            sql`${t.status} <> 'reading' or ${t.finishedAt} is null`,
+        ),
+        // 両方ある場合の前後関係。ISO 8601 UTC 固定書式のため辞書順比較で判定できる
+        check(
+            "ck_item_reading_states_date_order",
+            sql`${t.startedAt} is null or ${t.finishedAt} is null or ${t.finishedAt} >= ${t.startedAt}`,
+        ),
     ],
 );
 

@@ -25,6 +25,8 @@ const buildItem = (
     lotCount: 0,
     lowStockThreshold: null,
     memo: null,
+    // 読書状態を持つのは書籍カテゴリの品目だけなので、既定は未設定
+    readingStatus: null,
     ...timestamps,
     ...overrides,
 });
@@ -45,13 +47,29 @@ const buildLot = (
 const categoryLabels = new Map([
     ["cat-food", "食品"],
     ["cat-supply", "日用品"],
+    ["cat-book", "書籍"],
 ]);
 
 const locationLabels = new Map([
     ["loc-pantry", "食品棚"],
     ["loc-fridge", "冷蔵庫"],
     ["loc-storage", "納戸"],
+    ["loc-shelf", "本棚"],
 ]);
+
+// 書籍は期限を持たず、読書状態だけで区別が付く行になる
+const buildBook = (
+    overrides: Partial<ItemDto> & Pick<ItemDto, "id" | "name">,
+): ItemDto =>
+    buildItem({
+        categoryId: "cat-book",
+        locationId: "loc-shelf",
+        baseUnit: "冊",
+        baseDimension: "count",
+        currentQuantity: 1,
+        lotCount: 1,
+        ...overrides,
+    });
 
 const flour = buildItem({
     id: "it-flour",
@@ -310,6 +328,40 @@ export const LargeQuantities: Story = {
 export const LotsUnavailable: Story = {
     args: {
         items: [flour, milk],
+        lotsByItemId: new Map(),
+    },
+};
+
+/**
+ * 読書状態の 4 通り。書籍以外（食品）は読書状態を持たず「—」になる。
+ */
+export const ReadingStatuses: Story = {
+    args: {
+        items: [
+            buildBook({
+                id: "it-book-unread",
+                name: "積んだままの技術書",
+                readingStatus: "unread",
+            }),
+            buildBook({
+                id: "it-book-reading",
+                name: "SQL アンチパターン",
+                readingStatus: "reading",
+            }),
+            buildBook({
+                id: "it-book-finished",
+                name: "リーダブルコード",
+                readingStatus: "finished",
+            }),
+            buildBook({
+                id: "it-book-long-name",
+                name: "エラー処理と可用性のための分散システム設計 実践ガイド（改訂第 2 版・上巻）",
+                currentQuantity: 2,
+                readingStatus: "reading",
+            }),
+            // 書籍以外は読書状態を持たない
+            tape,
+        ],
         lotsByItemId: new Map(),
     },
 };

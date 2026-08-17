@@ -3,6 +3,7 @@ import { RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     InventoryTable,
+    readingStatusLabels,
     resolveExpirySignal,
 } from "@/components/InventoryTable";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import type { CategoryDto } from "@/domain/category";
 import type { ItemDto } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
 import type { ItemLotDto } from "@/domain/lot";
+import type { ReadingStatus } from "@/domain/reading";
 import {
     listCategories,
     listItems,
@@ -49,6 +51,20 @@ const expiryFilterItems: { label: string; value: ExpiryFilter }[] = [
 const isExpiryFilter = (value: string): value is ExpiryFilter =>
     expiryFilterItems.some((option) => option.value === value);
 
+// 読書状態は書籍カテゴリーの品目だけが持つ。`none` は書籍以外と未設定をまとめた選択肢
+type ReadingFilter = "all" | ReadingStatus | "none";
+
+const readingFilterItems: { label: string; value: ReadingFilter }[] = [
+    { label: "すべての読書状態", value: "all" },
+    { label: readingStatusLabels.unread, value: "unread" },
+    { label: readingStatusLabels.reading, value: "reading" },
+    { label: readingStatusLabels.finished, value: "finished" },
+    { label: "読書状態なし", value: "none" },
+];
+
+const isReadingFilter = (value: string): value is ReadingFilter =>
+    readingFilterItems.some((option) => option.value === value);
+
 const errorMessage = (cause: unknown, fallback: string): string =>
     cause instanceof Error ? cause.message : fallback;
 
@@ -70,6 +86,7 @@ function InventoryPage() {
     const [query, setQuery] = useState("");
     const [locationFilter, setLocationFilter] = useState("all");
     const [expiryFilter, setExpiryFilter] = useState<ExpiryFilter>("all");
+    const [readingFilter, setReadingFilter] = useState<ReadingFilter>("all");
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -128,6 +145,13 @@ function InventoryPage() {
             ) {
                 return false;
             }
+            if (readingFilter !== "all") {
+                const matches =
+                    readingFilter === "none"
+                        ? item.readingStatus === null
+                        : item.readingStatus === readingFilter;
+                if (!matches) return false;
+            }
             if (expiryFilter === "all") return true;
             const { state } = resolveExpirySignal(
                 item.earliestExpiryDate,
@@ -140,7 +164,7 @@ function InventoryPage() {
             if (expiryFilter === "expired") return state === "expired";
             return state === "none";
         });
-    }, [expiryFilter, items, locationFilter, query]);
+    }, [expiryFilter, items, locationFilter, query, readingFilter]);
 
     return (
         <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
@@ -188,7 +212,7 @@ function InventoryPage() {
                 aria-label="在庫の検索と絞り込み"
                 className="rounded-xl bg-card p-4 ring-1 ring-foreground/10 sm:p-5"
             >
-                <FieldGroup className="gap-4 md:grid md:grid-cols-[minmax(0,1.5fr)_minmax(10rem,1fr)_minmax(10rem,1fr)]">
+                <FieldGroup className="gap-4 md:grid md:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(9rem,1fr))]">
                     <Field>
                         <FieldLabel htmlFor="inventory-search">
                             品目を検索
@@ -261,6 +285,41 @@ function InventoryPage() {
                             <SelectContent>
                                 <SelectGroup>
                                     {expiryFilterItems.map((option) => (
+                                        <SelectItem
+                                            key={option.value}
+                                            value={option.value}
+                                        >
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                    <Field>
+                        <FieldLabel htmlFor="inventory-reading-filter">
+                            読書状態
+                        </FieldLabel>
+                        <Select
+                            items={readingFilterItems}
+                            value={readingFilter}
+                            onValueChange={(value) =>
+                                setReadingFilter(
+                                    value && isReadingFilter(value)
+                                        ? value
+                                        : "all",
+                                )
+                            }
+                        >
+                            <SelectTrigger
+                                className="w-full"
+                                id="inventory-reading-filter"
+                            >
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    {readingFilterItems.map((option) => (
                                         <SelectItem
                                             key={option.value}
                                             value={option.value}
