@@ -1,17 +1,13 @@
+import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { type ItemDto, itemDtoSchema } from "@/domain/item";
-import { type ItemLotDto, itemLotListDtoSchema } from "@/domain/lot";
+import type { ItemDto } from "@/domain/item";
+import type { ItemLotDto } from "@/domain/lot";
 import {
     type StockMovementReason,
     type StockOperationResult,
     stockAdjustmentSchema,
     stockOperationResultSchema,
 } from "@/domain/stock";
-
-const itemListOutputSchema = z.object({
-    items: z.array(itemDtoSchema),
-    nextCursor: z.string().nullable(),
-});
 
 const apiErrorSchema = z.object({
     error: z
@@ -41,32 +37,44 @@ const request = async <T>(
     return schema.parse(await response.json());
 };
 
-export const listItems = async (): Promise<ItemDto[]> => {
-    const items: ItemDto[] = [];
-    let cursor: string | undefined;
-    do {
-        const params = new URLSearchParams({ limit: "100" });
-        if (cursor) params.set("cursor", cursor);
-        const page = await request(
-            `/api/items?${params.toString()}`,
-            itemListOutputSchema,
-            "品目を読み込めませんでした",
-        );
-        items.push(...page.items);
-        cursor = page.nextCursor ?? undefined;
-    } while (cursor);
-    return items;
-};
+// 読み取りは server function から service を直接呼ぶ。SSR から自分の公開 URL を
+// fetch すると Cloudflare Access に阻まれるため、HTTP API 経由にしない。
+// `cloudflare:workers` と service はクライアントバンドルへ漏らさないよう動的 import する。
+export const listItems = createServerFn({ method: "GET" }).handler(
+    async (): Promise<ItemDto[]> => {
+        const [{ env }, { listItems: listItemPage }] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/itemService"),
+        ]);
+        const items: ItemDto[] = [];
+        let cursor: string | undefined;
+        do {
+            const page = await listItemPage(env.DB, {
+                limit: 100,
+                ...(cursor === undefined ? {} : { cursor }),
+            });
+            items.push(...page.items);
+            cursor = page.nextCursor ?? undefined;
+        } while (cursor);
+        return items;
+    },
+);
+
+const itemLotsInputSchema = z.object({
+    itemId: z.string().trim().min(1),
+});
 
 /** 加算先の候補を示すため、数量 > 0 のロットを FEFO 順で取得する。 */
-export const listItemLots = async (itemId: string): Promise<ItemLotDto[]> => {
-    const result = await request(
-        `/api/items/${encodeURIComponent(itemId)}/lots`,
-        itemLotListDtoSchema,
-        "ロットを読み込めませんでした",
-    );
-    return result.lots;
-};
+export const listItemLots = createServerFn({ method: "GET" })
+    .validator(itemLotsInputSchema)
+    .handler(async ({ data }): Promise<ItemLotDto[]> => {
+        const [{ env }, { listItemLots: listLotsForItem }] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/lotService"),
+        ]);
+        const result = await listLotsForItem(env.DB, data.itemId, {});
+        return result.lots;
+    });
 
 export interface ReceiveStockInput {
     quantity: number;

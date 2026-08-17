@@ -1,65 +1,41 @@
+import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { type CategoryDto, categoryListOutputSchema } from "@/domain/category";
-import { type ItemDto, itemDtoSchema } from "@/domain/item";
-import { type LocationDto, locationListOutputSchema } from "@/domain/location";
-import { type ItemLotDto, itemLotListDtoSchema } from "@/domain/lot";
+import type { CategoryDto } from "@/domain/category";
+import type { ItemDto } from "@/domain/item";
+import type { LocationDto } from "@/domain/location";
+import type { ItemLotDto } from "@/domain/lot";
+import { readingStatusSchema } from "@/domain/reading";
 
-const apiErrorSchema = z.object({
-    error: z
-        .object({
-            message: z.string().optional(),
-        })
-        .optional(),
+// 一覧 service の 1 ページ上限。画面は全件を扱うため cursor を辿って集める
+const pageLimit = 100;
+
+export const inventoryItemFiltersSchema = z.object({
+    q: z.string().optional(),
+    categoryId: z.string().optional(),
+    locationId: z.string().optional(),
+    lowStockOnly: z.boolean().optional(),
+    // 数量 > 0 のロットの期限が now + n 日以内の品目だけに絞る。0 は期限切れのみ
+    expiringWithinDays: z.number().int().min(0).optional(),
+    readingStatus: readingStatusSchema.optional(),
 });
 
-const itemListOutputSchema = z.object({
-    items: z.array(itemDtoSchema),
-    nextCursor: z.string().nullable(),
-});
+export type InventoryItemFilters = z.infer<typeof inventoryItemFiltersSchema>;
 
-const request = async <T>(
-    url: string,
-    schema: z.ZodType<T>,
-    fallbackMessage: string,
-): Promise<T> => {
-    const response = await fetch(url);
-    if (!response.ok) {
-        const body = apiErrorSchema.safeParse(
-            await response.json().catch(() => ({})),
-        );
-        throw new Error(
-            body.success && body.data.error?.message
-                ? body.data.error.message
-                : fallbackMessage,
-        );
-    }
-    return schema.parse(await response.json());
-};
+type Page<T> = { items: T[]; nextCursor: string | null };
 
-const hierarchyUrl = (
-    path: string,
-    parentId: string | null,
-    cursor: string | undefined,
-): string => {
-    const params = new URLSearchParams({ limit: "100" });
-    if (parentId) params.set("parentId", parentId);
-    if (cursor) params.set("cursor", cursor);
-    return `${path}?${params.toString()}`;
-};
-
-// カテゴリと保管場所の一覧 API は 1 階層ずつ返すため、親を辿って全件を集める
-const collectHierarchy = async <T extends { id: string }>(
-    fetchLevel: (
+// カテゴリと保管場所の一覧 service は 1 階層ずつ返すため、親を辿って全件を集める
+const collectTree = async <T extends { id: string }>(
+    listLevel: (
         parentId: string | null,
         cursor: string | undefined,
-    ) => Promise<{ items: T[]; nextCursor: string | null }>,
+    ) => Promise<Page<T>>,
 ): Promise<T[]> => {
     const collected: T[] = [];
     const visit = async (parentId: string | null): Promise<void> => {
         const level: T[] = [];
         let cursor: string | undefined;
         do {
-            const page = await fetchLevel(parentId, cursor);
+            const page = await listLevel(parentId, cursor);
             level.push(...page.items);
             cursor = page.nextCursor ?? undefined;
         } while (cursor);
@@ -70,73 +46,100 @@ const collectHierarchy = async <T extends { id: string }>(
     return collected;
 };
 
-export const listItems = async (): Promise<ItemDto[]> => {
-    const items: ItemDto[] = [];
-    let cursor: string | undefined;
-    do {
-        const params = new URLSearchParams({ limit: "100" });
-        if (cursor) params.set("cursor", cursor);
-        const page = await request(
-            `/api/items?${params.toString()}`,
-            itemListOutputSchema,
-            "在庫を読み込めませんでした",
+export const fetchInventoryItems = createServerFn({ method: "GET" })
+    .validator(inventoryItemFiltersSchema)
+    .handler(async ({ data }): Promise<ItemDto[]> => {
+        const [{ env }, { listItems }] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/itemService"),
+        ]);
+        const items: ItemDto[] = [];
+        let cursor: string | undefined;
+        do {
+            const page = await listItems(env.DB, {
+                ...data,
+                limit: pageLimit,
+                cursor,
+            });
+            items.push(...page.items);
+            cursor = page.nextCursor ?? undefined;
+        } while (cursor);
+        return items;
+    });
+
+export const fetchCategoryTree = createServerFn({ method: "GET" }).handler(
+    async (): Promise<CategoryDto[]> => {
+        const [{ env }, { listCategories }] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/categoryService"),
+        ]);
+        return collectTree<CategoryDto>((parentId, cursor) =>
+            listCategories(env.DB, { parentId, limit: pageLimit, cursor }),
         );
-        items.push(...page.items);
-        cursor = page.nextCursor ?? undefined;
-    } while (cursor);
-    return items;
-};
+    },
+);
 
-export const listCategories = (): Promise<CategoryDto[]> =>
-    collectHierarchy((parentId, cursor) =>
-        request(
-            hierarchyUrl("/api/categories", parentId, cursor),
-            categoryListOutputSchema,
-            "カテゴリを読み込めませんでした",
-        ),
-    );
+export const fetchLocationTree = createServerFn({ method: "GET" }).handler(
+    async (): Promise<LocationDto[]> => {
+        const [{ env }, { listLocations }] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/locationService"),
+        ]);
+        return collectTree<LocationDto>((parentId, cursor) =>
+            listLocations(env.DB, { parentId, limit: pageLimit, cursor }),
+        );
+    },
+);
 
-export const listLocations = (): Promise<LocationDto[]> =>
-    collectHierarchy((parentId, cursor) =>
-        request(
-            hierarchyUrl("/api/locations", parentId, cursor),
-            locationListOutputSchema,
-            "保管場所を読み込めませんでした",
-        ),
-    );
+export type ItemLotsEntry = { itemId: string; lots: ItemLotDto[] };
 
-export const listItemLots = async (itemId: string): Promise<ItemLotDto[]> => {
-    const result = await request(
-        `/api/items/${encodeURIComponent(itemId)}/lots`,
-        itemLotListDtoSchema,
-        "ロットを読み込めませんでした",
-    );
-    return result.lots;
-};
-
-// 一覧 DTO は最短期限と件数だけを持つため、内訳が必要な品目だけ個別に取得する。
-// 1 ロットの品目は合計と最短期限で内訳が尽きているので取得しない
+// ロットは品目ごとの取得しか service に無いため、1 リクエストあたりの D1 query を
+// 抑える目的で少しずつ並列に読む
 const lotFetchConcurrency = 5;
 
-export const listLotsForItems = async (
-    items: readonly ItemDto[],
-): Promise<Map<string, ItemLotDto[]>> => {
-    const targets = items.filter((item) => item.lotCount > 1);
-    const lotsByItemId = new Map<string, ItemLotDto[]>();
-    for (let index = 0; index < targets.length; index += lotFetchConcurrency) {
-        const chunk = targets.slice(index, index + lotFetchConcurrency);
-        const settled = await Promise.allSettled(
-            chunk.map(async (item) => ({
-                itemId: item.id,
-                lots: await listItemLots(item.id),
-            })),
-        );
-        // 取得できなかった品目は Map に載せず、件数のみの表示へ退避させる
-        for (const result of settled) {
-            if (result.status === "fulfilled") {
-                lotsByItemId.set(result.value.itemId, result.value.lots);
+export const fetchItemLots = createServerFn({ method: "GET" })
+    .validator(z.object({ itemIds: z.array(z.string().min(1)) }))
+    .handler(async ({ data }): Promise<ItemLotsEntry[]> => {
+        const [{ env }, { listItemLots }] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/lotService"),
+        ]);
+        const entries: ItemLotsEntry[] = [];
+        for (
+            let index = 0;
+            index < data.itemIds.length;
+            index += lotFetchConcurrency
+        ) {
+            const chunk = data.itemIds.slice(
+                index,
+                index + lotFetchConcurrency,
+            );
+            const settled = await Promise.allSettled(
+                chunk.map(async (itemId) => ({
+                    itemId,
+                    lots: (await listItemLots(env.DB, itemId, {})).lots,
+                })),
+            );
+            // 取得できなかった品目は返さず、件数のみの表示へ退避させる
+            for (const result of settled) {
+                if (result.status === "fulfilled") entries.push(result.value);
             }
         }
+        return entries;
+    });
+
+// GET の server function は入力を URL へ載せるため、品目 id をまとめて渡しすぎない
+const lotRequestChunkSize = 50;
+
+export const listLotsForItems = async (
+    itemIds: readonly string[],
+): Promise<ItemLotsEntry[]> => {
+    const chunks: string[][] = [];
+    for (let index = 0; index < itemIds.length; index += lotRequestChunkSize) {
+        chunks.push(itemIds.slice(index, index + lotRequestChunkSize));
     }
-    return lotsByItemId;
+    const results = await Promise.all(
+        chunks.map((chunk) => fetchItemLots({ data: { itemIds: chunk } })),
+    );
+    return results.flat();
 };

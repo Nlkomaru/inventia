@@ -34,6 +34,7 @@ import {
 import type { ItemDto } from "@/domain/item";
 import { type ItemLotDto, sortLotsFefo } from "@/domain/lot";
 import type { ReadingStatus } from "@/domain/reading";
+import { formatDisplayDate } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
 const features = tableFeatures({
@@ -43,9 +44,6 @@ const features = tableFeatures({
 
 const columnHelper = createColumnHelper<typeof features, ItemDto>();
 
-const dateFormatter = new Intl.DateTimeFormat("ja-JP", {
-    dateStyle: "medium",
-});
 const dayInMs = 86_400_000;
 const defaultSoonWithinDays = 7;
 // 内訳は先頭 2 件までを列挙し、残りは件数だけを示す
@@ -94,10 +92,7 @@ type ExpirySignal = {
     date: string | null;
 };
 
-const formatDate = (value: string): string => {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "—" : dateFormatter.format(date);
-};
+const formatDate = (value: string): string => formatDisplayDate(value) ?? "—";
 
 const formatQuantity = (quantity: number, unit: string): string =>
     `${quantity.toLocaleString("ja-JP")} ${unit}`;
