@@ -50,11 +50,19 @@ const stockHistoryItemQuerySchema = stockHistoryQuerySchema.omit({
 
 // 文字列を数値へ変換する query は入力型が unknown になり、生成される OpenAPI では
 // 省略可能に見える。実装は staleAfterDays を必須で検証するため、文書側で明示する
+// param は @hono/zod-openapi の z が拡張したスキーマにしか付けられない。domain の
+// スキーマから取り出した field へ .openapi() を呼ぶと、bundle 後に zod の実体が
+// 分かれて実行時 TypeError になるため、ここで同じ検証を組み直す
 const staleStocktakeQueryDocSchema = staleStocktakeQuerySchema.extend({
-    staleAfterDays: staleStocktakeQuerySchema.shape.staleAfterDays.openapi({
-        param: { name: "staleAfterDays", in: "query", required: true },
-        example: 90,
-    }),
+    staleAfterDays: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(3650)
+        .openapi({
+            param: { name: "staleAfterDays", in: "query", required: true },
+            example: 90,
+        }),
 });
 
 const responseContent = (schema: z.ZodType) => ({
