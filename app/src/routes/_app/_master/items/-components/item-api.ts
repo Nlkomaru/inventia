@@ -6,9 +6,11 @@ import {
 } from "@/domain/category";
 import {
     type ItemCreateInput,
+    type ItemDetailDto,
     type ItemDto,
     type ItemUpdateInput,
     itemCreateSchema,
+    itemDetailDtoSchema,
     itemDtoSchema,
     itemUpdateSchema,
 } from "@/domain/item";
@@ -17,6 +19,12 @@ import {
     locationDtoSchema,
     locationListOutputSchema,
 } from "@/domain/location";
+import {
+    type ReadingStateDto,
+    type ReadingStateUpsertInput,
+    readingStateDtoSchema,
+    readingStateUpsertSchema,
+} from "@/domain/reading";
 
 const apiErrorSchema = z.object({
     error: z
@@ -52,6 +60,22 @@ const request = async <T>(
         );
     }
     return schema.parse(await response.json());
+};
+
+// 本文の形を使わない応答（204 と JSON のどちらも返り得る）はここで読み捨てる
+const requestEmpty = async (url: string, init: RequestInit): Promise<void> => {
+    const response = await fetch(url, init);
+    if (!response.ok) {
+        const body = apiErrorSchema.safeParse(
+            await response.json().catch(() => ({})),
+        );
+        throw new Error(
+            body.success && body.data.error?.message
+                ? body.data.error.message
+                : "品目の更新に失敗しました",
+        );
+    }
+    await response.text();
 };
 
 const withCursor = (url: string, cursor: string | undefined): string => {
@@ -151,6 +175,30 @@ export const updateItem = (
 
 export const deleteItem = (id: string): Promise<{ deleted: true }> =>
     request(`/api/items/${encodeURIComponent(id)}`, itemDeleteOutputSchema, {
+        method: "DELETE",
+    });
+
+// 一覧 DTO は読書状態の有無しか持たないため、開始日と読了日は詳細から取る
+export const getItem = (id: string): Promise<ItemDetailDto> =>
+    request(`/api/items/${encodeURIComponent(id)}`, itemDetailDtoSchema);
+
+export const setReadingState = (
+    itemId: string,
+    input: ReadingStateUpsertInput,
+): Promise<ReadingStateDto> =>
+    request(
+        `/api/items/${encodeURIComponent(itemId)}/reading-state`,
+        readingStateDtoSchema,
+        {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(readingStateUpsertSchema.parse(input)),
+        },
+    );
+
+// 読書状態だけを消す。在庫と品目には影響しない
+export const clearReadingState = (itemId: string): Promise<void> =>
+    requestEmpty(`/api/items/${encodeURIComponent(itemId)}/reading-state`, {
         method: "DELETE",
     });
 

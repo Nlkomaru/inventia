@@ -4,6 +4,7 @@ import type {
     ItemListQuery,
     ItemUpdateInput,
 } from "../domain/item";
+import type { BookReadingListQuery } from "../domain/reading";
 
 export interface ItemRow {
     id: string;
@@ -84,8 +85,11 @@ const dayInMilliseconds = 24 * 60 * 60 * 1000;
 
 // 期限集計は items の SELECT 内の相関サブクエリで求め、ロットの追加読みで N+1 を作らない。
 // uq_item_lots_item_expiry を item_id の前方一致で使える。
-// 数量 0 のロットは既定の表示対象外なので集計から除く
-const itemColumns = `id, name, category_id AS categoryId, location_id AS locationId,
+// 数量 0 のロットは既定の表示対象外なので集計から除く。
+// 品目を返す他 repository の query（棚卸しが古い品目の一覧など）が同じ射影を
+// 重複定義しないよう export する。相関サブクエリは items を明示参照するため、
+// items へ別名を付けない query で使うこと
+export const itemColumns = `id, name, category_id AS categoryId, location_id AS locationId,
 		base_unit AS baseUnit, base_dimension AS baseDimension,
 		current_quantity AS currentQuantity,
 		(SELECT MIN(expiry_date) FROM item_lots
@@ -95,6 +99,22 @@ const itemColumns = `id, name, category_id AS categoryId, location_id AS locatio
 			WHERE item_id = items.id AND quantity > 0) AS lotCount,
 		low_stock_threshold AS lowStockThreshold, memo,
 		created_at AS createdAt, updated_at AS updatedAt`;
+
+// 読書状態は品目と 1:1 の別テーブルにあるため EXISTS で絞る。
+// 行が無い品目はどの状態にも一致しない
+const readingStatusCondition = `EXISTS (SELECT 1 FROM item_reading_states
+        WHERE item_id = items.id AND status = ?)`;
+
+// 実効カテゴリー種別が book の品目を選ぶための CTE。kind が NULL の子カテゴリーは
+// 直近の非 NULL 祖先の種別を継承するため、kind IS NULL の子だけを辿る
+// （getCategoryKind の祖先解決と同じ規則）
+const bookCategoriesCte = `WITH RECURSIVE book_categories(id) AS (
+		SELECT id FROM categories WHERE kind = 'book'
+		UNION
+		SELECT categories.id FROM categories
+			JOIN book_categories ON categories.parent_id = book_categories.id
+			WHERE categories.kind IS NULL
+	)`;
 
 export const getItem = async (
     db: D1Database,
@@ -142,6 +162,10 @@ export const listItems = async (
             ).toISOString(),
         );
     }
+    if (query.readingStatus) {
+        where.push(readingStatusCondition);
+        bindings.push(query.readingStatus);
+    }
     if (query.cursor) {
         const cursor = decodeCursor(query.cursor);
         where.push(
@@ -156,6 +180,54 @@ export const listItems = async (
 		ORDER BY name COLLATE NOCASE ASC, id ASC LIMIT ?`;
     const result = await db
         .prepare(sql)
+        .bind(...bindings, limit + 1)
+        .all<ItemRow>();
+    const rows = result.results;
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    const last = items.at(-1);
+    return {
+        items,
+        nextCursor:
+            hasMore && last
+                ? encodeCursor({ name: last.name, id: last.id })
+                : null,
+    };
+};
+
+/**
+ * 実効カテゴリー種別が book の品目を、一覧と同じ (name, id) 順で返す。
+ * 読書状態はこのクエリでは読まず、返した品目 id の IN 句 1 回で解決する
+ * （listReadingStatesByItemIds）。`status` を指定した場合はその状態が
+ * 保存されている品目だけに絞るため、読書状態が無い書籍は含めない。
+ */
+export const listBookItems = async (
+    db: D1Database,
+    query: BookReadingListQuery,
+): Promise<ItemListResult> => {
+    const where: string[] = ["category_id IN (SELECT id FROM book_categories)"];
+    const bindings: unknown[] = [];
+
+    if (query.status) {
+        where.push(readingStatusCondition);
+        bindings.push(query.status);
+    }
+    if (query.cursor) {
+        const cursor = decodeCursor(query.cursor);
+        where.push(
+            "(name COLLATE NOCASE > ? OR (name COLLATE NOCASE = ? AND id > ?))",
+        );
+        bindings.push(cursor.name, cursor.name, cursor.id);
+    }
+
+    const limit = query.limit;
+    const result = await db
+        .prepare(
+            `${bookCategoriesCte}
+			SELECT ${itemColumns}
+			FROM items WHERE ${where.join(" AND ")}
+			ORDER BY name COLLATE NOCASE ASC, id ASC LIMIT ?`,
+        )
         .bind(...bindings, limit + 1)
         .all<ItemRow>();
     const rows = result.results;
@@ -332,6 +404,11 @@ export const deleteItem = async (
     // 参照されていない空ロットだけ先に消す。在庫や履歴が残るロットは
     // item_lots の FK restrict で items の削除自体が失敗する
     const results = await db.batch([
+        // item_reading_states は ON DELETE restrict のため先に消す。読書状態は
+        // 在庫履歴ではないので、これを理由に品目の削除を止めない
+        db
+            .prepare("DELETE FROM item_reading_states WHERE item_id = ?")
+            .bind(id),
         db
             .prepare(
                 `DELETE FROM item_lots
@@ -344,5 +421,5 @@ export const deleteItem = async (
             .bind(id),
         db.prepare("DELETE FROM items WHERE id = ?").bind(id),
     ]);
-    return (results[1]?.meta.changes ?? 0) > 0;
+    return (results[2]?.meta.changes ?? 0) > 0;
 };

@@ -25,6 +25,7 @@ import {
 import type { CategoryDto } from "@/domain/category";
 import type { ItemDto } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
+import { readingStatusLabels } from "../-functions/reading-state-form";
 import { getHierarchyLabels } from "./item-options";
 
 const features = tableFeatures({});
@@ -124,6 +125,20 @@ export function ItemTable({
                         </span>
                     ),
                 }),
+                columnHelper.accessor("readingStatus", {
+                    header: "読書状態",
+                    // 書籍カテゴリ以外と未設定はどちらも値を持たない
+                    cell: ({ getValue }) => {
+                        const status = getValue();
+                        return status === null ? (
+                            <span className="text-muted-foreground">—</span>
+                        ) : (
+                            <span className="whitespace-nowrap">
+                                {readingStatusLabels[status]}
+                            </span>
+                        );
+                    },
+                }),
                 columnHelper.display({
                     id: "actions",
                     header: "操作",
@@ -167,7 +182,7 @@ export function ItemTable({
             <CardContent className="p-0">
                 <Table
                     aria-busy={loading}
-                    className="min-w-[880px]"
+                    className="min-w-[980px]"
                     aria-label="登録済み品目"
                 >
                     <TableHeader className="bg-muted/50">

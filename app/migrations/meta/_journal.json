@@ -43,6 +43,13 @@
       "when": 1786973695396,
       "tag": "0005_expiry_lots",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1786985131503,
+      "tag": "0006_reading_states",
+      "breakpoints": true
     }
   ]
 }

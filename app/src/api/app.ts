@@ -8,6 +8,7 @@ import { itemsApp } from "./http/items";
 import { locationsApp } from "./http/locations";
 import { lotsApp } from "./http/lots";
 import { pricesApp } from "./http/prices";
+import { readingApp } from "./http/reading";
 import { stockInventoryApp, stockItemsApp } from "./http/stock";
 import { handleMcpRequest } from "./mcp/handler";
 
@@ -20,6 +21,7 @@ apiApp.route("/api/items", itemsApp);
 apiApp.route("/api/items", pricesApp);
 apiApp.route("/api/items", stockItemsApp);
 apiApp.route("/api/items", lotsApp);
+apiApp.route("/api/items", readingApp);
 apiApp.route("/api/inventory", stockInventoryApp);
 apiApp.route("/api/settings/integrations", integrationsApp);
 

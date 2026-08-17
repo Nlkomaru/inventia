@@ -53,7 +53,7 @@ itemsApp.openAPIRegistry.registerPath({
     summary: "Search inventory items",
     operationId: "listItems",
     description:
-        "Search item names and filter by category, location, low-stock state, or expiry within a number of days (expiringWithinDays) with cursor pagination. Each item reports its total quantity plus the expiry summary of its lots: earliestExpiryDate is the earliest expiry date among the lots holding stock (null when none of them has an expiry date) and lotCount is how many lots hold stock. Use GET /api/items/{itemId}/lots or GET /api/items/{id} for the per-expiry breakdown.",
+        "Search item names and filter by category, location, low-stock state, expiry within a number of days (expiringWithinDays), or reading state (readingStatus) with cursor pagination. Each item reports its total quantity plus the expiry summary of its lots: earliestExpiryDate is the earliest expiry date among the lots holding stock (null when none of them has an expiry date) and lotCount is how many lots hold stock. Use GET /api/items/{itemId}/lots or GET /api/items/{id} for the per-expiry breakdown. readingStatus on an item is its stored reading state and is null for an item that has none, which includes every item outside a book category; filtering by readingStatus therefore matches stored reading states only and never returns items without one. Use GET /api/items/{id} for the reading dates.",
     request: { query: itemListQuerySchema },
     responses: {
         200: {
@@ -73,7 +73,7 @@ itemsApp.openAPIRegistry.registerPath({
     summary: "Get an inventory item",
     operationId: "getItem",
     description:
-        "Returns the item with its expiry lots. lots holds one entry per expiry date in FEFO order (earliest expiry first, the lot without an expiry date last) and omits lots at quantity 0, so currentQuantity equals the sum of the returned lot quantities.",
+        "Returns the item with its expiry lots and its reading state. lots holds one entry per expiry date in FEFO order (earliest expiry first, the lot without an expiry date last) and omits lots at quantity 0, so currentQuantity equals the sum of the returned lot quantities. readingState carries the stored status with startedAt and finishedAt, and is null for an item that has no reading state, which includes every item outside a book category; readingStatus repeats the status of that same row. Set the reading state with PUT /api/items/{itemId}/reading-state.",
     request: { params: z.object({ id: itemIdParameter }) },
     responses: {
         200: {
@@ -92,7 +92,7 @@ itemsApp.openAPIRegistry.registerPath({
     summary: "Create an inventory item",
     operationId: "createItem",
     description:
-        "Creates an item. expiryDate is the expiry date of the item's initial lot; a positive initial quantity or an expiryDate creates that lot and records an immutable stocktake movement with its lot allocation. Later expiry corrections go through PATCH /api/items/{itemId}/lots/{lotId}, and later quantity changes through the adjustment and stocktake endpoints.",
+        "Creates an item. expiryDate is the expiry date of the item's initial lot; a positive initial quantity or an expiryDate creates that lot, and a positive initial quantity also records an immutable stocktake movement with its lot allocation. An omitted currentQuantity is 0 except for document categories, where it defaults to 1, so a document created without a quantity already gets that initial lot and stocktake movement; send currentQuantity 0 to create one holding no stock. Later expiry corrections go through PATCH /api/items/{itemId}/lots/{lotId}, and later quantity changes through the adjustment and stocktake endpoints.",
     request: {
         body: {
             required: true,
@@ -120,7 +120,7 @@ itemsApp.openAPIRegistry.registerPath({
     summary: "Update an inventory item",
     operationId: "updateItem",
     description:
-        "Updates display metadata. Base unit, stock quantity, and lot expiry dates are immutable through this endpoint: change an expiry date with PATCH /api/items/{itemId}/lots/{lotId} and a quantity with the adjustment or stocktake endpoints.",
+        "Updates display metadata. Base unit, stock quantity, and lot expiry dates are immutable through this endpoint: change an expiry date with PATCH /api/items/{itemId}/lots/{lotId} and a quantity with the adjustment or stocktake endpoints. Moving an item that holds a reading state out of its book category is rejected, because only items in a book category can hold one; remove it with DELETE /api/items/{itemId}/reading-state first.",
     request: {
         params: z.object({ id: itemIdParameter }),
         body: {
@@ -140,7 +140,7 @@ itemsApp.openAPIRegistry.registerPath({
             "The item or a referenced record does not exist. Codes: ITEM_NOT_FOUND, CATEGORY_NOT_FOUND, LOCATION_NOT_FOUND.",
         ),
         409: jsonError(
-            "ITEM_CATEGORY_KIND_CONFLICT: an item cannot move across the document and non-document category boundary.",
+            "The requested category move is not allowed. Codes: ITEM_CATEGORY_KIND_CONFLICT (an item cannot move across the document and non-document category boundary), ITEM_READING_STATE_CONFLICT (the item still holds a reading state; remove it with DELETE /api/items/{itemId}/reading-state before moving the item out of a book category).",
         ),
         ...serverErrorResponses,
     },
