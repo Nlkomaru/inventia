@@ -5,140 +5,433 @@ import {
     tableFeatures,
     useTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, MapPin, PackageOpen } from "lucide-react";
-
-export type InventoryStatus = "在庫あり" | "残りわずか" | "在庫切れ";
-
-export type InventoryRecord = {
-    id: string;
-    name: string;
-    category: string;
-    location: string;
-    quantity: number;
-    unit: string;
-    status: InventoryStatus;
-    expiryDate: string | null;
-};
+import {
+    ArrowUpDown,
+    ChevronDown,
+    Clock,
+    MapPin,
+    TriangleAlert,
+} from "lucide-react";
+import { useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import type { ItemDto } from "@/domain/item";
+import { type ItemLotDto, sortLotsFefo } from "@/domain/lot";
+import { cn } from "@/lib/utils";
 
 const features = tableFeatures({
     rowSortingFeature,
     sortedRowModel: createSortedRowModel(),
 });
 
-const columnHelper = createColumnHelper<typeof features, InventoryRecord>();
+const columnHelper = createColumnHelper<typeof features, ItemDto>();
 
-const columns = columnHelper.columns([
-    columnHelper.accessor("name", {
-        header: "品目",
-        cell: ({ getValue, row }) => (
-            <div className="min-w-56">
-                <p className="font-semibold text-slate-950">{getValue()}</p>
-                <p className="mt-1 text-xs text-slate-500">
-                    {row.original.category}
-                </p>
-            </div>
-        ),
-    }),
-    columnHelper.accessor("location", {
-        header: "保管場所",
-        cell: ({ getValue }) => (
-            <div className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
-                <MapPin aria-hidden="true" className="size-4 text-slate-400" />
-                {getValue()}
-            </div>
-        ),
-    }),
-    columnHelper.accessor("quantity", {
-        header: "現在庫",
-        cell: ({ getValue, row }) => (
-            <p className="whitespace-nowrap text-right font-mono text-sm font-semibold text-slate-950">
-                {getValue().toLocaleString("ja-JP")} {row.original.unit}
-            </p>
-        ),
-        sortUndefined: "last",
-    }),
-    columnHelper.accessor("status", {
-        header: "状態",
-        cell: ({ getValue }) => <StatusBadge status={getValue()} />,
-    }),
-    columnHelper.accessor("expiryDate", {
-        header: "期限",
-        cell: ({ getValue }) => (
-            <span className="whitespace-nowrap text-sm text-slate-600">
-                {getValue() ?? "—"}
+const dateFormatter = new Intl.DateTimeFormat("ja-JP", {
+    dateStyle: "medium",
+});
+const dayInMs = 86_400_000;
+const defaultSoonWithinDays = 7;
+// 内訳は先頭 2 件までを列挙し、残りは件数だけを示す
+const visibleLotLines = 2;
+const loadingRowKeys = ["loading-0", "loading-1", "loading-2", "loading-3"];
+
+const columnLabels: Record<string, string> = {
+    name: "品目",
+    location: "保管場所",
+    currentQuantity: "現在庫（合計）",
+    earliestExpiryDate: "最短期限",
+    lots: "ロット内訳",
+};
+
+export type ExpiryState = "expired" | "soon" | "scheduled" | "none";
+
+type ExpirySignal = {
+    state: ExpiryState;
+    /** 状態を色以外の手段でも伝えるための短いラベル。 */
+    label: string;
+    date: string | null;
+};
+
+const formatDate = (value: string): string => {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "—" : dateFormatter.format(date);
+};
+
+const formatQuantity = (quantity: number, unit: string): string =>
+    `${quantity.toLocaleString("ja-JP")} ${unit}`;
+
+/**
+ * 期限の状態を判定する。`now` は 1 回の描画で共通の基準時刻を使う。
+ * 一覧側の期限フィルターも同じ判定を共有する。
+ */
+export const resolveExpirySignal = (
+    expiryDate: string | null,
+    now: number,
+    soonWithinDays: number,
+): ExpirySignal => {
+    if (expiryDate === null) {
+        return { state: "none", label: "期限なし", date: null };
+    }
+    const time = new Date(expiryDate).getTime();
+    if (Number.isNaN(time)) {
+        return { state: "none", label: "期限なし", date: null };
+    }
+    const date = formatDate(expiryDate);
+    if (time <= now) {
+        return { state: "expired", label: "期限切れ", date };
+    }
+    const daysLeft = Math.ceil((time - now) / dayInMs);
+    if (daysLeft <= soonWithinDays) {
+        return { state: "soon", label: `あと ${daysLeft} 日`, date };
+    }
+    return { state: "scheduled", label: date, date };
+};
+
+// 期限なしは昇順で最後に置く。降順では先頭へ回るが、期限の近い在庫を
+// 探す用途では昇順が主で、null を値として比較するより順序が読みやすい
+const compareExpiry = (left: string | null, right: string | null): number => {
+    if (left === right) return 0;
+    if (left === null) return 1;
+    if (right === null) return -1;
+    return left < right ? -1 : 1;
+};
+
+const badgeClassName =
+    "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold";
+
+function ExpiryCell({ signal }: { signal: ExpirySignal }) {
+    // 期限なし・余裕のある期限はバッジを付けず、静かな表示にとどめる
+    if (signal.state === "none" || signal.state === "scheduled") {
+        return (
+            <span className="whitespace-nowrap text-sm text-muted-foreground">
+                {signal.label}
             </span>
-        ),
-    }),
-]);
-
-function StatusBadge({ status }: { status: InventoryStatus }) {
-    const styles: Record<InventoryStatus, string> = {
-        在庫あり: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-        残りわずか: "bg-amber-50 text-amber-700 ring-amber-600/20",
-        在庫切れ: "bg-rose-50 text-rose-700 ring-rose-600/20",
-    };
-
+        );
+    }
+    const expired = signal.state === "expired";
+    const Icon = expired ? TriangleAlert : Clock;
     return (
-        <span
-            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${styles[status]}`}
-        >
-            {status}
+        <span className="flex flex-col items-start gap-1">
+            <span
+                className={cn(
+                    badgeClassName,
+                    // destructive の文字色は薄い赤地に載せると 4.5:1 を下回るため、
+                    // 期限切れバッジは地色を card のままにして枠線で示す
+                    expired
+                        ? "border-destructive/40 bg-card text-destructive"
+                        : "border-primary/30 bg-primary/10 text-primary",
+                )}
+            >
+                <Icon aria-hidden="true" className="size-3.5" />
+                {signal.label}
+            </span>
+            {signal.date ? (
+                <span className="whitespace-nowrap text-xs text-muted-foreground">
+                    {signal.date}
+                </span>
+            ) : null}
         </span>
     );
 }
 
-export function InventoryTable({ data }: { data: InventoryRecord[] }) {
+type LotLine = {
+    key: string;
+    quantity: number;
+    expiryDate: string | null;
+};
+
+/**
+ * 内訳として表示する行を決める。
+ * `lotCount <= 1` の品目は合計と最短期限で内訳が尽きているため行を作らない。
+ * `lotCount >= 2` でロットを取得できていない場合は null を返し、件数だけを示す。
+ */
+const resolveLotLines = (
+    item: ItemDto,
+    lots: readonly ItemLotDto[] | undefined,
+): LotLine[] | null => {
+    if (item.lotCount <= 1) {
+        return [];
+    }
+    if (lots === undefined) {
+        return null;
+    }
+    return sortLotsFefo(lots)
+        .filter((lot) => lot.quantity > 0)
+        .map((lot) => ({
+            key: lot.id,
+            quantity: lot.quantity,
+            expiryDate: lot.expiryDate,
+        }));
+};
+
+function LotBreakdownCell({
+    item,
+    lines,
+    now,
+    soonWithinDays,
+}: {
+    item: ItemDto;
+    lines: LotLine[] | null;
+    now: number;
+    soonWithinDays: number;
+}) {
+    if (lines === null) {
+        return (
+            <span className="whitespace-nowrap text-xs text-muted-foreground">
+                全 {item.lotCount} ロット
+            </span>
+        );
+    }
+    if (lines.length === 0) {
+        return <span className="text-sm text-muted-foreground">—</span>;
+    }
+    const visible = lines.slice(0, visibleLotLines);
+    const rest = lines.length - visible.length;
+    return (
+        <ul className="flex flex-col gap-0.5">
+            {visible.map((line) => {
+                const signal = resolveExpirySignal(
+                    line.expiryDate,
+                    now,
+                    soonWithinDays,
+                );
+                return (
+                    <li
+                        className="flex items-baseline gap-1.5 whitespace-nowrap text-xs"
+                        key={line.key}
+                    >
+                        <span className="font-mono font-medium tabular-nums">
+                            {formatQuantity(line.quantity, item.baseUnit)}
+                        </span>
+                        <span
+                            className={cn(
+                                "text-muted-foreground",
+                                signal.state === "expired" &&
+                                    "font-semibold text-destructive",
+                            )}
+                        >
+                            / {signal.date ?? "期限なし"}
+                        </span>
+                    </li>
+                );
+            })}
+            {rest > 0 ? (
+                <li className="whitespace-nowrap text-xs text-muted-foreground">
+                    +{rest} 件
+                </li>
+            ) : null}
+        </ul>
+    );
+}
+
+export type InventoryTableProps = {
+    items: ItemDto[];
+    /**
+     * ロットが 2 件以上ある品目の内訳。取得済みの品目だけを渡す。
+     * 未取得の品目は件数のみの表示へ退避する。
+     */
+    lotsByItemId?: ReadonlyMap<string, readonly ItemLotDto[]>;
+    categoryLabels?: ReadonlyMap<string, string>;
+    locationLabels?: ReadonlyMap<string, string>;
+    loading?: boolean;
+    soonWithinDays?: number;
+};
+
+export function InventoryTable({
+    items,
+    lotsByItemId,
+    categoryLabels,
+    locationLabels,
+    loading = false,
+    soonWithinDays = defaultSoonWithinDays,
+}: InventoryTableProps) {
+    // 期限判定の基準時刻。行ごとに Date.now() を読むと同一描画内で基準が
+    // ずれるため、マウント時に 1 回だけ求める
+    const now = useMemo(() => Date.now(), []);
+    const columns = useMemo(
+        () =>
+            columnHelper.columns([
+                columnHelper.accessor("name", {
+                    header: columnLabels.name,
+                    sortFn: (rowA, rowB) =>
+                        rowA.original.name.localeCompare(
+                            rowB.original.name,
+                            "ja",
+                        ),
+                    cell: ({ getValue, row }) => (
+                        <div className="min-w-48 max-w-72">
+                            <p className="font-semibold break-words">
+                                {getValue()}
+                            </p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                {categoryLabels?.get(row.original.categoryId) ??
+                                    "—"}
+                            </p>
+                        </div>
+                    ),
+                }),
+                columnHelper.display({
+                    id: "location",
+                    header: columnLabels.location,
+                    enableSorting: false,
+                    cell: ({ row }) => (
+                        <span className="flex items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground">
+                            <MapPin aria-hidden="true" className="size-4" />
+                            {locationLabels?.get(row.original.locationId) ??
+                                "—"}
+                        </span>
+                    ),
+                }),
+                columnHelper.accessor("currentQuantity", {
+                    header: columnLabels.currentQuantity,
+                    sortFn: (rowA, rowB) =>
+                        rowA.original.currentQuantity -
+                        rowB.original.currentQuantity,
+                    cell: ({ getValue, row }) => {
+                        const quantity = getValue();
+                        const threshold = row.original.lowStockThreshold;
+                        const low =
+                            quantity === 0 ||
+                            (threshold !== null && quantity <= threshold);
+                        return (
+                            <div className="text-right">
+                                <p
+                                    className={cn(
+                                        "whitespace-nowrap font-mono text-sm font-semibold tabular-nums",
+                                        quantity === 0 && "text-destructive",
+                                    )}
+                                >
+                                    {formatQuantity(
+                                        quantity,
+                                        row.original.baseUnit,
+                                    )}
+                                </p>
+                                {low ? (
+                                    <p className="mt-0.5 whitespace-nowrap text-xs font-semibold text-destructive">
+                                        {quantity === 0
+                                            ? "在庫切れ"
+                                            : "残りわずか"}
+                                    </p>
+                                ) : null}
+                            </div>
+                        );
+                    },
+                }),
+                columnHelper.accessor("earliestExpiryDate", {
+                    header: columnLabels.earliestExpiryDate,
+                    sortFn: (rowA, rowB) =>
+                        compareExpiry(
+                            rowA.original.earliestExpiryDate,
+                            rowB.original.earliestExpiryDate,
+                        ),
+                    cell: ({ getValue }) => (
+                        <ExpiryCell
+                            signal={resolveExpirySignal(
+                                getValue(),
+                                now,
+                                soonWithinDays,
+                            )}
+                        />
+                    ),
+                }),
+                columnHelper.display({
+                    id: "lots",
+                    header: columnLabels.lots,
+                    enableSorting: false,
+                    cell: ({ row }) => (
+                        <LotBreakdownCell
+                            item={row.original}
+                            lines={resolveLotLines(
+                                row.original,
+                                lotsByItemId?.get(row.original.id),
+                            )}
+                            now={now}
+                            soonWithinDays={soonWithinDays}
+                        />
+                    ),
+                }),
+            ]),
+        [categoryLabels, locationLabels, lotsByItemId, now, soonWithinDays],
+    );
     const table = useTable({
         columns,
-        data,
+        data: items,
         enableSortingRemoval: false,
         features,
     });
+    const rows = table.getRowModel().rows;
 
     return (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)]">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                <div>
-                    <h2 className="text-sm font-bold text-slate-950">
-                        在庫一覧
-                    </h2>
-                    <p className="mt-1 text-xs text-slate-500">
-                        {data.length} 件の品目
-                    </p>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <PackageOpen aria-hidden="true" className="size-4" />
-                    列名をクリックして並べ替え
-                </div>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] border-collapse text-left">
-                    <thead className="bg-slate-50/80">
+        <Card>
+            <CardHeader>
+                <CardTitle>品目と期限別ロット</CardTitle>
+                <CardDescription>
+                    {loading
+                        ? "在庫を読み込み中…"
+                        : `${items.length} 件の品目。数量は期限別ロットの合計です。`}
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+                <Table
+                    aria-busy={loading}
+                    aria-label="在庫一覧"
+                    className="min-w-[860px]"
+                >
+                    <TableHeader className="bg-muted/50">
                         {table.getHeaderGroups().map((headerGroup) => (
-                            <tr key={headerGroup.id}>
+                            <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
                                     const sortDirection =
                                         header.column.getIsSorted();
-                                    const ariaSort =
-                                        sortDirection === "asc"
-                                            ? "ascending"
-                                            : sortDirection === "desc"
-                                              ? "descending"
-                                              : "none";
+                                    const label =
+                                        columnLabels[header.column.id] ??
+                                        header.column.id;
+                                    const numeric =
+                                        header.column.id === "currentQuantity";
 
                                     return (
-                                        <th
-                                            aria-sort={ariaSort}
-                                            className="whitespace-nowrap px-5 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+                                        <TableHead
+                                            aria-sort={
+                                                sortDirection === "asc"
+                                                    ? "ascending"
+                                                    : sortDirection === "desc"
+                                                      ? "descending"
+                                                      : "none"
+                                            }
+                                            className={cn(
+                                                numeric && "text-right",
+                                            )}
                                             key={header.id}
                                             scope="col"
                                         >
-                                            {header.isPlaceholder ? null : (
-                                                <button
-                                                    aria-label={`${header.column.columnDef.header}で並べ替え`}
-                                                    className="inline-flex items-center gap-1.5 rounded-sm outline-none transition-colors hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                                            {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                                                <Button
+                                                    aria-label={`${label}で並べ替え`}
+                                                    className={cn(
+                                                        // 見出しの文字色は TableHead の text-foreground を保つ。
+                                                        // muted へ落とすとヘッダー背景との比が 4.5:1 を下回る
+                                                        "-mx-2.5 font-medium",
+                                                        numeric && "ml-auto",
+                                                    )}
                                                     onClick={header.column.getToggleSortingHandler()}
+                                                    size="sm"
                                                     type="button"
+                                                    variant="ghost"
                                                 >
                                                     {table.FlexRender({
                                                         header,
@@ -146,52 +439,68 @@ export function InventoryTable({ data }: { data: InventoryRecord[] }) {
                                                     {sortDirection ? (
                                                         <ChevronDown
                                                             aria-hidden="true"
-                                                            className={`size-3.5 transition-transform ${sortDirection === "asc" ? "rotate-180" : ""}`}
+                                                            className={cn(
+                                                                "transition-transform",
+                                                                sortDirection ===
+                                                                    "asc" &&
+                                                                    "rotate-180",
+                                                            )}
+                                                            data-icon="inline-end"
                                                         />
                                                     ) : (
                                                         <ArrowUpDown
                                                             aria-hidden="true"
-                                                            className="size-3.5 opacity-50"
+                                                            className="opacity-50"
+                                                            data-icon="inline-end"
                                                         />
                                                     )}
-                                                </button>
+                                                </Button>
+                                            ) : (
+                                                table.FlexRender({ header })
                                             )}
-                                        </th>
+                                        </TableHead>
                                     );
                                 })}
-                            </tr>
+                            </TableRow>
                         ))}
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {table.getRowModel().rows.length === 0 ? (
-                            <tr>
-                                <td
-                                    className="px-5 py-16 text-center text-sm text-slate-500"
-                                    colSpan={columns.length}
-                                >
-                                    該当する品目がありません
-                                </td>
-                            </tr>
-                        ) : (
-                            table.getRowModel().rows.map((row) => (
-                                <tr
-                                    className="transition-colors hover:bg-indigo-50/35"
-                                    key={row.id}
-                                >
+                    </TableHeader>
+                    <TableBody>
+                        {loading ? (
+                            loadingRowKeys.map((rowKey) => (
+                                <TableRow key={rowKey}>
+                                    {columns.map((column) => (
+                                        <TableCell key={column.id}>
+                                            <Skeleton className="h-4 w-24" />
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))
+                        ) : rows.length > 0 ? (
+                            rows.map((row) => (
+                                <TableRow key={row.id}>
                                     {row.getAllCells().map((cell) => (
-                                        <td
-                                            className="px-5 py-4 align-middle"
+                                        <TableCell
+                                            className="align-top"
                                             key={cell.id}
                                         >
                                             {table.FlexRender({ cell })}
-                                        </td>
+                                        </TableCell>
                                     ))}
-                                </tr>
+                                </TableRow>
                             ))
+                        ) : (
+                            <TableRow>
+                                <TableCell
+                                    className="h-28 text-center text-muted-foreground"
+                                    colSpan={columns.length}
+                                >
+                                    該当する品目がありません
+                                </TableCell>
+                            </TableRow>
                         )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
     );
 }

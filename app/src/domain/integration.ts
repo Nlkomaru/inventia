@@ -5,17 +5,39 @@ export const openRouterEmbeddingModel =
     "openai/text-embedding-3-small" as const;
 export const openRouterEmbeddingDimensions = 1536 as const;
 
+// レシート読み取り等に使うマルチモーダル LLM の既定値。
+// GET https://openrouter.ai/api/v1/models で実在と画像入力対応を確認した ID のみを既定にできる。
+export const openRouterDefaultChatModel = "google/gemini-3.7-flash" as const;
+
 export const openRouterApiKeySchema = z
     .string()
     .min(1, "API key を入力してください。")
     .max(4096, "API key は 4096 文字以内で入力してください。")
     .regex(/^[^\r\n]+$/, "API key に改行は入力できません。");
 
+export const openRouterChatModelSchema = z
+    .string()
+    .trim()
+    .min(1, "LLM モデルを選択してください。")
+    .max(200, "モデル ID は 200 文字以内で入力してください。")
+    .regex(
+        /^[a-z0-9][a-z0-9._-]*\/[A-Za-z0-9._:-]+$/,
+        "モデル ID は provider/model の形式で入力してください。",
+    );
+
 export const openRouterIntegrationUpdateSchema = z
     .object({
-        apiKey: openRouterApiKeySchema,
+        apiKey: openRouterApiKeySchema.optional(),
+        chatModel: openRouterChatModelSchema.optional(),
     })
-    .strict();
+    .strict()
+    .refine(
+        (value) => value.apiKey !== undefined || value.chatModel !== undefined,
+        {
+            message:
+                "apiKey か chatModel のいずれかを指定してください。API key を入力しなくてもモデルだけ保存できます。",
+        },
+    );
 
 export const openRouterIntegrationStatusSchema = z
     .object({
@@ -23,7 +45,23 @@ export const openRouterIntegrationStatusSchema = z
         configured: z.boolean(),
         model: z.literal(openRouterEmbeddingModel),
         dimensions: z.literal(openRouterEmbeddingDimensions),
+        chatModel: z.string(),
+        chatModelConfigured: z.boolean(),
         updatedAt: z.string().datetime().nullable(),
+    })
+    .strict();
+
+// 選択肢の出力 DTO。JSON Schema へ変換するため transform を持たせない。
+export const openRouterChatModelOptionSchema = z
+    .object({
+        id: z.string(),
+        name: z.string(),
+    })
+    .strict();
+
+export const openRouterChatModelListSchema = z
+    .object({
+        models: z.array(openRouterChatModelOptionSchema),
     })
     .strict();
 
@@ -32,4 +70,10 @@ export type OpenRouterIntegrationUpdate = z.infer<
 >;
 export type OpenRouterIntegrationStatus = z.infer<
     typeof openRouterIntegrationStatusSchema
+>;
+export type OpenRouterChatModelOption = z.infer<
+    typeof openRouterChatModelOptionSchema
+>;
+export type OpenRouterChatModelList = z.infer<
+    typeof openRouterChatModelListSchema
 >;

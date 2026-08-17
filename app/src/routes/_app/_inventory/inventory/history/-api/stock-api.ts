@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { type ItemDto, itemDtoSchema } from "@/domain/item";
-import { type ItemLotDto, itemLotListDtoSchema } from "@/domain/lot";
 import {
-    type StockOperationResult,
-    stockOperationResultSchema,
-    stocktakeSchema,
+    type StockHistoryResult,
+    stockHistoryResultSchema,
 } from "@/domain/stock";
+import {
+    type HistoryQuery,
+    toHistoryParams,
+} from "../-functions/history-query";
 
 const itemListOutputSchema = z.object({
     items: z.array(itemDtoSchema),
@@ -57,38 +59,12 @@ export const listItems = async (): Promise<ItemDto[]> => {
     return items;
 };
 
-/** 棚卸しの初期値は数量 > 0 のロットから作るため、既定の一覧を FEFO 順で取得する。 */
-export const listItemLots = async (itemId: string): Promise<ItemLotDto[]> => {
-    const result = await request(
-        `/api/items/${encodeURIComponent(itemId)}/lots`,
-        itemLotListDtoSchema,
-        "ロットを読み込めませんでした",
+/** 履歴は cursor ページングで、1 ページごとにロット内訳を同梱して返る。 */
+export const listStockHistory = (
+    query: HistoryQuery,
+): Promise<StockHistoryResult> =>
+    request(
+        `/api/inventory/history?${toHistoryParams(query)}`,
+        stockHistoryResultSchema,
+        "在庫履歴を読み込めませんでした",
     );
-    return result.lots;
-};
-
-export interface StocktakeRequestInput {
-    // 棚卸し後の全数状態。ここに現れない既存ロットは 0 になる
-    lots: { expiryDate: string | null; quantity: number }[];
-    idempotencyKey: string;
-}
-
-export const recordStocktake = (
-    itemId: string,
-    input: StocktakeRequestInput,
-): Promise<StockOperationResult> => {
-    const body = stocktakeSchema.parse({
-        lots: input.lots,
-        idempotencyKey: input.idempotencyKey,
-    });
-    return request(
-        `/api/items/${encodeURIComponent(itemId)}/stocktake`,
-        stockOperationResultSchema,
-        "棚卸しを記録できませんでした",
-        {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(body),
-        },
-    );
-};

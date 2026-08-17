@@ -13,7 +13,10 @@ export interface ItemRow {
     baseUnit: string;
     baseDimension: "mass" | "volume" | "count";
     currentQuantity: number;
-    expiryDate: string | null;
+    // 数量 > 0 のロットのうち最も早い期限。期限付きの在庫がなければ null
+    earliestExpiryDate: string | null;
+    // 数量 > 0 のロット件数
+    lotCount: number;
     lowStockThreshold: number | null;
     memo: string | null;
     createdAt: string;
@@ -77,19 +80,28 @@ const escapeLike = (value: string): string =>
         .replaceAll("%", "\\%")
         .replaceAll("_", "\\_");
 
+const dayInMilliseconds = 24 * 60 * 60 * 1000;
+
+// 期限集計は items の SELECT 内の相関サブクエリで求め、ロットの追加読みで N+1 を作らない。
+// uq_item_lots_item_expiry を item_id の前方一致で使える。
+// 数量 0 のロットは既定の表示対象外なので集計から除く
+const itemColumns = `id, name, category_id AS categoryId, location_id AS locationId,
+		base_unit AS baseUnit, base_dimension AS baseDimension,
+		current_quantity AS currentQuantity,
+		(SELECT MIN(expiry_date) FROM item_lots
+			WHERE item_id = items.id AND quantity > 0 AND expiry_date IS NOT NULL)
+			AS earliestExpiryDate,
+		(SELECT COUNT(*) FROM item_lots
+			WHERE item_id = items.id AND quantity > 0) AS lotCount,
+		low_stock_threshold AS lowStockThreshold, memo,
+		created_at AS createdAt, updated_at AS updatedAt`;
+
 export const getItem = async (
     db: D1Database,
     id: string,
 ): Promise<ItemRow | null> =>
     db
-        .prepare(
-            `SELECT id, name, category_id AS categoryId, location_id AS locationId,
-				base_unit AS baseUnit, base_dimension AS baseDimension,
-				current_quantity AS currentQuantity, expiry_date AS expiryDate,
-				low_stock_threshold AS lowStockThreshold, memo,
-				created_at AS createdAt, updated_at AS updatedAt
-			 FROM items WHERE id = ?`,
-        )
+        .prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`)
         .bind(id)
         .first<ItemRow>();
 
@@ -117,6 +129,19 @@ export const listItems = async (
             "low_stock_threshold IS NOT NULL AND current_quantity <= low_stock_threshold",
         );
     }
+    if (query.expiringWithinDays !== undefined) {
+        // 期限なしロットは対象外。既に期限を過ぎたロットは常に該当する
+        where.push(
+            `EXISTS (SELECT 1 FROM item_lots
+				WHERE item_id = items.id AND quantity > 0
+					AND expiry_date IS NOT NULL AND expiry_date <= ?)`,
+        );
+        bindings.push(
+            new Date(
+                Date.now() + query.expiringWithinDays * dayInMilliseconds,
+            ).toISOString(),
+        );
+    }
     if (query.cursor) {
         const cursor = decodeCursor(query.cursor);
         where.push(
@@ -126,11 +151,7 @@ export const listItems = async (
     }
 
     const limit = query.limit;
-    const sql = `SELECT id, name, category_id AS categoryId, location_id AS locationId,
-		base_unit AS baseUnit, base_dimension AS baseDimension,
-		current_quantity AS currentQuantity, expiry_date AS expiryDate,
-		low_stock_threshold AS lowStockThreshold, memo,
-		created_at AS createdAt, updated_at AS updatedAt
+    const sql = `SELECT ${itemColumns}
 		FROM items${where.length > 0 ? ` WHERE ${where.join(" AND ")}` : ""}
 		ORDER BY name COLLATE NOCASE ASC, id ASC LIMIT ?`;
     const result = await db
@@ -157,13 +178,13 @@ export const getCategoryKind = async (
     const result = await db
         .prepare(
             `WITH RECURSIVE ancestors(id, parent_id, kind, depth) AS (
-				SELECT id, parent_id, kind, 0 FROM categories WHERE id = ?
-				UNION ALL
-				SELECT categories.id, categories.parent_id, categories.kind, ancestors.depth + 1
-				FROM categories JOIN ancestors ON categories.id = ancestors.parent_id
-			)
-			SELECT kind FROM ancestors
-			WHERE kind IS NOT NULL ORDER BY depth ASC LIMIT 1`,
+					SELECT id, parent_id, kind, 0 FROM categories WHERE id = ?
+					UNION ALL
+					SELECT categories.id, categories.parent_id, categories.kind, ancestors.depth + 1
+					FROM categories JOIN ancestors ON categories.id = ancestors.parent_id
+				)
+				SELECT kind FROM ancestors
+				WHERE kind IS NOT NULL ORDER BY depth ASC LIMIT 1`,
         )
         .bind(categoryId)
         .first<{ kind: "daily_goods" | "food" | "book" | "document" }>();
@@ -198,12 +219,13 @@ export const createItem = async (
 ): Promise<ItemRow> => {
     const id = newId();
     const now = new Date().toISOString();
+    const expiryDate = input.expiryDate ?? null;
     const itemStatement = db
         .prepare(
             `INSERT INTO items
-				(id, name, category_id, location_id, base_unit, base_dimension,
-				 current_quantity, expiry_date, low_stock_threshold, memo, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					(id, name, category_id, location_id, base_unit, base_dimension,
+					 current_quantity, low_stock_threshold, memo, created_at, updated_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
             id,
@@ -213,22 +235,53 @@ export const createItem = async (
             input.baseUnit,
             input.baseDimension,
             input.currentQuantity,
-            input.expiryDate ?? null,
             input.lowStockThreshold ?? null,
             input.memo ?? null,
             now,
             now,
         );
     const statements: D1PreparedStatement[] = [itemStatement];
-    if (input.currentQuantity > 0) {
+    // 在庫か期限のどちらかがあるときだけ初期ロットを作る。
+    // 数量 0 かつ期限なしの品目はロットを持たない
+    const lotId =
+        input.currentQuantity > 0 || expiryDate !== null ? newId() : null;
+    if (lotId) {
+        statements.push(
+            db
+                .prepare(
+                    `INSERT INTO item_lots
+							(id, item_id, expiry_date, quantity, created_at, updated_at)
+						 VALUES (?, ?, ?, ?, ?, ?)`,
+                )
+                .bind(lotId, id, expiryDate, input.currentQuantity, now, now),
+        );
+    }
+    if (input.currentQuantity > 0 && lotId) {
+        const movementId = newId();
         statements.push(
             db
                 .prepare(
                     `INSERT INTO stock_movements
-						(id, item_id, delta, reason, purchase_id, occurred_at, idempotency_key, created_at)
-					 VALUES (?, ?, ?, 'stocktake', NULL, ?, NULL, ?)`,
+							(id, item_id, delta, reason, purchase_id, occurred_at, idempotency_key, created_at)
+						 VALUES (?, ?, ?, 'stocktake', NULL, ?, NULL, ?)`,
                 )
-                .bind(newId(), id, input.currentQuantity, now, now),
+                .bind(movementId, id, input.currentQuantity, now, now),
+            // 初期在庫の movement もロット内訳を持たせ、履歴の一貫性を保つ。
+            // 期限は記録時点のスナップショットとして allocation に写す
+            db
+                .prepare(
+                    `INSERT INTO stock_movement_lot_allocations
+							(id, movement_id, lot_id, expiry_date, delta, created_at)
+						 VALUES (?, ?, ?, ?, ?, ?)`,
+                )
+                .bind(
+                    newId(),
+                    movementId,
+                    lotId,
+                    expiryDate,
+                    input.currentQuantity,
+                    now,
+                ),
         );
     }
     await db.batch(statements);
@@ -250,7 +303,6 @@ export const updateItem = async (
         ["name", "name"],
         ["categoryId", "category_id"],
         ["locationId", "location_id"],
-        ["expiryDate", "expiry_date"],
         ["lowStockThreshold", "low_stock_threshold"],
         ["memo", "memo"],
     ];
@@ -276,9 +328,21 @@ export const deleteItem = async (
     db: D1Database,
     id: string,
 ): Promise<boolean> => {
-    const result = await db
-        .prepare("DELETE FROM items WHERE id = ?")
-        .bind(id)
-        .run();
-    return (result.meta.changes ?? 0) > 0;
+    // 履歴を持たない品目を削除できる従来の挙動を保つため、allocation から
+    // 参照されていない空ロットだけ先に消す。在庫や履歴が残るロットは
+    // item_lots の FK restrict で items の削除自体が失敗する
+    const results = await db.batch([
+        db
+            .prepare(
+                `DELETE FROM item_lots
+					WHERE item_id = ? AND quantity = 0
+						AND NOT EXISTS (
+							SELECT 1 FROM stock_movement_lot_allocations
+							WHERE lot_id = item_lots.id
+						)`,
+            )
+            .bind(id),
+        db.prepare("DELETE FROM items WHERE id = ?").bind(id),
+    ]);
+    return (results[1]?.meta.changes ?? 0) > 0;
 };

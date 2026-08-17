@@ -2,6 +2,7 @@ import { OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import {
     itemCreateSchema,
+    itemDetailDtoSchema,
     itemDtoSchema,
     itemListQuerySchema,
     itemUpdateSchema,
@@ -36,24 +37,13 @@ const deletedSchema = z.object({ deleted: z.literal(true) });
 const responseContent = (schema: z.ZodType) => ({
     "application/json": { schema },
 });
-const errorResponses = {
-    400: {
-        description: "The request is invalid; correct the reported input.",
-        content: responseContent(itemErrorSchema),
-    },
-    404: {
-        description:
-            "The requested item, category, or location does not exist.",
-        content: responseContent(itemErrorSchema),
-    },
-    409: {
-        description: "The operation conflicts with current inventory data.",
-        content: responseContent(itemErrorSchema),
-    },
-    500: {
-        description: "The service could not complete the request.",
-        content: responseContent(itemErrorSchema),
-    },
+// エラー応答は利用者が対処できるコードを description に列挙する
+const jsonError = (description: string) => ({
+    description,
+    content: responseContent(itemErrorSchema),
+});
+const serverErrorResponses = {
+    500: jsonError("The service could not complete the request."),
 };
 
 itemsApp.openAPIRegistry.registerPath({
@@ -61,15 +51,19 @@ itemsApp.openAPIRegistry.registerPath({
     path: "/",
     tags: ["Items"],
     summary: "Search inventory items",
+    operationId: "listItems",
     description:
-        "Search item names and filter by category, location, or low-stock state with cursor pagination.",
+        "Search item names and filter by category, location, low-stock state, or expiry within a number of days (expiringWithinDays) with cursor pagination. Each item reports its total quantity plus the expiry summary of its lots: earliestExpiryDate is the earliest expiry date among the lots holding stock (null when none of them has an expiry date) and lotCount is how many lots hold stock. Use GET /api/items/{itemId}/lots or GET /api/items/{id} for the per-expiry breakdown.",
     request: { query: itemListQuerySchema },
     responses: {
         200: {
             description: "A stable page of inventory items.",
             content: responseContent(itemListSchema),
         },
-        ...errorResponses,
+        400: jsonError(
+            "The request is invalid; correct the reported input. Codes: VALIDATION_ERROR, INVALID_CURSOR.",
+        ),
+        ...serverErrorResponses,
     },
 });
 itemsApp.openAPIRegistry.registerPath({
@@ -77,13 +71,18 @@ itemsApp.openAPIRegistry.registerPath({
     path: "/{id}",
     tags: ["Items"],
     summary: "Get an inventory item",
+    operationId: "getItem",
+    description:
+        "Returns the item with its expiry lots. lots holds one entry per expiry date in FEFO order (earliest expiry first, the lot without an expiry date last) and omits lots at quantity 0, so currentQuantity equals the sum of the returned lot quantities.",
     request: { params: z.object({ id: itemIdParameter }) },
     responses: {
         200: {
-            description: "The requested inventory item.",
-            content: responseContent(itemDtoSchema),
+            description: "The requested inventory item with its expiry lots.",
+            content: responseContent(itemDetailDtoSchema),
         },
-        ...errorResponses,
+        400: jsonError("INVALID_ID: the path id is empty."),
+        404: jsonError("The requested item does not exist: ITEM_NOT_FOUND."),
+        ...serverErrorResponses,
     },
 });
 itemsApp.openAPIRegistry.registerPath({
@@ -91,8 +90,9 @@ itemsApp.openAPIRegistry.registerPath({
     path: "/",
     tags: ["Items"],
     summary: "Create an inventory item",
+    operationId: "createItem",
     description:
-        "Creates an item. A positive initial quantity also records an immutable stocktake movement.",
+        "Creates an item. expiryDate is the expiry date of the item's initial lot; a positive initial quantity or an expiryDate creates that lot and records an immutable stocktake movement with its lot allocation. Later expiry corrections go through PATCH /api/items/{itemId}/lots/{lotId}, and later quantity changes through the adjustment and stocktake endpoints.",
     request: {
         body: {
             required: true,
@@ -104,7 +104,13 @@ itemsApp.openAPIRegistry.registerPath({
             description: "The created inventory item.",
             content: responseContent(itemDtoSchema),
         },
-        ...errorResponses,
+        400: jsonError(
+            "The request is invalid; correct the reported input. Codes: VALIDATION_ERROR, INVALID_JSON, BASE_UNIT_REQUIRED (this category has no default unit, so send baseUnit and baseDimension together).",
+        ),
+        404: jsonError(
+            "A referenced record does not exist. Codes: CATEGORY_NOT_FOUND, LOCATION_NOT_FOUND.",
+        ),
+        ...serverErrorResponses,
     },
 });
 itemsApp.openAPIRegistry.registerPath({
@@ -112,8 +118,9 @@ itemsApp.openAPIRegistry.registerPath({
     path: "/{id}",
     tags: ["Items"],
     summary: "Update an inventory item",
+    operationId: "updateItem",
     description:
-        "Updates display metadata. Base unit and stock quantity are immutable through this endpoint.",
+        "Updates display metadata. Base unit, stock quantity, and lot expiry dates are immutable through this endpoint: change an expiry date with PATCH /api/items/{itemId}/lots/{lotId} and a quantity with the adjustment or stocktake endpoints.",
     request: {
         params: z.object({ id: itemIdParameter }),
         body: {
@@ -126,7 +133,16 @@ itemsApp.openAPIRegistry.registerPath({
             description: "The updated inventory item.",
             content: responseContent(itemDtoSchema),
         },
-        ...errorResponses,
+        400: jsonError(
+            "The request is invalid; correct the reported input. Codes: VALIDATION_ERROR, INVALID_JSON, INVALID_ID.",
+        ),
+        404: jsonError(
+            "The item or a referenced record does not exist. Codes: ITEM_NOT_FOUND, CATEGORY_NOT_FOUND, LOCATION_NOT_FOUND.",
+        ),
+        409: jsonError(
+            "ITEM_CATEGORY_KIND_CONFLICT: an item cannot move across the document and non-document category boundary.",
+        ),
+        ...serverErrorResponses,
     },
 });
 itemsApp.openAPIRegistry.registerPath({
@@ -134,13 +150,21 @@ itemsApp.openAPIRegistry.registerPath({
     path: "/{id}",
     tags: ["Items"],
     summary: "Delete an inventory item",
+    operationId: "deleteItem",
+    description:
+        "Deletes an item that has no stock history, together with its lots that hold no stock and are not referenced by a movement. An item with recorded stock movements cannot be deleted.",
     request: { params: z.object({ id: itemIdParameter }) },
     responses: {
         200: {
             description: "The item was deleted.",
             content: responseContent(deletedSchema),
         },
-        ...errorResponses,
+        400: jsonError("INVALID_ID: the path id is empty."),
+        404: jsonError("The requested item does not exist: ITEM_NOT_FOUND."),
+        409: jsonError(
+            "ITEM_DELETE_CONFLICT: the item has stock history and cannot be deleted.",
+        ),
+        ...serverErrorResponses,
     },
 });
 

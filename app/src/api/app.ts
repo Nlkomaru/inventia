@@ -6,6 +6,7 @@ import { healthApp } from "./http/health";
 import { integrationsApp } from "./http/integrations";
 import { itemsApp } from "./http/items";
 import { locationsApp } from "./http/locations";
+import { lotsApp } from "./http/lots";
 import { pricesApp } from "./http/prices";
 import { stockInventoryApp, stockItemsApp } from "./http/stock";
 import { handleMcpRequest } from "./mcp/handler";
@@ -18,6 +19,7 @@ apiApp.route("/api/locations", locationsApp);
 apiApp.route("/api/items", itemsApp);
 apiApp.route("/api/items", pricesApp);
 apiApp.route("/api/items", stockItemsApp);
+apiApp.route("/api/items", lotsApp);
 apiApp.route("/api/inventory", stockInventoryApp);
 apiApp.route("/api/settings/integrations", integrationsApp);
 

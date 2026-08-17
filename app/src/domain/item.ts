@@ -1,15 +1,11 @@
 import { z } from "zod";
+import {
+    itemLotDtoSchema,
+    lotExpiryDateOutputSchema,
+    lotExpiryDateSchema,
+} from "./lot";
 
 export const itemBaseDimensionSchema = z.enum(["mass", "volume", "count"]);
-
-const isoDateTimeSchema = z.iso.datetime({ offset: true });
-
-const normalizeUtcDateTime = (value: string): string =>
-    new Date(value).toISOString();
-
-export const itemExpiryDateSchema = isoDateTimeSchema
-    .transform(normalizeUtcDateTime)
-    .nullable();
 
 export const itemDtoSchema = z.object({
     id: z.string().min(1),
@@ -18,12 +14,21 @@ export const itemDtoSchema = z.object({
     locationId: z.string(),
     baseUnit: z.string(),
     baseDimension: itemBaseDimensionSchema,
+    // ロット合計の維持キャッシュ。在庫の正は item_lots である
     currentQuantity: z.int().min(0),
-    expiryDate: itemExpiryDateSchema,
+    // 数量 > 0 のロットのうち最も早い期限。期限付きの在庫がなければ null
+    earliestExpiryDate: lotExpiryDateOutputSchema,
+    // 数量 > 0 のロット件数。内訳表示の有無の判定に使う
+    lotCount: z.int().min(0),
     lowStockThreshold: z.int().min(0).nullable(),
     memo: z.string().nullable(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
+});
+
+// 詳細取得では期限別の内訳を同梱する（数量 0 のロットは含めない）
+export const itemDetailDtoSchema = itemDtoSchema.extend({
+    lots: z.array(itemLotDtoSchema),
 });
 
 const itemFields = {
@@ -33,7 +38,8 @@ const itemFields = {
     baseUnit: z.string().trim().min(1).max(50),
     baseDimension: itemBaseDimensionSchema,
     currentQuantity: z.int().min(0),
-    expiryDate: itemExpiryDateSchema,
+    // 作成時の初期ロットの期限。以後の期限変更はロット単位の操作で行う
+    expiryDate: lotExpiryDateSchema,
     lowStockThreshold: z.int().min(0).nullable(),
     memo: z.string().max(2000).nullable(),
 };
@@ -66,7 +72,6 @@ export const itemUpdateSchema = z
         name: itemFields.name.optional(),
         categoryId: itemFields.categoryId.optional(),
         locationId: itemFields.locationId.optional(),
-        expiryDate: itemFields.expiryDate.optional(),
         lowStockThreshold: itemFields.lowStockThreshold.optional(),
         memo: itemFields.memo.optional(),
     })
@@ -90,6 +95,9 @@ export const itemListQuerySchema = z.object({
             z.boolean(),
         )
         .optional(),
+    // 数量 > 0 のロットの期限が now + n 日以内の品目だけに絞る。
+    // 期限なしロットは対象外で、既に期限を過ぎたロットは常に該当する
+    expiringWithinDays: z.coerce.number().int().min(0).max(3650).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
     cursor: z.string().min(1).optional(),
 });
@@ -99,3 +107,4 @@ export type ItemUpdateInput = z.infer<typeof itemUpdateSchema>;
 export type ItemListQuery = z.infer<typeof itemListQuerySchema>;
 
 export type ItemDto = z.infer<typeof itemDtoSchema>;
+export type ItemDetailDto = z.infer<typeof itemDetailDtoSchema>;

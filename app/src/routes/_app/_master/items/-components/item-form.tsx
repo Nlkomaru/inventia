@@ -79,15 +79,6 @@ const dimensionLabels: Record<BaseDimension, string> = {
     count: "個数",
 };
 
-const pad = (value: number): string => String(value).padStart(2, "0");
-
-const toDateTimeLocal = (value: string | null): string => {
-    if (!value) return "";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
-
 const toIsoDateTime = (value: string): string | null => {
     if (!value) return null;
     const date = new Date(value);
@@ -110,7 +101,8 @@ const initialForm = (item: ItemDto | null): FormValues => {
         baseUnit: item.baseUnit,
         baseDimension: item.baseDimension,
         currentQuantity: String(item.currentQuantity),
-        expiryDate: toDateTimeLocal(item.expiryDate),
+        // 期限はロット単位で管理するため、編集フォームでは扱わない
+        expiryDate: "",
         lowStockThreshold:
             item.lowStockThreshold === null
                 ? ""
@@ -240,12 +232,6 @@ export function ItemForm({
             setError("カテゴリと保管場所を選択してください");
             return;
         }
-        if (!toIsoDateTime(form.expiryDate) && form.expiryDate) {
-            setFieldErrors({ expiryDate: "期限日時を正しく入力してください" });
-            setError("期限日時を正しく入力してください");
-            return;
-        }
-        const expiryDate = toIsoDateTime(form.expiryDate);
         const lowStockThreshold = parseNullableInteger(form.lowStockThreshold);
         if (form.lowStockThreshold.trim() && lowStockThreshold === null) {
             setFieldErrors({
@@ -255,11 +241,11 @@ export function ItemForm({
             return;
         }
         if (item) {
+            // itemUpdateSchema は strict で expiryDate を受け付けない
             const parsed = itemUpdateSchema.safeParse({
                 name,
                 categoryId: form.categoryId,
                 locationId: form.locationId,
-                expiryDate,
                 lowStockThreshold,
                 memo: form.memo.trim() || null,
             });
@@ -286,6 +272,12 @@ export function ItemForm({
             return;
         }
 
+        if (form.expiryDate && !toIsoDateTime(form.expiryDate)) {
+            setFieldErrors({ expiryDate: "期限日時を正しく入力してください" });
+            setError("期限日時を正しく入力してください");
+            return;
+        }
+        const expiryDate = toIsoDateTime(form.expiryDate);
         const currentQuantity = parseNullableInteger(form.currentQuantity);
         if (!isDocument && (!form.baseUnit.trim() || !form.baseDimension)) {
             const errors: FieldErrors = {};
@@ -349,7 +341,7 @@ export function ItemForm({
                     </SheetTitle>
                     <SheetDescription>
                         {item
-                            ? "表示情報と保管場所を更新します。単位と在庫数量は変更できません。"
+                            ? "表示情報と保管場所を更新します。単位と在庫数量は変更できません。期限は在庫画面のロット操作で変更します。"
                             : "在庫として管理する品目の基本情報を入力します。"}
                     </SheetDescription>
                 </SheetHeader>
@@ -616,25 +608,34 @@ export function ItemForm({
                     )}
 
                     <FieldGroup>
-                        <Field data-invalid={Boolean(fieldErrors.expiryDate)}>
-                            <FieldLabel htmlFor="item-expiry-date">
-                                期限日時
-                            </FieldLabel>
-                            <Input
-                                aria-invalid={Boolean(fieldErrors.expiryDate)}
-                                id="item-expiry-date"
-                                type="datetime-local"
-                                value={form.expiryDate}
-                                onChange={(event) =>
-                                    update("expiryDate", event.target.value)
-                                }
-                            />
-                            <FieldDescription>
-                                入力した日時は UTC の ISO 8601
-                                形式で保存します。
-                            </FieldDescription>
-                            <FieldError>{fieldErrors.expiryDate}</FieldError>
-                        </Field>
+                        {item ? null : (
+                            <Field
+                                data-invalid={Boolean(fieldErrors.expiryDate)}
+                            >
+                                <FieldLabel htmlFor="item-expiry-date">
+                                    初期ロットの期限（任意）
+                                </FieldLabel>
+                                <Input
+                                    aria-invalid={Boolean(
+                                        fieldErrors.expiryDate,
+                                    )}
+                                    id="item-expiry-date"
+                                    type="datetime-local"
+                                    value={form.expiryDate}
+                                    onChange={(event) =>
+                                        update("expiryDate", event.target.value)
+                                    }
+                                />
+                                <FieldDescription>
+                                    登録時に作る最初のロットの期限です。入力した日時は
+                                    UTC の ISO 8601
+                                    形式で保存します。以後の期限は在庫画面のロット操作で変更します。
+                                </FieldDescription>
+                                <FieldError>
+                                    {fieldErrors.expiryDate}
+                                </FieldError>
+                            </Field>
+                        )}
                         <Field
                             data-invalid={Boolean(
                                 fieldErrors.lowStockThreshold,

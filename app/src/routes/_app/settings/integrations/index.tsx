@@ -1,7 +1,7 @@
 "use client";
 
 import { createFileRoute } from "@tanstack/react-router";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,8 +21,20 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    type OpenRouterChatModelOption,
     type OpenRouterIntegrationStatus,
     openRouterApiKeySchema,
+    openRouterChatModelListSchema,
+    openRouterChatModelSchema,
+    openRouterDefaultChatModel,
     openRouterEmbeddingDimensions,
     openRouterEmbeddingModel,
     openRouterIntegrationStatusSchema,
@@ -54,14 +66,32 @@ const readApiError = async (response: Response): Promise<string> => {
 
 function IntegrationsSettingsPage() {
     const [apiKey, setApiKey] = useState("");
+    const [chatModel, setChatModel] = useState<string>(
+        openRouterDefaultChatModel,
+    );
     const [status, setStatus] = useState<OpenRouterIntegrationStatus | null>(
         null,
     );
+    const [models, setModels] = useState<OpenRouterChatModelOption[]>([]);
+    const [modelsLoading, setModelsLoading] = useState(true);
+    const [modelsError, setModelsError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const validation = apiKey ? openRouterApiKeySchema.safeParse(apiKey) : null;
+    const chatModelValidation = openRouterChatModelSchema.safeParse(chatModel);
+
+    // 保存済みモデルが一覧に無い場合（提供終了・取得失敗）も現在値を選択肢として残す。
+    const modelItems = useMemo(() => {
+        const options = models.some((model) => model.id === chatModel)
+            ? models
+            : [{ id: chatModel, name: chatModel }, ...models];
+        return options.map((model) => ({
+            label: model.name,
+            value: model.id,
+        }));
+    }, [chatModel, models]);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -81,6 +111,7 @@ function IntegrationsSettingsPage() {
                     throw new Error("連携設定の応答を確認できませんでした。");
                 }
                 setStatus(parsed.data);
+                setChatModel(parsed.data.chatModel);
             } catch (loadError) {
                 if (!controller.signal.aborted) {
                     setError(
@@ -99,18 +130,68 @@ function IntegrationsSettingsPage() {
         return () => controller.abort();
     }, []);
 
+    useEffect(() => {
+        const controller = new AbortController();
+        const load = async () => {
+            try {
+                const response = await fetch(
+                    "/api/settings/integrations/openrouter/models",
+                    { signal: controller.signal },
+                );
+                if (!response.ok) {
+                    throw new Error(await readApiError(response));
+                }
+                const parsed = openRouterChatModelListSchema.safeParse(
+                    await response.json(),
+                );
+                if (!parsed.success) {
+                    throw new Error("モデル一覧の応答を確認できませんでした。");
+                }
+                setModels(parsed.data.models);
+            } catch (loadError) {
+                if (!controller.signal.aborted) {
+                    setModelsError(
+                        loadError instanceof Error
+                            ? loadError.message
+                            : "モデル一覧を取得できませんでした。",
+                    );
+                }
+            } finally {
+                if (!controller.signal.aborted) {
+                    setModelsLoading(false);
+                }
+            }
+        };
+        void load();
+        return () => controller.abort();
+    }, []);
+
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setMessage(null);
         setError(null);
-        const parsed = openRouterApiKeySchema.safeParse(apiKey);
-        if (!parsed.success) {
+        const parsedApiKey = apiKey
+            ? openRouterApiKeySchema.safeParse(apiKey)
+            : null;
+        if (parsedApiKey && !parsedApiKey.success) {
             setError(
-                parsed.error.issues[0]?.message ??
+                parsedApiKey.error.issues[0]?.message ??
                     "API key を確認してください。",
             );
             return;
         }
+        if (!chatModelValidation.success) {
+            setError(
+                chatModelValidation.error.issues[0]?.message ??
+                    "LLM モデルを確認してください。",
+            );
+            return;
+        }
+        // API key を入力していなくてもモデルだけ保存できる。
+        const payload = {
+            ...(parsedApiKey ? { apiKey: parsedApiKey.data } : {}),
+            chatModel: chatModelValidation.data,
+        };
         setSaving(true);
         try {
             const response = await fetch(
@@ -118,7 +199,7 @@ function IntegrationsSettingsPage() {
                 {
                     method: "PUT",
                     headers: { "content-type": "application/json" },
-                    body: JSON.stringify({ apiKey: parsed.data }),
+                    body: JSON.stringify(payload),
                 },
             );
             if (!response.ok) {
@@ -131,8 +212,13 @@ function IntegrationsSettingsPage() {
                 throw new Error("連携設定の応答を確認できませんでした。");
             }
             setStatus(updated.data);
+            setChatModel(updated.data.chatModel);
             setApiKey("");
-            setMessage("OpenRouter API key を保存しました。");
+            setMessage(
+                parsedApiKey
+                    ? "OpenRouter API key と LLM モデルを保存しました。"
+                    : "LLM モデルを保存しました。",
+            );
         } catch (saveError) {
             setError(
                 saveError instanceof Error
@@ -149,7 +235,7 @@ function IntegrationsSettingsPage() {
             <div className="flex flex-col gap-1">
                 <h1 className="text-2xl font-semibold">AI・ベクトル検索</h1>
                 <p className="text-muted-foreground">
-                    OpenRouter の認証情報とベクトル化モデルを設定します。
+                    OpenRouter の認証情報と、利用するモデルを設定します。
                 </p>
             </div>
 
@@ -201,6 +287,72 @@ function IntegrationsSettingsPage() {
                                 />
                             </Field>
 
+                            <Field
+                                data-invalid={
+                                    chatModelValidation.success === false
+                                }
+                            >
+                                <FieldLabel htmlFor="openrouter-chat-model">
+                                    利用する LLM モデル
+                                </FieldLabel>
+                                <Select
+                                    items={modelItems}
+                                    value={chatModel}
+                                    onValueChange={(value) => {
+                                        if (value !== null) {
+                                            setChatModel(value);
+                                        }
+                                    }}
+                                >
+                                    <SelectTrigger
+                                        aria-invalid={
+                                            chatModelValidation.success ===
+                                            false
+                                        }
+                                        className="w-full"
+                                        disabled={loading || modelsLoading}
+                                        id="openrouter-chat-model"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectGroup>
+                                            {modelItems.map((model) => (
+                                                <SelectItem
+                                                    key={model.value}
+                                                    value={model.value}
+                                                >
+                                                    {model.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    </SelectContent>
+                                </Select>
+                                <FieldDescription>
+                                    レシート読み取りなど画像を読む処理に使う、画像入力対応モデルです。
+                                    {modelsLoading
+                                        ? "モデル一覧を取得しています。"
+                                        : `選択中: ${chatModel}`}
+                                    {status && !status.chatModelConfigured
+                                        ? "（既定値。まだ保存されていません）"
+                                        : null}
+                                </FieldDescription>
+                                <div aria-live="polite">
+                                    {modelsError ? (
+                                        <FieldError>
+                                            {`${modelsError}現在のモデルはそのまま保存できます。`}
+                                        </FieldError>
+                                    ) : null}
+                                </div>
+                                <FieldError
+                                    errors={
+                                        chatModelValidation.success === false
+                                            ? chatModelValidation.error.issues
+                                            : undefined
+                                    }
+                                />
+                            </Field>
+
                             <Field data-disabled>
                                 <FieldLabel htmlFor="vectorization-model">
                                     ベクトル化モデル
@@ -213,7 +365,8 @@ function IntegrationsSettingsPage() {
                                 <FieldDescription>
                                     OpenRouter 経由で{" "}
                                     {openRouterEmbeddingDimensions}
-                                    次元の embedding を生成します。
+                                    次元の embedding
+                                    を生成します。このモデルは変更できません。
                                 </FieldDescription>
                             </Field>
                         </FieldGroup>
@@ -228,10 +381,14 @@ function IntegrationsSettingsPage() {
                     </CardContent>
                     <CardFooter className="justify-end">
                         <Button
-                            disabled={saving || loading || !apiKey}
+                            disabled={
+                                saving ||
+                                loading ||
+                                chatModelValidation.success === false
+                            }
                             type="submit"
                         >
-                            {saving ? "保存中…" : "API key を保存"}
+                            {saving ? "保存中…" : "保存"}
                         </Button>
                     </CardFooter>
                 </Card>

@@ -1,13 +1,18 @@
 import {
     type ItemCreateInput,
+    type ItemDetailDto,
     type ItemDto,
     type ItemListQuery,
     type ItemUpdateInput,
     itemCreateSchema,
-    itemExpiryDateSchema,
     itemListQuerySchema,
     itemUpdateSchema,
 } from "../domain/item";
+import {
+    earliestExpiryDate,
+    type ItemLotDto,
+    lotExpiryDateSchema,
+} from "../domain/lot";
 import {
     categoryExists,
     createItem as createItemRecord,
@@ -20,6 +25,7 @@ import {
     locationExists,
     updateItem as updateItemRecord,
 } from "../repositories/itemRepository";
+import { type ItemLotRow, listItemLots } from "../repositories/lotRepository";
 
 export class ItemServiceError extends Error {
     readonly status: 400 | 404 | 409;
@@ -75,11 +81,29 @@ const toDto = (row: ItemRow): ItemDto => ({
     baseUnit: row.baseUnit,
     baseDimension: row.baseDimension,
     currentQuantity: row.currentQuantity,
-    expiryDate: itemExpiryDateSchema.parse(row.expiryDate),
+    earliestExpiryDate: lotExpiryDateSchema.parse(row.earliestExpiryDate),
+    lotCount: row.lotCount,
     lowStockThreshold: row.lowStockThreshold,
     memo: row.memo,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+});
+
+const toLotDto = (row: ItemLotRow): ItemLotDto => ({
+    id: row.id,
+    itemId: row.itemId,
+    expiryDate: row.expiryDate,
+    quantity: row.quantity,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+});
+
+// 詳細では同梱したロットから期限集計を導き、内訳と要約が食い違わないようにする
+const toDetailDto = (row: ItemRow, lots: ItemLotRow[]): ItemDetailDto => ({
+    ...toDto(row),
+    earliestExpiryDate: earliestExpiryDate(lots),
+    lotCount: lots.length,
+    lots: lots.map(toLotDto),
 });
 
 export const listItems = async (
@@ -105,7 +129,10 @@ export const listItems = async (
     }
 };
 
-export const getItem = async (db: D1Database, id: string): Promise<ItemDto> => {
+export const getItem = async (
+    db: D1Database,
+    id: string,
+): Promise<ItemDetailDto> => {
     if (id.trim().length === 0) {
         throw new ItemServiceError(400, "INVALID_ID", "id must not be empty");
     }
@@ -113,7 +140,9 @@ export const getItem = async (db: D1Database, id: string): Promise<ItemDto> => {
     if (!row) {
         throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
     }
-    return toDto(row);
+    // 数量 0 のロットは既定の表示対象外のため詳細にも含めない
+    const lots = await listItemLots(db, id, { includeEmpty: false });
+    return toDetailDto(row, lots);
 };
 
 export const createItem = async (

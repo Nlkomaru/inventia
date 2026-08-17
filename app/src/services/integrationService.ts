@@ -1,5 +1,11 @@
+import { z } from "zod";
 import {
+    type OpenRouterChatModelList,
+    type OpenRouterChatModelOption,
     type OpenRouterIntegrationStatus,
+    openRouterApiKeySchema,
+    openRouterChatModelSchema,
+    openRouterDefaultChatModel,
     openRouterEmbeddingDimensions,
     openRouterEmbeddingModel,
     openRouterIntegrationUpdateSchema,
@@ -7,20 +13,24 @@ import {
 } from "../domain/integration";
 import {
     getOpenRouterCredential,
+    getOpenRouterSettings,
     upsertOpenRouterCredential,
+    upsertOpenRouterSettings,
 } from "../repositories/integrationRepository";
 
 export type IntegrationServiceErrorCode =
     | "INTEGRATION_INVALID_INPUT"
+    | "INTEGRATION_PROVIDER_ERROR"
     | "INTEGRATION_ENCRYPTION_UNAVAILABLE";
 
-const statusByCode: Record<IntegrationServiceErrorCode, 400 | 503> = {
+const statusByCode: Record<IntegrationServiceErrorCode, 400 | 502 | 503> = {
     INTEGRATION_INVALID_INPUT: 400,
+    INTEGRATION_PROVIDER_ERROR: 502,
     INTEGRATION_ENCRYPTION_UNAVAILABLE: 503,
 };
 
 export class IntegrationServiceError extends Error {
-    readonly status: 400 | 503;
+    readonly status: 400 | 502 | 503;
 
     constructor(
         readonly code: IntegrationServiceErrorCode,
@@ -128,19 +138,27 @@ const decryptApiKey = async (
     }
 };
 
-const toStatus = (updatedAt: string | null): OpenRouterIntegrationStatus => ({
+const toStatus = (
+    credentialUpdatedAt: string | null,
+    chatModel: string | null,
+): OpenRouterIntegrationStatus => ({
     provider: openRouterProvider,
-    configured: updatedAt !== null,
+    configured: credentialUpdatedAt !== null,
     model: openRouterEmbeddingModel,
     dimensions: openRouterEmbeddingDimensions,
-    updatedAt,
+    chatModel: chatModel ?? openRouterDefaultChatModel,
+    chatModelConfigured: chatModel !== null,
+    updatedAt: credentialUpdatedAt,
 });
 
 export const getOpenRouterIntegrationStatus = async (
     db: D1Database,
 ): Promise<OpenRouterIntegrationStatus> => {
-    const credential = await getOpenRouterCredential(db);
-    return toStatus(credential?.updatedAt ?? null);
+    const [credential, settings] = await Promise.all([
+        getOpenRouterCredential(db),
+        getOpenRouterSettings(db),
+    ]);
+    return toStatus(credential?.updatedAt ?? null, settings?.chatModel ?? null);
 };
 
 export const updateOpenRouterIntegration = async (
@@ -152,17 +170,117 @@ export const updateOpenRouterIntegration = async (
     if (!parsed.success) {
         throw new IntegrationServiceError(
             "INTEGRATION_INVALID_INPUT",
-            parsed.error.issues[0]?.message ?? "API key を確認してください。",
+            parsed.error.issues[0]?.message ?? "入力内容を確認してください。",
         );
     }
-    const encrypted = await encryptApiKey(parsed.data.apiKey, encryptionSecret);
+    const { apiKey, chatModel } = parsed.data;
+    // 暗号化を先に行い、鍵が無いときにモデルだけ保存された状態を作らない。
+    const encrypted =
+        apiKey === undefined
+            ? null
+            : await encryptApiKey(apiKey, encryptionSecret);
     const now = new Date().toISOString();
-    await upsertOpenRouterCredential(db, {
-        ...encrypted,
-        createdAt: now,
-        updatedAt: now,
-    });
-    return toStatus(now);
+    if (encrypted) {
+        await upsertOpenRouterCredential(db, {
+            ...encrypted,
+            createdAt: now,
+            updatedAt: now,
+        });
+    }
+    if (chatModel !== undefined) {
+        await upsertOpenRouterSettings(db, {
+            chatModel,
+            createdAt: now,
+            updatedAt: now,
+        });
+    }
+    return getOpenRouterIntegrationStatus(db);
+};
+
+// OpenRouter の公開エンドポイントの応答。必要な項目だけを緩く検証し、
+// 想定外の項目を持つモデルが 1 件あっても一覧全体を失敗させない。
+const openRouterModelsEnvelopeSchema = z.object({
+    data: z.array(z.unknown()),
+});
+
+const openRouterModelEntrySchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    architecture: z.object({
+        input_modalities: z.array(z.string()),
+    }),
+});
+
+const providerError = () =>
+    new IntegrationServiceError(
+        "INTEGRATION_PROVIDER_ERROR",
+        "OpenRouter からモデル一覧を取得できませんでした。時間をおいて再試行してください。",
+    );
+
+/** OpenRouter の認証情報があれば返す。取得・復号に失敗しても一覧取得は続行する。 */
+const readApiKeyForModelList = async (
+    db: D1Database,
+    encryptionSecret: string,
+): Promise<string | null> => {
+    try {
+        return await getOpenRouterApiKey(db, encryptionSecret);
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * 画像入力に対応したモデルだけを選択肢として返す。
+ * モデル一覧は API key 未設定でも取得できる公開エンドポイントで、応答に API key は含めない。
+ */
+export const listOpenRouterVisionModels = async (
+    db: D1Database,
+    encryptionSecret: string,
+    fetcher: typeof fetch = fetch,
+): Promise<OpenRouterChatModelList> => {
+    const apiKey = await readApiKeyForModelList(db, encryptionSecret);
+    let payload: unknown;
+    try {
+        const response = await fetcher("https://openrouter.ai/api/v1/models", {
+            headers: {
+                accept: "application/json",
+                ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
+            },
+            signal: AbortSignal.timeout(10_000),
+        });
+        if (!response.ok) {
+            throw providerError();
+        }
+        payload = await response.json();
+    } catch {
+        throw providerError();
+    }
+    const envelope = openRouterModelsEnvelopeSchema.safeParse(payload);
+    if (!envelope.success) {
+        throw providerError();
+    }
+    const models: OpenRouterChatModelOption[] = [];
+    for (const entry of envelope.data.data) {
+        const model = openRouterModelEntrySchema.safeParse(entry);
+        if (!model.success) {
+            continue;
+        }
+        if (!model.data.architecture.input_modalities.includes("image")) {
+            continue;
+        }
+        // 保存できない ID を選択肢に出さないため、保存時と同じ検証を通す。
+        const id = openRouterChatModelSchema.safeParse(model.data.id);
+        if (!id.success) {
+            continue;
+        }
+        models.push({ id: id.data, name: model.data.name });
+    }
+    models.sort(
+        (left, right) =>
+            left.name.localeCompare(right.name, "en") ||
+            left.id.localeCompare(right.id, "en"),
+    );
+    return { models };
 };
 
 /** Returns the credential only to server-side callers that invoke OpenRouter. */
@@ -179,8 +297,7 @@ export const getOpenRouterApiKey = async (
         credential.initializationVector,
         encryptionSecret,
     );
-    const parsed =
-        openRouterIntegrationUpdateSchema.shape.apiKey.safeParse(apiKey);
+    const parsed = openRouterApiKeySchema.safeParse(apiKey);
     if (!parsed.success) {
         throw new Error("Stored OpenRouter credential is invalid");
     }

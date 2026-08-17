@@ -109,10 +109,9 @@ export const items = sqliteTable(
         baseDimension: text("base_dimension", {
             enum: unitDimensions,
         }).notNull(),
-        // 基準単位での現在在庫。stock_movements の追加と同一トランザクションで原子的に更新する
+        // 基準単位での現在在庫。在庫の正は item_lots であり、この列は一覧表示と
+        // 在庫下限判定のための維持キャッシュとして書き込みバッチ末尾で再計算する
         currentQuantity: integer("current_quantity").notNull().default(0),
-        // 商品単位の任意期限日 1 つ（ISO 8601 UTC）。ロット単位の期限は対象外
-        expiryDate: text("expiry_date"),
         // 基準単位での在庫下限。在庫不足判定に使用する
         lowStockThreshold: integer("low_stock_threshold"),
         memo: text("memo"),
@@ -137,6 +136,38 @@ export const items = sqliteTable(
             sql`${t.lowStockThreshold} is null or ${t.lowStockThreshold} >= 0`,
         ),
         check("ck_items_name_not_empty", sql`length(${t.name}) > 0`),
+    ],
+);
+
+// 期限別の在庫ロット。在庫数量の正はこのテーブルで、items.current_quantity は
+// ロット合計から再計算されるキャッシュである。保管場所は品目単位のためロットは持たない。
+// 数量 0 のロット行は削除しない（stock_movement_lot_allocations が参照する）。
+// 既定の表示と FEFO 配分の対象からは service 層で除外する
+export const itemLots = sqliteTable(
+    "item_lots",
+    {
+        id: text("id").primaryKey(),
+        itemId: text("item_id")
+            .notNull()
+            .references(() => items.id, { onDelete: "restrict" }),
+        // ISO 8601 UTC。NULL は「期限なしロット」を表す
+        expiryDate: text("expiry_date"),
+        quantity: integer("quantity").notNull().default(0),
+        createdAt: text("created_at").notNull(),
+        updatedAt: text("updated_at").notNull(),
+    },
+    (t) => [
+        uniqueIndex("uq_item_lots_item_expiry").on(t.itemId, t.expiryDate),
+        // SQLite は NULL 同士を別値として扱い上の unique index が効かないため、
+        // 期限なしロットの重複は部分 unique index で禁止する。
+        // 期限なしロットへの upsert はこの index を conflict target に使う
+        uniqueIndex("uq_item_lots_item_no_expiry")
+            .on(t.itemId)
+            .where(sql`${t.expiryDate} is null`),
+        // 期限接近の横断検索用
+        index("idx_item_lots_expiry").on(t.expiryDate, t.itemId),
+        // 負在庫は許可しない。出庫時の在庫不足はこの CHECK で batch 全体を rollback させる
+        check("ck_item_lots_quantity_non_negative", sql`${t.quantity} >= 0`),
     ],
 );
 
@@ -206,7 +237,12 @@ export const stockMovements = sqliteTable(
         ),
         // 全商品の履歴一覧の cursor paging 用
         index("idx_stock_movements_occurred").on(t.occurredAt, t.id),
-        check("ck_stock_movements_delta_not_zero", sql`${t.delta} <> 0`),
+        // 期限ごとの棚卸しでは合計差分 0 でロット内訳だけが変わる正当な操作があるため、
+        // reason = 'stocktake' に限り delta 0 を許可する
+        check(
+            "ck_stock_movements_delta_not_zero",
+            sql`${t.delta} <> 0 or ${t.reason} = 'stocktake'`,
+        ),
         // 購入以外の理由の movement が購入を参照することを禁止する。
         // 逆方向（purchase なら purchase_id 必須）はクイック入庫を許すため課さない
         check(
@@ -216,6 +252,42 @@ export const stockMovements = sqliteTable(
         check(
             "ck_stock_movements_reason",
             sql`${t.reason} in ('purchase', 'stocktake', 'consume', 'discard', 'other')`,
+        ),
+    ],
+);
+
+// 1 movement の増減をどのロットへどれだけ割り当てたかの内訳。追加のみで不変。
+// 0005 より前に記録された movement には allocation が存在しない（ロット追跡前の履歴）。
+// これは仕様であり、履歴表示では空配列として扱う
+export const stockMovementLotAllocations = sqliteTable(
+    "stock_movement_lot_allocations",
+    {
+        id: text("id").primaryKey(),
+        movementId: text("movement_id")
+            .notNull()
+            .references(() => stockMovements.id, { onDelete: "restrict" }),
+        lotId: text("lot_id")
+            .notNull()
+            .references(() => itemLots.id, { onDelete: "restrict" }),
+        // 記録時点のロット期限のスナップショット。ロットの期限は後から変更できるため、
+        // 参照で解決すると過去の履歴の期限まで書き換わってしまう。NULL は期限なしロット
+        expiryDate: text("expiry_date"),
+        delta: integer("delta").notNull(),
+        createdAt: text("created_at").notNull(),
+    },
+    (t) => [
+        uniqueIndex("uq_stock_movement_lot_allocations_movement_lot").on(
+            t.movementId,
+            t.lotId,
+        ),
+        // ロットごとの増減履歴の逆引き用
+        index("idx_stock_movement_lot_allocations_lot").on(
+            t.lotId,
+            t.createdAt,
+        ),
+        check(
+            "ck_stock_movement_lot_allocations_delta_not_zero",
+            sql`${t.delta} <> 0`,
         ),
     ],
 );
@@ -243,6 +315,10 @@ export const stockOperations = sqliteTable(
         movementId: text("movement_id"),
         resultingQuantity: integer("resulting_quantity").notNull(),
         createdAt: text("created_at").notNull(),
+        // ロット指定を含む再送リクエストの同一性判定に使う正規化リクエストの SHA-256 hex。
+        // 0005 より前の既存行は NULL で、その場合は従来のフィールド比較へフォールバックする。
+        // ALTER ADD COLUMN で末尾に追加されるため宣言順も末尾に合わせる
+        requestDigest: text("request_digest"),
     },
     (t) => [
         index("idx_stock_operations_item_created").on(
@@ -357,6 +433,31 @@ export const integrationCredentials = sqliteTable(
         check(
             "ck_integration_credentials_iv_not_empty",
             sql`length(${t.initializationVector}) > 0`,
+        ),
+    ],
+);
+
+// 外部連携の非機密設定。認証情報（integration_credentials）と分離することで、
+// API key 未設定でもモデル選択だけを保存できる
+export const integrationSettings = sqliteTable(
+    "integration_settings",
+    {
+        provider: text("provider", { enum: ["openrouter"] })
+            .primaryKey()
+            .notNull(),
+        // レシート読み取り等に使うマルチモーダル LLM のモデル ID
+        chatModel: text("chat_model").notNull(),
+        createdAt: text("created_at").notNull(),
+        updatedAt: text("updated_at").notNull(),
+    },
+    (t) => [
+        check(
+            "ck_integration_settings_provider",
+            sql`${t.provider} = 'openrouter'`,
+        ),
+        check(
+            "ck_integration_settings_chat_model_not_empty",
+            sql`length(${t.chatModel}) > 0`,
         ),
     ],
 );

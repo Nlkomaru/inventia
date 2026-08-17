@@ -111,9 +111,18 @@ export function ItemTable({
                         );
                     },
                 }),
-                columnHelper.accessor("expiryDate", {
-                    header: "期限",
-                    cell: ({ getValue }) => formatExpiry(getValue()),
+                columnHelper.accessor("earliestExpiryDate", {
+                    header: "最短期限",
+                    cell: ({ getValue, row }) => (
+                        <span className="whitespace-nowrap">
+                            {formatExpiry(getValue())}
+                            {row.original.lotCount > 1 ? (
+                                <span className="ml-1.5 text-xs text-muted-foreground">
+                                    （{row.original.lotCount} ロット）
+                                </span>
+                            ) : null}
+                        </span>
+                    ),
                 }),
                 columnHelper.display({
                     id: "actions",
