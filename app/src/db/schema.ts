@@ -622,6 +622,16 @@ export const receiptLines = sqliteTable(
         // FK を持てない（存在しない行を参照する）。再実行時はこの ID の品目を
         // 探して再利用し、同名の孤児品目が増えないようにする
         pendingItemId: text("pending_item_id"),
+        // 在庫に置かない行（レジ袋・送料など）。既存行は 0 のままにして、
+        // 解析済みレシートの確認画面の既定を後から変えない
+        stockRelevant: integer("stock_relevant").notNull().default(0),
+        // 解析時に既存カテゴリへ解決できた場合の ID。カテゴリ削除を妨げないよう
+        // 外部キーは張らず、参照が切れた場合は確認画面で選び直す
+        suggestedCategoryId: text("suggested_category_id"),
+        suggestedBaseUnit: text("suggested_base_unit"),
+        suggestedBaseDimension: text("suggested_base_dimension", {
+            enum: unitDimensions,
+        }),
         matchMethod: text("match_method", { enum: receiptMatchMethods }),
         // 類似度は 0-100 の整数。浮動小数を保存しない
         matchScore: integer("match_score"),

@@ -1,5 +1,6 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText, Output, stepCountIs, type ToolSet } from "ai";
+import type { CategoryDto } from "../domain/category";
 import { newId } from "../domain/id";
 import { normalizeContentAmount } from "../domain/price";
 import {
@@ -9,6 +10,7 @@ import {
     type ReceiptApplyLineInput,
     type ReceiptApplyLineResult,
     type ReceiptApplyResult,
+    type ReceiptBaseDimension,
     type ReceiptDetailDto,
     type ReceiptDto,
     type ReceiptLineDto,
@@ -59,6 +61,7 @@ import {
     updateReceiptLineMatches,
     updateReceiptStatus,
 } from "../repositories/receiptRepository";
+import { listCategoryTree } from "./categoryService";
 import {
     getOpenRouterApiKey,
     getOpenRouterIntegrationStatus,
@@ -221,6 +224,10 @@ const toLineDto = (
     lineNo: row.lineNo,
     rawName: row.rawName,
     completedName: row.completedName,
+    stockRelevant: row.stockRelevant,
+    suggestedCategoryId: row.suggestedCategoryId,
+    suggestedBaseUnit: row.suggestedBaseUnit,
+    suggestedBaseDimension: row.suggestedBaseDimension,
     normalizedName: row.normalizedName,
     quantity: row.quantity,
     price: row.price,
@@ -417,6 +424,19 @@ const normalizeCompletedName = (
     return trimmed.length === 0 || trimmed === rawName ? null : trimmed;
 };
 
+/** カテゴリ名から既存カテゴリを引く索引。名前は前後の空白と大文字小文字を無視して比較する。 */
+const categoryIdByName = (categories: readonly CategoryDto[]) => {
+    const index = new Map<string, string>();
+    for (const category of categories) {
+        const key = category.name.trim().toLocaleLowerCase("ja");
+        // 同名が複数階層にある場合は先に見つかった方を使い、解決できたことにしない
+        if (!index.has(key)) {
+            index.set(key, category.id);
+        }
+    }
+    return index;
+};
+
 const toLineWrites = (
     lines: readonly {
         name: string;
@@ -428,7 +448,12 @@ const toLineWrites = (
         expirySource: "printed" | "estimated" | "unknown";
         expiryConfidence: "high" | "medium" | "low" | null;
         expiryEstimateReason: string | null;
+        stockRelevant: boolean;
+        suggestedCategoryName: string | null;
+        suggestedBaseUnit: string | null;
+        suggestedBaseDimension: ReceiptBaseDimension | null;
     }[],
+    categoryIndex: ReadonlyMap<string, string>,
 ): ReceiptLineWrite[] => {
     const writes: ReceiptLineWrite[] = [];
     for (const line of lines) {
@@ -446,10 +471,24 @@ const toLineWrites = (
             expiryConfidence: line.expiryConfidence,
             expiryEstimateReason: line.expiryEstimateReason,
         });
+        // 単位は表記と量の種類が対でないと品目を作れないため、片方だけの提案は捨てる
+        const baseUnit = line.suggestedBaseUnit?.trim().slice(0, 50) ?? "";
+        const unitPaired =
+            baseUnit.length > 0 && line.suggestedBaseDimension !== null;
+        const suggestedCategoryName =
+            line.suggestedCategoryName?.trim().toLocaleLowerCase("ja") ?? "";
         writes.push({
             lineNo: writes.length + 1,
             rawName,
             completedName: normalizeCompletedName(line.completedName, rawName),
+            stockRelevant: line.stockRelevant,
+            // 解決できた ID だけを保存する。名前が一致しなければ確認画面で選ばせる
+            suggestedCategoryId:
+                categoryIndex.get(suggestedCategoryName) ?? null,
+            suggestedBaseUnit: unitPaired ? baseUnit : null,
+            suggestedBaseDimension: unitPaired
+                ? line.suggestedBaseDimension
+                : null,
             normalizedName: normalizeReceiptName(rawName),
             quantity: line.quantity,
             price: line.price,
@@ -535,11 +574,10 @@ export const parseReceipt = async (
         }
         const bytes = new Uint8Array(await object.arrayBuffer());
         const openrouter = createOpenRouter({ apiKey, fetch: fetcher });
-        // tool を渡すのは設定が有効なときだけ。既定では 1 往復のままにする
-        const toolSet =
-            status.receiptToolsEnabled && options.createToolSet
-                ? await options.createToolSet()
-                : null;
+        // tool は常に渡す。構築できない環境では tool 無しで解析を続ける
+        const toolSet = options.createToolSet
+            ? await options.createToolSet()
+            : null;
         try {
             // リトライは 1 回まで（既定の 2 回は使わない）。タイムアウトは
             // リトライと tool 呼び出しを含む呼び出し全体へ掛ける
@@ -577,7 +615,11 @@ export const parseReceipt = async (
             if (!parsed.success) {
                 throw new ReceiptParseFailure(parseFailureMessages.malformed);
             }
-            const lines = toLineWrites(parsed.data.lines);
+            const categories = await listCategoryTree(env.DB);
+            const lines = toLineWrites(
+                parsed.data.lines,
+                categoryIdByName(categories.items),
+            );
             if (lines.length === 0) {
                 throw new ReceiptParseFailure(parseFailureMessages.malformed);
             }

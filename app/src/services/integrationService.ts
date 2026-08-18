@@ -153,7 +153,6 @@ const toStatus = (
     // 解析へ渡る実効値を返す。未設定なら既定の指示がそのまま入る
     receiptPrompt: settings?.receiptPrompt ?? receiptParseDefaultInstructions,
     receiptPromptConfigured: settings?.receiptPrompt != null,
-    receiptToolsEnabled: settings?.receiptToolsEnabled ?? false,
     updatedAt: credentialUpdatedAt,
 });
 
@@ -194,8 +193,7 @@ export const updateOpenRouterIntegration = async (
             parsed.error.issues[0]?.message ?? "入力内容を確認してください。",
         );
     }
-    const { apiKey, chatModel, receiptPrompt, receiptToolsEnabled } =
-        parsed.data;
+    const { apiKey, chatModel, receiptPrompt } = parsed.data;
     // 暗号化を先に行い、鍵が無いときにモデルだけ保存された状態を作らない。
     const encrypted =
         apiKey === undefined
@@ -209,11 +207,7 @@ export const updateOpenRouterIntegration = async (
             updatedAt: now,
         });
     }
-    if (
-        chatModel !== undefined ||
-        receiptPrompt !== undefined ||
-        receiptToolsEnabled !== undefined
-    ) {
+    if (chatModel !== undefined || receiptPrompt !== undefined) {
         // 1 行を丸ごと書き戻すため、渡されなかった項目は保存済みの値を引き継ぐ
         const current = await getOpenRouterSettings(db);
         await upsertOpenRouterSettings(db, {
@@ -223,8 +217,8 @@ export const updateOpenRouterIntegration = async (
                 receiptPrompt === undefined
                     ? (current?.receiptPrompt ?? null)
                     : normalizeReceiptPrompt(receiptPrompt),
-            receiptToolsEnabled:
-                receiptToolsEnabled ?? current?.receiptToolsEnabled ?? false,
+            // 列は残っているが解析へ渡す tool は常時有効のため、保存済みの値をそのまま戻す
+            receiptToolsEnabled: current?.receiptToolsEnabled ?? false,
             createdAt: current?.createdAt ?? now,
             updatedAt: now,
         });

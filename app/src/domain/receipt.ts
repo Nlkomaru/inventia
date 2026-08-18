@@ -7,6 +7,9 @@ import { z } from "zod";
 // UTC への変換・商品照合・基準単位への正規化は service 層で行う。
 // 期限関連フィールドは #13 のレシート取込パイプライン向けの契約であり、現時点で呼び出し元はない。
 
+// 単位の量の種類は品目側と同じ集合。OCR・DTO・保存で共有する
+export const receiptBaseDimensionSchema = z.enum(["mass", "volume", "count"]);
+
 export const receiptOcrLineSchema = z.object({
     name: z
         .string()
@@ -60,6 +63,32 @@ export const receiptOcrLineSchema = z.object({
         .describe(
             "推測根拠の短い日本語（例: 「常温の小麦粉は購入から約 12 か月」）。expirySource が estimated のときだけ設定し、それ以外は null",
         ),
+    stockRelevant: z
+        .boolean()
+        .describe(
+            "在庫として管理する品物の行なら true。食品・日用品・書籍などの商品は true。レジ袋、割り箸、送料、手数料、包装代、預り金の調整のような、在庫に置かないものは false",
+        ),
+    suggestedCategoryName: z
+        .string()
+        .min(1)
+        .max(200)
+        .nullable()
+        .describe(
+            "この品物を登録するカテゴリ名。カテゴリ一覧を取得する tool が提供されている場合は既存のカテゴリを調べ、当てはまるものがあればその名前をそのまま入れる。tool が無い場合や当てはまるものが無い場合は「食料品」「日用品」のような一般的な分類名でよい。判断できない場合と stockRelevant が false の場合は null",
+        ),
+    suggestedBaseUnit: z
+        .string()
+        .min(1)
+        .max(50)
+        .nullable()
+        .describe(
+            "在庫を数える単位の表記（例: 個、本、袋、g、ml）。商品名や内容量から判断する。suggestedBaseDimension と必ず対で設定し、片方だけにしない。判断できない場合と stockRelevant が false の場合は null",
+        ),
+    suggestedBaseDimension: receiptBaseDimensionSchema
+        .nullable()
+        .describe(
+            "suggestedBaseUnit が属する量の種類。g や kg は mass、ml や L は volume、個・本・袋のように数えるものは count。suggestedBaseUnit と必ず対で設定する",
+        ),
 });
 
 export const receiptOcrResultSchema = z.object({
@@ -72,7 +101,7 @@ export const receiptOcrResultSchema = z.object({
         .datetime({ local: true })
         .nullable()
         .describe(
-            "レシート記載の購入日時（タイムゾーンなしの ISO 8601、例: 2026-04-01T19:23:00）。時刻が読み取れない場合は 00:00:00、日付も読み取れない場合は null",
+            "レシート記載の購入日時（タイムゾーンなしの ISO 8601、例: 2026-04-01T19:23:00）。印字された現地時刻をそのまま入れ、末尾に Z や +09:00 のような時差を付けない。時刻が読み取れない場合は 00:00:00、日付も読み取れない場合は null",
         ),
     totalPrice: z
         .int()
@@ -177,6 +206,12 @@ export const receiptLineDtoSchema = z
         rawName: z.string().min(1),
         // 印字が途切れていた場合の補完名。rawName と同じ値や空文字は保存しない
         completedName: z.string().min(1).nullable(),
+        // 在庫に置かない行（レジ袋・送料など）は確認画面の既定を「取り込まない」にする
+        stockRelevant: z.boolean(),
+        // 解析時に既存カテゴリへ解決できた場合だけ ID が入る。AI へ ID は生成させない
+        suggestedCategoryId: z.string().min(1).nullable(),
+        suggestedBaseUnit: z.string().min(1).nullable(),
+        suggestedBaseDimension: receiptBaseDimensionSchema.nullable(),
         normalizedName: z.string(),
         quantity: z.int().min(1),
         price: z.int().min(0).nullable(),
@@ -377,6 +412,7 @@ export type ReceiptExpiryConfidence = z.infer<
     typeof receiptExpiryConfidenceSchema
 >;
 export type ReceiptMatchMethodValue = z.infer<typeof receiptMatchMethodSchema>;
+export type ReceiptBaseDimension = z.infer<typeof receiptBaseDimensionSchema>;
 export type ReceiptContentType = z.infer<typeof receiptContentTypeSchema>;
 export type ReceiptDto = z.infer<typeof receiptDtoSchema>;
 export type ReceiptLineDto = z.infer<typeof receiptLineDtoSchema>;
@@ -417,6 +453,11 @@ export const receiptParseDefaultInstructions = [
     "name にはレシートの印字をそのまま入れ、補完や言い換えをしないでください。",
     "商品名が幅の都合で途中で切れている場合は、補完した名前を completedName に入れてください。確信を持てない場合は null にしてください。",
     "在庫を検索する tool が提供されている場合は、既存の品目を調べ、同一だと判断できるものがあれば completedName にその品目名をそのまま入れてください。",
+    "",
+    "在庫として管理する品物の行は stockRelevant を true にしてください。",
+    "レジ袋、割り箸、送料、手数料、包装代のように在庫に置かないものは false にしてください。",
+    "stockRelevant が true の行は、登録先のカテゴリ名を suggestedCategoryName に、在庫を数える単位を suggestedBaseUnit と suggestedBaseDimension の対に入れてください。",
+    "カテゴリ一覧を取得する tool が提供されている場合は既存のカテゴリを調べ、当てはまるものがあればその名前をそのまま使ってください。",
 ].join("\n");
 
 // 改行を含むため trim せず、前後の空白だけを落とすのは保存時に service が行う

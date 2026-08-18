@@ -16,7 +16,6 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
     Field,
     FieldDescription,
@@ -78,10 +77,6 @@ export function IntegrationsSettingsPage() {
         null,
     );
     const receiptPrompt = receiptPromptDraft ?? status.receiptPrompt;
-    const [receiptToolsDraft, setReceiptToolsDraft] = useState<boolean | null>(
-        null,
-    );
-    const receiptToolsEnabled = receiptToolsDraft ?? status.receiptToolsEnabled;
     const [receiptMessage, setReceiptMessage] = useState<string | null>(null);
     const [receiptError, setReceiptError] = useState<string | null>(null);
     // 空欄は「既定へ戻す」を表すため、長さの検証だけを事前に行う。
@@ -179,10 +174,8 @@ export function IntegrationsSettingsPage() {
                 receiptPrompt: receiptPromptValidation
                     ? receiptPromptValidation.data
                     : null,
-                receiptToolsEnabled,
             });
             setReceiptPromptDraft(null);
-            setReceiptToolsDraft(null);
             setReceiptMessage(
                 result.receiptPromptConfigured
                     ? "レシート読み取りの指示を保存しました。"
@@ -415,25 +408,6 @@ export function IntegrationsSettingsPage() {
                                             : undefined
                                     }
                                 />
-                            </Field>
-
-                            <Field orientation="horizontal">
-                                <Checkbox
-                                    checked={receiptToolsEnabled}
-                                    id="receipt-parse-tools"
-                                    onCheckedChange={(checked) =>
-                                        setReceiptToolsDraft(checked === true)
-                                    }
-                                />
-                                <FieldLabel htmlFor="receipt-parse-tools">
-                                    在庫の読み取り tool を渡す
-                                </FieldLabel>
-                                <FieldDescription>
-                                    解析中に在庫検索・カテゴリ・保管場所・価格履歴の読み取り
-                                    tool を LLM へ渡します。在庫を書き換える
-                                    tool
-                                    は渡しません。実際に使うかはモデル次第で、上の指示で使い方を書くと効果が出ます。往復が増えるぶん解析は遅く、費用も増えます。
-                                </FieldDescription>
                             </Field>
                         </FieldGroup>
                         <div aria-live="polite" className="mt-5">
