@@ -11,9 +11,11 @@ import {
     openRouterIntegrationUpdateSchema,
     openRouterProvider,
 } from "../domain/integration";
+import { receiptParseDefaultInstructions } from "../domain/receipt";
 import {
     getOpenRouterCredential,
     getOpenRouterSettings,
+    type IntegrationSettingsRecord,
     upsertOpenRouterCredential,
     upsertOpenRouterSettings,
 } from "../repositories/integrationRepository";
@@ -140,16 +142,35 @@ const decryptApiKey = async (
 
 const toStatus = (
     credentialUpdatedAt: string | null,
-    chatModel: string | null,
+    settings: IntegrationSettingsRecord | null,
 ): OpenRouterIntegrationStatus => ({
     provider: openRouterProvider,
     configured: credentialUpdatedAt !== null,
     model: openRouterEmbeddingModel,
     dimensions: openRouterEmbeddingDimensions,
-    chatModel: chatModel ?? openRouterDefaultChatModel,
-    chatModelConfigured: chatModel !== null,
+    chatModel: settings?.chatModel ?? openRouterDefaultChatModel,
+    chatModelConfigured: settings !== null,
+    // 解析へ渡る実効値を返す。未設定なら既定の指示がそのまま入る
+    receiptPrompt: settings?.receiptPrompt ?? receiptParseDefaultInstructions,
+    receiptPromptConfigured: settings?.receiptPrompt != null,
+    receiptToolsEnabled: settings?.receiptToolsEnabled ?? false,
     updatedAt: credentialUpdatedAt,
 });
+
+/**
+ * 既定と同じ内容は保存しない。保存してしまうと既定の指示を改善しても
+ * 一度保存した利用者へ届かなくなる。
+ */
+const normalizeReceiptPrompt = (value: string | null): string | null => {
+    if (value === null) {
+        return null;
+    }
+    const trimmed = value.trim();
+    if (trimmed.length === 0 || trimmed === receiptParseDefaultInstructions) {
+        return null;
+    }
+    return trimmed;
+};
 
 export const getOpenRouterIntegrationStatus = async (
     db: D1Database,
@@ -158,7 +179,7 @@ export const getOpenRouterIntegrationStatus = async (
         getOpenRouterCredential(db),
         getOpenRouterSettings(db),
     ]);
-    return toStatus(credential?.updatedAt ?? null, settings?.chatModel ?? null);
+    return toStatus(credential?.updatedAt ?? null, settings);
 };
 
 export const updateOpenRouterIntegration = async (
@@ -173,7 +194,8 @@ export const updateOpenRouterIntegration = async (
             parsed.error.issues[0]?.message ?? "入力内容を確認してください。",
         );
     }
-    const { apiKey, chatModel } = parsed.data;
+    const { apiKey, chatModel, receiptPrompt, receiptToolsEnabled } =
+        parsed.data;
     // 暗号化を先に行い、鍵が無いときにモデルだけ保存された状態を作らない。
     const encrypted =
         apiKey === undefined
@@ -187,10 +209,23 @@ export const updateOpenRouterIntegration = async (
             updatedAt: now,
         });
     }
-    if (chatModel !== undefined) {
+    if (
+        chatModel !== undefined ||
+        receiptPrompt !== undefined ||
+        receiptToolsEnabled !== undefined
+    ) {
+        // 1 行を丸ごと書き戻すため、渡されなかった項目は保存済みの値を引き継ぐ
+        const current = await getOpenRouterSettings(db);
         await upsertOpenRouterSettings(db, {
-            chatModel,
-            createdAt: now,
+            chatModel:
+                chatModel ?? current?.chatModel ?? openRouterDefaultChatModel,
+            receiptPrompt:
+                receiptPrompt === undefined
+                    ? (current?.receiptPrompt ?? null)
+                    : normalizeReceiptPrompt(receiptPrompt),
+            receiptToolsEnabled:
+                receiptToolsEnabled ?? current?.receiptToolsEnabled ?? false,
+            createdAt: current?.createdAt ?? now,
             updatedAt: now,
         });
     }

@@ -37,6 +37,9 @@ const toCredentialRecord = (
 export interface IntegrationSettingsRecord {
     provider: typeof openRouterProvider;
     chatModel: string;
+    /** null は既定の指示を使うことを表す。 */
+    receiptPrompt: string | null;
+    receiptToolsEnabled: boolean;
     createdAt: string;
     updatedAt: string;
 }
@@ -44,6 +47,9 @@ export interface IntegrationSettingsRecord {
 interface IntegrationSettingsRow {
     provider: string;
     chatModel: string;
+    receiptPrompt: string | null;
+    // SQLite に真偽値型が無いため 0 / 1 で読み書きする
+    receiptToolsEnabled: number;
     createdAt: string;
     updatedAt: string;
 }
@@ -57,6 +63,11 @@ const toSettingsRecord = (
     return {
         provider: openRouterProvider,
         chatModel: row.chatModel,
+        receiptPrompt:
+            row.receiptPrompt !== null && row.receiptPrompt.length > 0
+                ? row.receiptPrompt
+                : null,
+        receiptToolsEnabled: row.receiptToolsEnabled !== 0,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };
@@ -124,6 +135,8 @@ export const getOpenRouterSettings = async (
             `SELECT
                 provider,
                 chat_model AS chatModel,
+                receipt_prompt AS receiptPrompt,
+                receipt_tools_enabled AS receiptToolsEnabled,
                 created_at AS createdAt,
                 updated_at AS updatedAt
             FROM integration_settings
@@ -143,16 +156,22 @@ export const upsertOpenRouterSettings = async (
             `INSERT INTO integration_settings (
                 provider,
                 chat_model,
+                receipt_prompt,
+                receipt_tools_enabled,
                 created_at,
                 updated_at
-            ) VALUES (?1, ?2, ?3, ?4)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             ON CONFLICT(provider) DO UPDATE SET
                 chat_model = excluded.chat_model,
+                receipt_prompt = excluded.receipt_prompt,
+                receipt_tools_enabled = excluded.receipt_tools_enabled,
                 updated_at = excluded.updated_at`,
         )
         .bind(
             openRouterProvider,
             settings.chatModel,
+            settings.receiptPrompt,
+            settings.receiptToolsEnabled ? 1 : 0,
             settings.createdAt,
             settings.updatedAt,
         )

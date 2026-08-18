@@ -517,6 +517,13 @@ export const integrationSettings = sqliteTable(
             .notNull(),
         // レシート読み取り等に使うマルチモーダル LLM のモデル ID
         chatModel: text("chat_model").notNull(),
+        // レシート解析へ渡す指示。null は domain の既定を使うことを表し、
+        // 既定と同じ内容を保存しないことで既定の改善が利用者へ届き続ける
+        receiptPrompt: text("receipt_prompt"),
+        // 解析時に MCP の読み取り tool を渡すか。0 / 1 で保持し、既定は渡さない
+        receiptToolsEnabled: integer("receipt_tools_enabled")
+            .notNull()
+            .default(0),
         createdAt: text("created_at").notNull(),
         updatedAt: text("updated_at").notNull(),
     },

@@ -57,6 +57,13 @@
       "when": 1787017091822,
       "tag": "0007_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1787026701900,
+      "tag": "0008_receipt_parse_settings",
+      "breakpoints": true
     }
   ]
 }

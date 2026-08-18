@@ -1,0 +1,1728 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "f6935686-feaf-417a-8635-194ca71f66c2",
+  "prevId": "6ef86a7b-0a4d-4962-888b-b521bcb5a322",
+  "tables": {
+    "categories": {
+      "name": "categories",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_categories_parent_name": {
+          "name": "uq_categories_parent_name",
+          "columns": [
+            "parent_id",
+            "name"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "categories_parent_id_categories_id_fk": {
+          "name": "categories_parent_id_categories_id_fk",
+          "tableFrom": "categories",
+          "tableTo": "categories",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_categories_kind": {
+          "name": "ck_categories_kind",
+          "value": "\"categories\".\"kind\" is null or \"categories\".\"kind\" in ('daily_goods', 'food', 'book', 'document')"
+        },
+        "ck_categories_name_not_empty": {
+          "name": "ck_categories_name_not_empty",
+          "value": "length(\"categories\".\"name\") > 0"
+        }
+      }
+    },
+    "integration_credentials": {
+      "name": "integration_credentials",
+      "columns": {
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ciphertext": {
+          "name": "ciphertext",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "initialization_vector": {
+          "name": "initialization_vector",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "encryption_version": {
+          "name": "encryption_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_integration_credentials_provider": {
+          "name": "ck_integration_credentials_provider",
+          "value": "\"integration_credentials\".\"provider\" = 'openrouter'"
+        },
+        "ck_integration_credentials_encryption_version": {
+          "name": "ck_integration_credentials_encryption_version",
+          "value": "\"integration_credentials\".\"encryption_version\" = 1"
+        },
+        "ck_integration_credentials_ciphertext_not_empty": {
+          "name": "ck_integration_credentials_ciphertext_not_empty",
+          "value": "length(\"integration_credentials\".\"ciphertext\") > 0"
+        },
+        "ck_integration_credentials_iv_not_empty": {
+          "name": "ck_integration_credentials_iv_not_empty",
+          "value": "length(\"integration_credentials\".\"initialization_vector\") > 0"
+        }
+      }
+    },
+    "integration_settings": {
+      "name": "integration_settings",
+      "columns": {
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "chat_model": {
+          "name": "chat_model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "receipt_prompt": {
+          "name": "receipt_prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "receipt_tools_enabled": {
+          "name": "receipt_tools_enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_integration_settings_provider": {
+          "name": "ck_integration_settings_provider",
+          "value": "\"integration_settings\".\"provider\" = 'openrouter'"
+        },
+        "ck_integration_settings_chat_model_not_empty": {
+          "name": "ck_integration_settings_chat_model_not_empty",
+          "value": "length(\"integration_settings\".\"chat_model\") > 0"
+        }
+      }
+    },
+    "item_aliases": {
+      "name": "item_aliases",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "normalized_name": {
+          "name": "normalized_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_item_aliases_normalized_name": {
+          "name": "uq_item_aliases_normalized_name",
+          "columns": [
+            "normalized_name"
+          ],
+          "isUnique": true
+        },
+        "idx_item_aliases_item": {
+          "name": "idx_item_aliases_item",
+          "columns": [
+            "item_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "item_aliases_item_id_items_id_fk": {
+          "name": "item_aliases_item_id_items_id_fk",
+          "tableFrom": "item_aliases",
+          "tableTo": "items",
+          "columnsFrom": [
+            "item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_item_aliases_source": {
+          "name": "ck_item_aliases_source",
+          "value": "\"item_aliases\".\"source\" in ('receipt', 'manual')"
+        }
+      }
+    },
+    "item_lots": {
+      "name": "item_lots",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expiry_date": {
+          "name": "expiry_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_item_lots_item_expiry": {
+          "name": "uq_item_lots_item_expiry",
+          "columns": [
+            "item_id",
+            "expiry_date"
+          ],
+          "isUnique": true
+        },
+        "uq_item_lots_item_no_expiry": {
+          "name": "uq_item_lots_item_no_expiry",
+          "columns": [
+            "item_id"
+          ],
+          "isUnique": true,
+          "where": "\"item_lots\".\"expiry_date\" is null"
+        },
+        "idx_item_lots_expiry": {
+          "name": "idx_item_lots_expiry",
+          "columns": [
+            "expiry_date",
+            "item_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "item_lots_item_id_items_id_fk": {
+          "name": "item_lots_item_id_items_id_fk",
+          "tableFrom": "item_lots",
+          "tableTo": "items",
+          "columnsFrom": [
+            "item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_item_lots_quantity_non_negative": {
+          "name": "ck_item_lots_quantity_non_negative",
+          "value": "\"item_lots\".\"quantity\" >= 0"
+        }
+      }
+    },
+    "item_reading_states": {
+      "name": "item_reading_states",
+      "columns": {
+        "item_id": {
+          "name": "item_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_item_reading_states_status": {
+          "name": "idx_item_reading_states_status",
+          "columns": [
+            "status",
+            "item_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "item_reading_states_item_id_items_id_fk": {
+          "name": "item_reading_states_item_id_items_id_fk",
+          "tableFrom": "item_reading_states",
+          "tableTo": "items",
+          "columnsFrom": [
+            "item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_item_reading_states_status": {
+          "name": "ck_item_reading_states_status",
+          "value": "\"item_reading_states\".\"status\" in ('unread', 'reading', 'finished')"
+        },
+        "ck_item_reading_states_unread_dates": {
+          "name": "ck_item_reading_states_unread_dates",
+          "value": "\"item_reading_states\".\"status\" <> 'unread' or (\"item_reading_states\".\"started_at\" is null and \"item_reading_states\".\"finished_at\" is null)"
+        },
+        "ck_item_reading_states_reading_dates": {
+          "name": "ck_item_reading_states_reading_dates",
+          "value": "\"item_reading_states\".\"status\" <> 'reading' or \"item_reading_states\".\"finished_at\" is null"
+        },
+        "ck_item_reading_states_date_order": {
+          "name": "ck_item_reading_states_date_order",
+          "value": "\"item_reading_states\".\"started_at\" is null or \"item_reading_states\".\"finished_at\" is null or \"item_reading_states\".\"finished_at\" >= \"item_reading_states\".\"started_at\""
+        }
+      }
+    },
+    "items": {
+      "name": "items",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "base_unit": {
+          "name": "base_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "base_dimension": {
+          "name": "base_dimension",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "current_quantity": {
+          "name": "current_quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "low_stock_threshold": {
+          "name": "low_stock_threshold",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "memo": {
+          "name": "memo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_items_location": {
+          "name": "idx_items_location",
+          "columns": [
+            "location_id"
+          ],
+          "isUnique": false
+        },
+        "idx_items_category": {
+          "name": "idx_items_category",
+          "columns": [
+            "category_id"
+          ],
+          "isUnique": false
+        },
+        "idx_items_name": {
+          "name": "idx_items_name",
+          "columns": [
+            "name"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "items_category_id_categories_id_fk": {
+          "name": "items_category_id_categories_id_fk",
+          "tableFrom": "items",
+          "tableTo": "categories",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "items_location_id_storage_locations_id_fk": {
+          "name": "items_location_id_storage_locations_id_fk",
+          "tableFrom": "items",
+          "tableTo": "storage_locations",
+          "columnsFrom": [
+            "location_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_items_base_dimension": {
+          "name": "ck_items_base_dimension",
+          "value": "\"items\".\"base_dimension\" in ('mass', 'volume', 'count')"
+        },
+        "ck_items_current_quantity_non_negative": {
+          "name": "ck_items_current_quantity_non_negative",
+          "value": "\"items\".\"current_quantity\" >= 0"
+        },
+        "ck_items_low_stock_threshold_non_negative": {
+          "name": "ck_items_low_stock_threshold_non_negative",
+          "value": "\"items\".\"low_stock_threshold\" is null or \"items\".\"low_stock_threshold\" >= 0"
+        },
+        "ck_items_name_not_empty": {
+          "name": "ck_items_name_not_empty",
+          "value": "length(\"items\".\"name\") > 0"
+        }
+      }
+    },
+    "price_records": {
+      "name": "price_records",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "purchase_id": {
+          "name": "purchase_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "content_amount": {
+          "name": "content_amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "set_count": {
+          "name": "set_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "packaging": {
+          "name": "packaging",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "price": {
+          "name": "price",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_price_records_item_recorded": {
+          "name": "idx_price_records_item_recorded",
+          "columns": [
+            "item_id",
+            "recorded_at",
+            "id"
+          ],
+          "isUnique": false
+        },
+        "idx_price_records_source": {
+          "name": "idx_price_records_source",
+          "columns": [
+            "source"
+          ],
+          "isUnique": false
+        },
+        "idx_price_records_purchase": {
+          "name": "idx_price_records_purchase",
+          "columns": [
+            "purchase_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "price_records_item_id_items_id_fk": {
+          "name": "price_records_item_id_items_id_fk",
+          "tableFrom": "price_records",
+          "tableTo": "items",
+          "columnsFrom": [
+            "item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "price_records_purchase_id_purchases_id_fk": {
+          "name": "price_records_purchase_id_purchases_id_fk",
+          "tableFrom": "price_records",
+          "tableTo": "purchases",
+          "columnsFrom": [
+            "purchase_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_price_records_content_amount_positive": {
+          "name": "ck_price_records_content_amount_positive",
+          "value": "\"price_records\".\"content_amount\" > 0"
+        },
+        "ck_price_records_set_count_positive": {
+          "name": "ck_price_records_set_count_positive",
+          "value": "\"price_records\".\"set_count\" >= 1"
+        },
+        "ck_price_records_price_non_negative": {
+          "name": "ck_price_records_price_non_negative",
+          "value": "\"price_records\".\"price\" >= 0"
+        },
+        "ck_price_records_source_not_empty": {
+          "name": "ck_price_records_source_not_empty",
+          "value": "length(\"price_records\".\"source\") > 0"
+        }
+      }
+    },
+    "purchases": {
+      "name": "purchases",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "purchased_at": {
+          "name": "purchased_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_purchases_idempotency_key": {
+          "name": "uq_purchases_idempotency_key",
+          "columns": [
+            "idempotency_key"
+          ],
+          "isUnique": true
+        },
+        "idx_purchases_purchased_at": {
+          "name": "idx_purchases_purchased_at",
+          "columns": [
+            "purchased_at",
+            "id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_purchases_source_not_empty": {
+          "name": "ck_purchases_source_not_empty",
+          "value": "length(\"purchases\".\"source\") > 0"
+        }
+      }
+    },
+    "receipt_lines": {
+      "name": "receipt_lines",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "receipt_id": {
+          "name": "receipt_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "line_no": {
+          "name": "line_no",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "raw_name": {
+          "name": "raw_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "normalized_name": {
+          "name": "normalized_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "price": {
+          "name": "price",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "printed_expiry_date": {
+          "name": "printed_expiry_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "estimated_expiry_date": {
+          "name": "estimated_expiry_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "expiry_source": {
+          "name": "expiry_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expiry_confidence": {
+          "name": "expiry_confidence",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "expiry_reason": {
+          "name": "expiry_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "matched_item_id": {
+          "name": "matched_item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "pending_item_id": {
+          "name": "pending_item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "match_method": {
+          "name": "match_method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "match_score": {
+          "name": "match_score",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_receipt_lines_receipt_line_no": {
+          "name": "uq_receipt_lines_receipt_line_no",
+          "columns": [
+            "receipt_id",
+            "line_no"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "receipt_lines_receipt_id_receipts_id_fk": {
+          "name": "receipt_lines_receipt_id_receipts_id_fk",
+          "tableFrom": "receipt_lines",
+          "tableTo": "receipts",
+          "columnsFrom": [
+            "receipt_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "receipt_lines_matched_item_id_items_id_fk": {
+          "name": "receipt_lines_matched_item_id_items_id_fk",
+          "tableFrom": "receipt_lines",
+          "tableTo": "items",
+          "columnsFrom": [
+            "matched_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_receipt_lines_line_no_positive": {
+          "name": "ck_receipt_lines_line_no_positive",
+          "value": "\"receipt_lines\".\"line_no\" >= 1"
+        },
+        "ck_receipt_lines_quantity_positive": {
+          "name": "ck_receipt_lines_quantity_positive",
+          "value": "\"receipt_lines\".\"quantity\" >= 1"
+        },
+        "ck_receipt_lines_price_non_negative": {
+          "name": "ck_receipt_lines_price_non_negative",
+          "value": "\"receipt_lines\".\"price\" is null or \"receipt_lines\".\"price\" >= 0"
+        },
+        "ck_receipt_lines_expiry_source": {
+          "name": "ck_receipt_lines_expiry_source",
+          "value": "\"receipt_lines\".\"expiry_source\" in ('printed', 'estimated', 'unknown')"
+        },
+        "ck_receipt_lines_expiry_confidence": {
+          "name": "ck_receipt_lines_expiry_confidence",
+          "value": "\"receipt_lines\".\"expiry_confidence\" is null or \"receipt_lines\".\"expiry_confidence\" in ('high', 'medium', 'low')"
+        },
+        "ck_receipt_lines_expiry_consistent": {
+          "name": "ck_receipt_lines_expiry_consistent",
+          "value": "(\"receipt_lines\".\"expiry_source\" = 'printed'\n                    and \"receipt_lines\".\"printed_expiry_date\" is not null\n                    and \"receipt_lines\".\"estimated_expiry_date\" is null\n                    and \"receipt_lines\".\"expiry_confidence\" is null\n                    and \"receipt_lines\".\"expiry_reason\" is null)\n                or (\"receipt_lines\".\"expiry_source\" = 'estimated'\n                    and \"receipt_lines\".\"printed_expiry_date\" is null\n                    and \"receipt_lines\".\"estimated_expiry_date\" is not null)\n                or (\"receipt_lines\".\"expiry_source\" = 'unknown'\n                    and \"receipt_lines\".\"printed_expiry_date\" is null\n                    and \"receipt_lines\".\"estimated_expiry_date\" is null\n                    and \"receipt_lines\".\"expiry_confidence\" is null\n                    and \"receipt_lines\".\"expiry_reason\" is null)"
+        },
+        "ck_receipt_lines_match_method": {
+          "name": "ck_receipt_lines_match_method",
+          "value": "\"receipt_lines\".\"match_method\" is null or \"receipt_lines\".\"match_method\" in ('exact', 'alias', 'similarity', 'manual')"
+        },
+        "ck_receipt_lines_match_score_range": {
+          "name": "ck_receipt_lines_match_score_range",
+          "value": "\"receipt_lines\".\"match_score\" is null or (\"receipt_lines\".\"match_score\" >= 0 and \"receipt_lines\".\"match_score\" <= 100)"
+        }
+      }
+    },
+    "receipts": {
+      "name": "receipts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "object_key": {
+          "name": "object_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "byte_size": {
+          "name": "byte_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_name": {
+          "name": "store_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "purchased_at": {
+          "name": "purchased_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "total_price": {
+          "name": "total_price",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "purchase_id": {
+          "name": "purchase_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "applied_at": {
+          "name": "applied_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_receipts_object_key": {
+          "name": "uq_receipts_object_key",
+          "columns": [
+            "object_key"
+          ],
+          "isUnique": true
+        },
+        "idx_receipts_created_at": {
+          "name": "idx_receipts_created_at",
+          "columns": [
+            "created_at",
+            "id"
+          ],
+          "isUnique": false
+        },
+        "idx_receipts_status": {
+          "name": "idx_receipts_status",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "receipts_purchase_id_purchases_id_fk": {
+          "name": "receipts_purchase_id_purchases_id_fk",
+          "tableFrom": "receipts",
+          "tableTo": "purchases",
+          "columnsFrom": [
+            "purchase_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_receipts_byte_size_positive": {
+          "name": "ck_receipts_byte_size_positive",
+          "value": "\"receipts\".\"byte_size\" > 0"
+        },
+        "ck_receipts_status": {
+          "name": "ck_receipts_status",
+          "value": "\"receipts\".\"status\" in ('uploaded', 'parsing', 'parsed', 'applied', 'failed')"
+        },
+        "ck_receipts_total_price_non_negative": {
+          "name": "ck_receipts_total_price_non_negative",
+          "value": "\"receipts\".\"total_price\" is null or \"receipts\".\"total_price\" >= 0"
+        }
+      }
+    },
+    "stock_movement_lot_allocations": {
+      "name": "stock_movement_lot_allocations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "movement_id": {
+          "name": "movement_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "lot_id": {
+          "name": "lot_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expiry_date": {
+          "name": "expiry_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "delta": {
+          "name": "delta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_stock_movement_lot_allocations_movement_lot": {
+          "name": "uq_stock_movement_lot_allocations_movement_lot",
+          "columns": [
+            "movement_id",
+            "lot_id"
+          ],
+          "isUnique": true
+        },
+        "idx_stock_movement_lot_allocations_lot": {
+          "name": "idx_stock_movement_lot_allocations_lot",
+          "columns": [
+            "lot_id",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "stock_movement_lot_allocations_movement_id_stock_movements_id_fk": {
+          "name": "stock_movement_lot_allocations_movement_id_stock_movements_id_fk",
+          "tableFrom": "stock_movement_lot_allocations",
+          "tableTo": "stock_movements",
+          "columnsFrom": [
+            "movement_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "stock_movement_lot_allocations_lot_id_item_lots_id_fk": {
+          "name": "stock_movement_lot_allocations_lot_id_item_lots_id_fk",
+          "tableFrom": "stock_movement_lot_allocations",
+          "tableTo": "item_lots",
+          "columnsFrom": [
+            "lot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_stock_movement_lot_allocations_delta_not_zero": {
+          "name": "ck_stock_movement_lot_allocations_delta_not_zero",
+          "value": "\"stock_movement_lot_allocations\".\"delta\" <> 0"
+        }
+      }
+    },
+    "stock_movements": {
+      "name": "stock_movements",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "delta": {
+          "name": "delta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "purchase_id": {
+          "name": "purchase_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_stock_movements_idempotency_key": {
+          "name": "uq_stock_movements_idempotency_key",
+          "columns": [
+            "idempotency_key"
+          ],
+          "isUnique": true
+        },
+        "uq_stock_movements_purchase_item": {
+          "name": "uq_stock_movements_purchase_item",
+          "columns": [
+            "purchase_id",
+            "item_id"
+          ],
+          "isUnique": true
+        },
+        "idx_stock_movements_item_occurred": {
+          "name": "idx_stock_movements_item_occurred",
+          "columns": [
+            "item_id",
+            "occurred_at",
+            "id"
+          ],
+          "isUnique": false
+        },
+        "idx_stock_movements_occurred": {
+          "name": "idx_stock_movements_occurred",
+          "columns": [
+            "occurred_at",
+            "id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "stock_movements_item_id_items_id_fk": {
+          "name": "stock_movements_item_id_items_id_fk",
+          "tableFrom": "stock_movements",
+          "tableTo": "items",
+          "columnsFrom": [
+            "item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "stock_movements_purchase_id_purchases_id_fk": {
+          "name": "stock_movements_purchase_id_purchases_id_fk",
+          "tableFrom": "stock_movements",
+          "tableTo": "purchases",
+          "columnsFrom": [
+            "purchase_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_stock_movements_delta_not_zero": {
+          "name": "ck_stock_movements_delta_not_zero",
+          "value": "\"stock_movements\".\"delta\" <> 0 or \"stock_movements\".\"reason\" = 'stocktake'"
+        },
+        "ck_stock_movements_purchase_reason": {
+          "name": "ck_stock_movements_purchase_reason",
+          "value": "\"stock_movements\".\"purchase_id\" is null or \"stock_movements\".\"reason\" = 'purchase'"
+        },
+        "ck_stock_movements_reason": {
+          "name": "ck_stock_movements_reason",
+          "value": "\"stock_movements\".\"reason\" in ('purchase', 'stocktake', 'consume', 'discard', 'other')"
+        }
+      }
+    },
+    "stock_operations": {
+      "name": "stock_operations",
+      "columns": {
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "delta": {
+          "name": "delta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_quantity": {
+          "name": "target_quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurred_at_provided": {
+          "name": "occurred_at_provided",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "movement_id": {
+          "name": "movement_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resulting_quantity": {
+          "name": "resulting_quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "request_digest": {
+          "name": "request_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_stock_operations_item_created": {
+          "name": "idx_stock_operations_item_created",
+          "columns": [
+            "item_id",
+            "created_at",
+            "idempotency_key"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "stock_operations_item_id_items_id_fk": {
+          "name": "stock_operations_item_id_items_id_fk",
+          "tableFrom": "stock_operations",
+          "tableTo": "items",
+          "columnsFrom": [
+            "item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_stock_operations_kind": {
+          "name": "ck_stock_operations_kind",
+          "value": "\"stock_operations\".\"kind\" in ('adjustment', 'stocktake')"
+        },
+        "ck_stock_operations_reason": {
+          "name": "ck_stock_operations_reason",
+          "value": "\"stock_operations\".\"reason\" in ('purchase', 'stocktake', 'consume', 'discard', 'other')"
+        },
+        "ck_stock_operations_occurred_at_provided": {
+          "name": "ck_stock_operations_occurred_at_provided",
+          "value": "\"stock_operations\".\"occurred_at_provided\" in (0, 1)"
+        },
+        "ck_stock_operations_payload": {
+          "name": "ck_stock_operations_payload",
+          "value": "(\"stock_operations\".\"kind\" = 'stocktake' and \"stock_operations\".\"target_quantity\" is not null) or (\"stock_operations\".\"kind\" = 'adjustment' and \"stock_operations\".\"target_quantity\" is null and \"stock_operations\".\"delta\" <> 0)"
+        },
+        "ck_stock_operations_target_quantity_non_negative": {
+          "name": "ck_stock_operations_target_quantity_non_negative",
+          "value": "\"stock_operations\".\"target_quantity\" is null or \"stock_operations\".\"target_quantity\" >= 0"
+        },
+        "ck_stock_operations_resulting_quantity_non_negative": {
+          "name": "ck_stock_operations_resulting_quantity_non_negative",
+          "value": "\"stock_operations\".\"resulting_quantity\" >= 0"
+        }
+      }
+    },
+    "storage_locations": {
+      "name": "storage_locations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_storage_locations_parent_name": {
+          "name": "uq_storage_locations_parent_name",
+          "columns": [
+            "parent_id",
+            "name"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "storage_locations_parent_id_storage_locations_id_fk": {
+          "name": "storage_locations_parent_id_storage_locations_id_fk",
+          "tableFrom": "storage_locations",
+          "tableTo": "storage_locations",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_storage_locations_name_not_empty": {
+          "name": "ck_storage_locations_name_not_empty",
+          "value": "length(\"storage_locations\".\"name\") > 0"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}
