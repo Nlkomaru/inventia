@@ -9,7 +9,7 @@ import {
     type ErrorComponentProps,
     useRouter,
 } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +24,6 @@ import {
     Field,
     FieldDescription,
     FieldError,
-    FieldGroup,
     FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -40,7 +39,6 @@ import {
     type ReceiptApplyInput,
     type ReceiptApplyResult,
     type ReceiptDetailDto,
-    receiptAllowedContentTypes,
     receiptMaxByteSize,
 } from "@/domain/receipt";
 import {
@@ -65,11 +63,11 @@ import {
     receiptStatusClassNames,
     receiptStatusLabels,
 } from "../-functions/receipt-format";
-import {
-    ReceiptReviewLine,
-    type SelectOption,
-} from "./-components/receipt-review-line";
+import { ReceiptDropzone } from "./-components/receipt-dropzone";
+import type { SelectOption } from "./-components/receipt-review-detail";
+import { ReceiptReviewTable } from "./-components/receipt-review-table";
 import { buildHierarchyLabels } from "./-functions/hierarchy-labels";
+import { megabytes, validateFile } from "./-functions/receipt-file";
 import {
     actionLabels,
     buildApplyInput,
@@ -127,12 +125,6 @@ const emptyIssueIndex: ReadonlyMap<
     Partial<Record<ReceiptReviewField, string>>
 > = new Map();
 
-const isAllowedContentType = (value: string): boolean =>
-    receiptAllowedContentTypes.some((allowed) => allowed === value);
-
-const megabytes = (bytes: number): string =>
-    `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-
 function ReceiptIntakePage() {
     const navigate = Route.useNavigate();
     const search = Route.useSearch();
@@ -145,7 +137,6 @@ function ReceiptIntakePage() {
     const detailQuery = useQuery(receiptDetailQueryOptions(receiptId));
     const receipt = detailQuery.data ?? null;
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const [file, setFile] = useState<File | null>(null);
     const [fileError, setFileError] = useState<string | null>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
@@ -157,6 +148,9 @@ function ReceiptIntakePage() {
     const [storeName, setStoreName] = useState("");
     const [note, setNote] = useState("");
     const [submitted, setSubmitted] = useState(false);
+    // アップロード完了から解析開始までは mutation の isPending が両方 false になる。
+    // その隙に 2 枚目を投入されるとレシートが二重に作られるため、取込全体を 1 つのフラグで覆う
+    const [starting, setStarting] = useState(false);
 
     const uploadMutation = useMutation({
         mutationFn: (input: File) => uploadReceiptImage(input),
@@ -233,7 +227,10 @@ function ReceiptIntakePage() {
 
     const totals = useMemo(() => summarizeReviewTotals(rows), [rows]);
     const issues = useMemo(() => validateReviewRows(rows), [rows]);
-    const issueIndex = submitted ? indexReviewIssues(issues) : emptyIssueIndex;
+    const issueIndex = useMemo(
+        () => (submitted ? indexReviewIssues(issues) : emptyIssueIndex),
+        [issues, submitted],
+    );
     const storeNameError =
         submitted &&
         receipt !== null &&
@@ -243,28 +240,26 @@ function ReceiptIntakePage() {
             ? "レシートから店舗名を読み取れませんでした。店舗名を入力してください"
             : null;
 
-    const updateRow = (lineId: string, patch: Partial<ReceiptReviewRow>) => {
-        setRowsState((current) => ({
-            key: current.key,
-            rows: patchReviewRow(current.rows, lineId, patch),
-        }));
-    };
-    const updateRowNewItem = (
-        lineId: string,
-        patch: Partial<ReceiptReviewNewItemForm>,
-    ) => {
-        setRowsState((current) => ({
-            key: current.key,
-            rows: patchReviewRowNewItem(current.rows, lineId, patch),
-        }));
-    };
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const selected = event.target.files?.item(0) ?? null;
-        setFile(selected);
-        setUploadError(null);
-        setFileError(validateFile(selected));
-    };
+    // data table のセルへ渡すハンドラ。参照が変わるとセルが再マウントされ、
+    // 入力中のフォーカスと IME の変換が途切れるため useCallback で固定する
+    const updateRow = useCallback(
+        (lineId: string, patch: Partial<ReceiptReviewRow>) => {
+            setRowsState((current) => ({
+                key: current.key,
+                rows: patchReviewRow(current.rows, lineId, patch),
+            }));
+        },
+        [],
+    );
+    const updateRowNewItem = useCallback(
+        (lineId: string, patch: Partial<ReceiptReviewNewItemForm>) => {
+            setRowsState((current) => ({
+                key: current.key,
+                rows: patchReviewRowNewItem(current.rows, lineId, patch),
+            }));
+        },
+        [],
+    );
 
     const runParse = async (id: string) => {
         setParseError(null);
@@ -277,19 +272,18 @@ function ReceiptIntakePage() {
         }
     };
 
-    const submitUpload = async (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
+    // 画像を選んだ時点で解析まで進める。失敗したときだけ再試行ボタンを出す
+    const startUpload = async (target: File) => {
+        if (starting) return;
         setUploadError(null);
         setParseError(null);
-        const invalid = validateFile(file);
+        const invalid = validateFile(target);
         setFileError(invalid);
-        if (invalid !== null || file === null) return;
+        if (invalid !== null) return;
+        setStarting(true);
         try {
-            const created = await uploadMutation.mutateAsync(file);
+            const created = await uploadMutation.mutateAsync(target);
             setFile(null);
-            if (fileInputRef.current !== null) {
-                fileInputRef.current.value = "";
-            }
             setApplyResult(null);
             setSubmitted(false);
             await navigate({
@@ -304,7 +298,28 @@ function ReceiptIntakePage() {
                     "レシート画像をアップロードできませんでした",
                 ),
             );
+        } finally {
+            setStarting(false);
         }
+    };
+
+    const handleFileSelect = (selected: File) => {
+        setFile(selected);
+        setFileError(null);
+        setUploadError(null);
+        void startUpload(selected);
+    };
+
+    const handleFileReject = (message: string) => {
+        setFile(null);
+        setFileError(message);
+        setUploadError(null);
+    };
+
+    const handleFileClear = () => {
+        setFile(null);
+        setFileError(null);
+        setUploadError(null);
     };
 
     const submitApply = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -344,7 +359,8 @@ function ReceiptIntakePage() {
         ? errorMessage(detailQuery.error, "レシートを読み込めませんでした")
         : null;
     const appliedCount = rows.filter((row) => row.action !== "skip").length;
-    const busy = uploading || parsing || applying;
+    const busy = starting || uploading || parsing || applying;
+    const canRetryUpload = uploadError !== null && file !== null;
 
     return (
         <main className={pageClassName}>
@@ -373,49 +389,33 @@ function ReceiptIntakePage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>1. レシート画像を選ぶ</CardTitle>
+                    <CardTitle>1. レシート画像を取り込む</CardTitle>
                     <CardDescription>
-                        スマートフォンではその場で撮影できます。JPEG・PNG・WebP
+                        画像を選ぶとそのままアップロードして解析します。JPEG・PNG・WebP
                         の画像を {megabytes(receiptMaxByteSize)}{" "}
                         まで受け付けます。
                     </CardDescription>
                 </CardHeader>
-                <form onSubmit={submitUpload}>
-                    <CardContent>
-                        <FieldGroup>
-                            <Field data-invalid={Boolean(fileError)}>
-                                <FieldLabel htmlFor="receipt-file">
-                                    レシート画像
-                                </FieldLabel>
-                                <Input
-                                    accept="image/*"
-                                    aria-describedby={
-                                        fileError
-                                            ? "receipt-file-description receipt-file-error"
-                                            : "receipt-file-description"
-                                    }
-                                    aria-invalid={Boolean(fileError)}
-                                    capture="environment"
-                                    className="file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm"
-                                    disabled={busy}
-                                    id="receipt-file"
-                                    onChange={handleFileChange}
-                                    ref={fileInputRef}
-                                    type="file"
-                                />
-                                <FieldDescription id="receipt-file-description">
-                                    {file === null
-                                        ? "カメラで撮影するか、保存済みの画像を選んでください。"
-                                        : `${file.name}（${megabytes(file.size)}）`}
-                                </FieldDescription>
-                                {fileError ? (
-                                    <FieldError id="receipt-file-error">
-                                        {fileError}
-                                    </FieldError>
-                                ) : null}
-                            </Field>
-                        </FieldGroup>
-                    </CardContent>
+                <CardContent>
+                    <ReceiptDropzone
+                        disabled={busy}
+                        error={fileError}
+                        file={file}
+                        onClear={handleFileClear}
+                        onReject={handleFileReject}
+                        onSelect={handleFileSelect}
+                        statusMessage={
+                            uploading
+                                ? "レシート画像をアップロードしています…"
+                                : parsing
+                                  ? "レシートを解析しています…"
+                                  : starting
+                                    ? "レシートを取り込んでいます…"
+                                    : null
+                        }
+                    />
+                </CardContent>
+                {receiptId === "" && !canRetryUpload ? null : (
                     <CardFooter className="justify-end gap-2">
                         {receiptId === "" ? null : (
                             <Button
@@ -434,15 +434,19 @@ function ReceiptIntakePage() {
                                 取込をやめる
                             </Button>
                         )}
-                        <Button disabled={busy || file === null} type="submit">
-                            {uploading
-                                ? "アップロード中…"
-                                : parsing
-                                  ? "解析中…"
-                                  : "アップロードして解析"}
-                        </Button>
+                        {canRetryUpload ? (
+                            <Button
+                                disabled={busy}
+                                onClick={() => {
+                                    if (file !== null) void startUpload(file);
+                                }}
+                                type="button"
+                            >
+                                もう一度アップロード
+                            </Button>
+                        ) : null}
                     </CardFooter>
-                </form>
+                )}
             </Card>
 
             {uploadError ? (
@@ -603,43 +607,17 @@ function ReceiptIntakePage() {
                                     明細がありません。画像を撮り直して再解析してください。
                                 </p>
                             ) : (
-                                <ul className="flex flex-col gap-4">
-                                    {lines.map((line) => {
-                                        const row = rows.find(
-                                            (candidate) =>
-                                                candidate.lineId === line.id,
-                                        );
-                                        if (row === undefined) return null;
-                                        return (
-                                            <ReceiptReviewLine
-                                                categoryOptions={
-                                                    categoryOptions
-                                                }
-                                                disabled={applying}
-                                                issues={
-                                                    issueIndex.get(line.id) ??
-                                                    emptyIssues
-                                                }
-                                                itemOptions={itemOptions}
-                                                key={line.id}
-                                                line={line}
-                                                locationOptions={
-                                                    locationOptions
-                                                }
-                                                onChange={(patch) =>
-                                                    updateRow(line.id, patch)
-                                                }
-                                                onNewItemChange={(patch) =>
-                                                    updateRowNewItem(
-                                                        line.id,
-                                                        patch,
-                                                    )
-                                                }
-                                                row={row}
-                                            />
-                                        );
-                                    })}
-                                </ul>
+                                <ReceiptReviewTable
+                                    categoryOptions={categoryOptions}
+                                    disabled={applying}
+                                    issueIndex={issueIndex}
+                                    itemOptions={itemOptions}
+                                    lines={lines}
+                                    locationOptions={locationOptions}
+                                    onChange={updateRow}
+                                    onNewItemChange={updateRowNewItem}
+                                    rows={rows}
+                                />
                             )}
 
                             <Field>
@@ -927,22 +905,9 @@ function ReceiptIntakeError({ error, reset }: ErrorComponentProps) {
 }
 
 const emptyLines: ReceiptDetailDto["lines"] = [];
-const emptyIssues: Partial<Record<ReceiptReviewField, string>> = {};
 
 const errorMessage = (cause: unknown, fallback: string): string =>
     cause instanceof Error ? cause.message : fallback;
-
-const validateFile = (file: File | null): string | null => {
-    if (file === null) return "レシート画像を選択してください";
-    if (file.size === 0) return "空のファイルは取り込めません";
-    if (!isAllowedContentType(file.type)) {
-        return "JPEG・PNG・WebP の画像を選んでください";
-    }
-    if (file.size > receiptMaxByteSize) {
-        return `画像は ${megabytes(receiptMaxByteSize)} 以下にしてください`;
-    }
-    return null;
-};
 
 /** レシート記載の合計と明細合計の突き合わせ。ずれても反映は止めない。 */
 const reconcileMessage = (

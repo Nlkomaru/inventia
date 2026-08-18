@@ -21,6 +21,28 @@ export const categorySortOrderSchema = z
     .min(-2_147_483_648)
     .max(2_147_483_647);
 
+export const categoryCreateInputSchema = z
+    .object({
+        name: categoryNameSchema,
+        parentId: categoryIdSchema.nullable().optional().default(null),
+        // null は汎用カテゴリで、実効 kind は祖先を遡って解決する
+        kind: categoryKindSchema.nullable().optional().default(null),
+        sortOrder: categorySortOrderSchema.optional().default(0),
+    })
+    .strict();
+
+export const categoryUpdateInputSchema = z
+    .object({
+        name: categoryNameSchema.optional(),
+        parentId: categoryIdSchema.nullable().optional(),
+        kind: categoryKindSchema.nullable().optional(),
+        sortOrder: categorySortOrderSchema.optional(),
+    })
+    .strict()
+    .refine((value) => Object.keys(value).length > 0, {
+        message: "更新する項目を1つ以上指定してください",
+    });
+
 export const categoryListInputSchema = z.object({
     parentId: categoryIdSchema.nullable().default(null),
     limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -54,8 +76,14 @@ export const categoryListOutputSchema = z
     })
     .strict();
 
+export const categoryDeleteOutputSchema = z
+    .object({ deleted: z.literal(true) })
+    .strict();
+
 export type CategoryId = z.infer<typeof categoryIdSchema>;
 export type CategoryKind = z.infer<typeof categoryKindSchema>;
+export type CategoryCreateInput = z.infer<typeof categoryCreateInputSchema>;
+export type CategoryUpdateInput = z.infer<typeof categoryUpdateInputSchema>;
 export type CategoryListInput = z.infer<typeof categoryListInputSchema>;
 export type CategoryCursor = z.infer<typeof categoryCursorSchema>;
 export type CategoryDto = z.infer<typeof categoryDtoSchema>;
