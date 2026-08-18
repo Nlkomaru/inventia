@@ -16,6 +16,7 @@ import { Route as AppMasterRouteImport } from './routes/_app/_master'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as AppLicenseIndexRouteImport } from './routes/_app/license/index'
 import { Route as AppInventoryInventoryIndexRouteImport } from './routes/_app/_inventory/inventory/index'
+import { Route as AppInventoryReceiptsIndexRouteImport } from './routes/_app/_inventory/receipts/index'
 import { Route as AppMasterCategoriesIndexRouteImport } from './routes/_app/_master/categories/index'
 import { Route as AppMasterItemsIndexRouteImport } from './routes/_app/_master/items/index'
 import { Route as AppMasterLocationsIndexRouteImport } from './routes/_app/_master/locations/index'
@@ -59,6 +60,12 @@ const AppInventoryInventoryIndexRoute =
   AppInventoryInventoryIndexRouteImport.update({
     id: '/inventory/',
     path: '/inventory/',
+    getParentRoute: () => AppInventoryRoute,
+  } as any)
+const AppInventoryReceiptsIndexRoute =
+  AppInventoryReceiptsIndexRouteImport.update({
+    id: '/receipts/',
+    path: '/receipts/',
     getParentRoute: () => AppInventoryRoute,
   } as any)
 const AppMasterCategoriesIndexRoute =
@@ -130,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/api/$': typeof ApiSplatRoute
   '/license/': typeof AppLicenseIndexRoute
   '/inventory/': typeof AppInventoryInventoryIndexRoute
+  '/receipts/': typeof AppInventoryReceiptsIndexRoute
   '/categories/': typeof AppMasterCategoriesIndexRoute
   '/items/': typeof AppMasterItemsIndexRoute
   '/locations/': typeof AppMasterLocationsIndexRoute
@@ -147,6 +155,7 @@ export interface FileRoutesByTo {
   '/api/$': typeof ApiSplatRoute
   '/license': typeof AppLicenseIndexRoute
   '/inventory': typeof AppInventoryInventoryIndexRoute
+  '/receipts': typeof AppInventoryReceiptsIndexRoute
   '/categories': typeof AppMasterCategoriesIndexRoute
   '/items': typeof AppMasterItemsIndexRoute
   '/locations': typeof AppMasterLocationsIndexRoute
@@ -168,6 +177,7 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/license/': typeof AppLicenseIndexRoute
   '/_app/_inventory/inventory/': typeof AppInventoryInventoryIndexRoute
+  '/_app/_inventory/receipts/': typeof AppInventoryReceiptsIndexRoute
   '/_app/_master/categories/': typeof AppMasterCategoriesIndexRoute
   '/_app/_master/items/': typeof AppMasterItemsIndexRoute
   '/_app/_master/locations/': typeof AppMasterLocationsIndexRoute
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/api/$'
     | '/license/'
     | '/inventory/'
+    | '/receipts/'
     | '/categories/'
     | '/items/'
     | '/locations/'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/api/$'
     | '/license'
     | '/inventory'
+    | '/receipts'
     | '/categories'
     | '/items'
     | '/locations'
@@ -224,6 +236,7 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/license/'
     | '/_app/_inventory/inventory/'
+    | '/_app/_inventory/receipts/'
     | '/_app/_master/categories/'
     | '/_app/_master/items/'
     | '/_app/_master/locations/'
@@ -291,6 +304,13 @@ declare module '@tanstack/react-router' {
       path: '/inventory'
       fullPath: '/inventory/'
       preLoaderRoute: typeof AppInventoryInventoryIndexRouteImport
+      parentRoute: typeof AppInventoryRoute
+    }
+    '/_app/_inventory/receipts/': {
+      id: '/_app/_inventory/receipts/'
+      path: '/receipts'
+      fullPath: '/receipts/'
+      preLoaderRoute: typeof AppInventoryReceiptsIndexRouteImport
       parentRoute: typeof AppInventoryRoute
     }
     '/_app/_master/categories/': {
@@ -375,6 +395,7 @@ declare module '@tanstack/react-router' {
 
 interface AppInventoryRouteChildren {
   AppInventoryInventoryIndexRoute: typeof AppInventoryInventoryIndexRoute
+  AppInventoryReceiptsIndexRoute: typeof AppInventoryReceiptsIndexRoute
   AppInventoryInventoryHistoryIndexRoute: typeof AppInventoryInventoryHistoryIndexRoute
   AppInventoryInventoryIssueIndexRoute: typeof AppInventoryInventoryIssueIndexRoute
   AppInventoryInventoryReceiveIndexRoute: typeof AppInventoryInventoryReceiveIndexRoute
@@ -384,6 +405,7 @@ interface AppInventoryRouteChildren {
 
 const AppInventoryRouteChildren: AppInventoryRouteChildren = {
   AppInventoryInventoryIndexRoute: AppInventoryInventoryIndexRoute,
+  AppInventoryReceiptsIndexRoute: AppInventoryReceiptsIndexRoute,
   AppInventoryInventoryHistoryIndexRoute:
     AppInventoryInventoryHistoryIndexRoute,
   AppInventoryInventoryIssueIndexRoute: AppInventoryInventoryIssueIndexRoute,

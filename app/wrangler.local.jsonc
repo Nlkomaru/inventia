@@ -12,6 +12,12 @@
 			"migrations_dir": "migrations"
 		}
 	],
+	"r2_buckets": [
+		{
+			"binding": "RECEIPTS",
+			"bucket_name": "inventia-receipts"
+		}
+	],
 	"secrets": {
 		"required": ["SETTINGS_ENCRYPTION_KEY"]
 	}

@@ -30,6 +30,18 @@
 			"remote": true
 		}
 	],
+	/**
+	 * DB と同じく既定でリモート接続にする。片方だけローカル emulation にすると、
+	 * 本番 D1 のレシート行がローカルにしか存在しないオブジェクトを指してしまう。
+	 * ローカル D1 / ローカル R2 で動かす場合は wrangler.local.jsonc を使う。
+	 */
+	"r2_buckets": [
+		{
+			"binding": "RECEIPTS",
+			"bucket_name": "inventia-receipts",
+			"remote": true
+		}
+	],
 	"secrets": {
 		"required": ["SETTINGS_ENCRYPTION_KEY"]
 	}

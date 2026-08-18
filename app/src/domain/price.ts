@@ -158,6 +158,11 @@ export const normalizeContentAmount = (
     if (!Number.isSafeInteger(contentAmount) || contentAmount <= 0) {
         return null;
     }
+    // 個数は換算しないため、同じ単位どうしなら恒等変換になる。単位表に無い
+    // 基準単位（袋、パック、箱など）の品目でも価格を記録できるようにする
+    if (baseDimension === "count") {
+        return contentUnit === baseUnit ? contentAmount : null;
+    }
     const source = getPriceUnitDefinition(contentUnit);
     const target = getPriceUnitDefinition(baseUnit);
     if (
@@ -166,9 +171,6 @@ export const normalizeContentAmount = (
         source.dimension !== baseDimension ||
         target.dimension !== baseDimension
     ) {
-        return null;
-    }
-    if (baseDimension === "count" && contentUnit !== baseUnit) {
         return null;
     }
     const amountInSmallestUnit = contentAmount * source.factorToSmallest;
@@ -189,6 +191,12 @@ const toSmallestUnitAmount = (
     baseUnit: string,
     baseDimension: PriceRecordDimension,
 ): number | null => {
+    // 個数は基準単位そのものが最小単位なので、単位表に無い単位でも 1 倍で扱う
+    if (baseDimension === "count") {
+        return Number.isSafeInteger(contentAmount) && contentAmount > 0
+            ? contentAmount
+            : null;
+    }
     const base = getPriceUnitDefinition(baseUnit);
     if (!base || base.dimension !== baseDimension) {
         return null;

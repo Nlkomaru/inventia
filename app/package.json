@@ -11,6 +11,7 @@
 		"generate-routes": "tsr generate",
 		"build": "pnpm run generate-licenses && vite build",
 		"preview": "pnpm run build && vite preview",
+		"preview:local": "INVENTIA_API_PROXY=1 pnpm run build && INVENTIA_API_PROXY=1 vite preview",
 		"check": "biome check --write",
 		"deploy": "VITE_DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.000Z) pnpm run build && wrangler deploy",
 		"cf-typegen": "wrangler types"
@@ -23,6 +24,7 @@
 		"@hono/mcp": "^0.3.1",
 		"@hono/zod-openapi": "^1.5.1",
 		"@modelcontextprotocol/sdk": "^1.30.0",
+		"@openrouter/ai-sdk-provider": "^3.0.0",
 		"@scalar/hono-api-reference": "^0.11.12",
 		"@tailwindcss/vite": "^4.1.18",
 		"@tanstack/react-devtools": "latest",
@@ -32,6 +34,7 @@
 		"@tanstack/react-router-ssr-query": "^1.167.1",
 		"@tanstack/react-start": "latest",
 		"@tanstack/react-table": "^9.1.2",
+		"ai": "^7.0.66",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"drizzle-orm": "^0.45.2",

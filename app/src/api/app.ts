@@ -9,6 +9,7 @@ import { locationsApp } from "./http/locations";
 import { lotsApp } from "./http/lots";
 import { pricesApp } from "./http/prices";
 import { readingApp } from "./http/reading";
+import { receiptsApp } from "./http/receipts";
 import { stockInventoryApp, stockItemsApp } from "./http/stock";
 import { handleMcpRequest } from "./mcp/handler";
 
@@ -24,6 +25,7 @@ apiApp.route("/api/items", lotsApp);
 apiApp.route("/api/items", readingApp);
 apiApp.route("/api/inventory", stockInventoryApp);
 apiApp.route("/api/settings/integrations", integrationsApp);
+apiApp.route("/api/receipts", receiptsApp);
 
 apiApp.doc31("/api/openapi", {
     openapi: "3.1.0",
