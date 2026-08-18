@@ -31,14 +31,24 @@
 		}
 	],
 	/**
-	 * DB と同じく既定でリモート接続にする。片方だけローカル emulation にすると、
+	 * DB と同じくリモート接続にする。片方だけローカル emulation にすると、
 	 * 本番 D1 のレシート行がローカルにしか存在しないオブジェクトを指してしまう。
-	 * ローカル D1 / ローカル R2 で動かす場合は wrangler.local.jsonc を使う。
 	 */
 	"r2_buckets": [
 		{
 			"binding": "RECEIPTS",
 			"bucket_name": "inventia-receipts",
+			"remote": true
+		}
+	],
+	/**
+	 * 品目名の埋め込み索引。ローカル emulation が無いため dev でも remote を使う。
+	 * 次元数は domain/integration.ts の openRouterEmbeddingDimensions と一致させる。
+	 */
+	"vectorize": [
+		{
+			"binding": "VECTORIZE",
+			"index_name": "inventia-items",
 			"remote": true
 		}
 	],

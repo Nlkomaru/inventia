@@ -125,9 +125,29 @@ export const itemListQuerySchema = z
     })
     .strict();
 
+// 品目名の意味検索の入力。HTTP のクエリ文字列と MCP の JSON 入力の両方から使うため、
+// topK は文字列・数値のどちらで来ても z.coerce で受ける
+export const itemSemanticSearchQuerySchema = z
+    .object({
+        q: z.string().trim().min(1).max(200),
+        topK: z.coerce.number().int().min(1).max(100).default(20),
+    })
+    .strict();
+
+// cursor を持たない。Vectorize の query は cursor を提供せず、topK で打ち切る仕様のため
+export const itemSemanticSearchResultSchema = z.object({
+    items: z.array(itemDtoSchema),
+});
+
 export type ItemCreateInput = z.infer<typeof itemCreateSchema>;
 export type ItemUpdateInput = z.infer<typeof itemUpdateSchema>;
 export type ItemListQuery = z.infer<typeof itemListQuerySchema>;
+export type ItemSemanticSearchQuery = z.infer<
+    typeof itemSemanticSearchQuerySchema
+>;
+export type ItemSemanticSearchResult = z.infer<
+    typeof itemSemanticSearchResultSchema
+>;
 
 export type ItemDto = z.infer<typeof itemDtoSchema>;
 export type ItemDetailDto = z.infer<typeof itemDetailDtoSchema>;

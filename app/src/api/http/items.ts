@@ -5,8 +5,17 @@ import {
     itemDetailDtoSchema,
     itemDtoSchema,
     itemListQuerySchema,
+    itemSemanticSearchQuerySchema,
+    itemSemanticSearchResultSchema,
     itemUpdateSchema,
 } from "../../domain/item";
+import { EmbeddingServiceError } from "../../services/embeddingService";
+import {
+    indexItem,
+    reindexAllItems,
+    removeItemFromIndex,
+    searchItemsByVector,
+} from "../../services/itemSearchService";
 import {
     createItem,
     deleteItem,
@@ -34,6 +43,12 @@ const itemListSchema = z.object({
     nextCursor: z.string().nullable(),
 });
 const deletedSchema = z.object({ deleted: z.literal(true) });
+// 再索引の集計。1 品目単位の索引更新は best-effort で結果を返さないため、
+// この経路だけが利用者へ結果件数を示す
+const itemReindexResultSchema = z.object({
+    indexed: z.int().min(0),
+    failed: z.int().min(0),
+});
 const responseContent = (schema: z.ZodType) => ({
     "application/json": { schema },
 });
@@ -62,6 +77,53 @@ itemsApp.openAPIRegistry.registerPath({
         },
         400: jsonError(
             "The request is invalid; correct the reported input. Codes: VALIDATION_ERROR, INVALID_CURSOR.",
+        ),
+        ...serverErrorResponses,
+    },
+});
+itemsApp.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/search/semantic",
+    tags: ["Items"],
+    summary: "Search inventory items by meaning",
+    operationId: "searchItemsSemantic",
+    description:
+        "Finds items whose stored name is semantically similar to q, using embeddings generated from item names and matched through Cloudflare Vectorize. This is a supplement to GET /api/items's name search (the q parameter there), not a replacement: it can match items even when the query uses different wording than the stored name, but only items that have been indexed can be returned. Indexing runs best-effort whenever an item is created or updated, so an item can be missing from these results when the OpenRouter API key was not configured at index time or the indexing call itself failed; POST /api/items/reindex recovers from that by rebuilding the index for every item. There is no cursor and no nextCursor in the response: results are cut off at topK (default 20, maximum 100) because the underlying vector query has no paging.",
+    request: { query: itemSemanticSearchQuerySchema },
+    responses: {
+        200: {
+            description:
+                "Items ordered by similarity to q, most similar first. May be shorter than topK, and never includes items that were never indexed.",
+            content: responseContent(itemSemanticSearchResultSchema),
+        },
+        400: jsonError(
+            "VALIDATION_ERROR: q is empty or over 200 characters, or topK is out of range (1-100).",
+        ),
+        503: jsonError(
+            "EMBEDDING_NOT_CONFIGURED: the OpenRouter API key is not stored. Save it from the integration settings, or use POST /api/items/reindex once it is saved.",
+        ),
+        502: jsonError(
+            "The embedding provider could not complete the request. Codes: EMBEDDING_PROVIDER_ERROR (OpenRouter could not be reached or returned an error), EMBEDDING_INVALID_RESPONSE (the response could not be read). Retry later.",
+        ),
+        ...serverErrorResponses,
+    },
+});
+itemsApp.openAPIRegistry.registerPath({
+    method: "post",
+    path: "/reindex",
+    tags: ["Items"],
+    summary: "Rebuild the semantic search index",
+    operationId: "reindexItems",
+    description:
+        "Rebuilds the semantic search index used by GET /api/items/search/semantic: regenerates the embedding for every item from its current name and upserts it into Vectorize, in batches of up to 100 items. Side effects: calls the configured OpenRouter embeddings API once per batch and overwrites the stored vectors, so it takes time and OpenRouter usage proportional to the number of items. Use it to recover items missed by the best-effort per-item indexing, for example right after the OpenRouter API key is configured for the first time. A batch that fails for a transient reason is counted in failed and does not stop the remaining batches, so a positive failed leaves some items unindexed and worth retrying; if the OpenRouter API key is not configured, every batch would fail the same way, so the whole run stops immediately and the response is 503 instead of a misleadingly successful 200.",
+    responses: {
+        200: {
+            description:
+                "The reindex ran to completion. indexed is the number of items whose vector was written; failed is the number of items whose batch could not be embedded or upserted.",
+            content: responseContent(itemReindexResultSchema),
+        },
+        503: jsonError(
+            "EMBEDDING_NOT_CONFIGURED: the OpenRouter API key is not stored. Save it from the integration settings, then retry.",
         ),
         ...serverErrorResponses,
     },
@@ -212,10 +274,76 @@ const parseJson = async (c: ItemsContext): Promise<unknown> => {
     }
 };
 
+// EmbeddingServiceError のコードを利用者が対処できる HTTP status へ写す。
+// 入力不備は 400、API key 未設定は復旧手段のある 503、上流の失敗は 502
+const embeddingErrorResponse = (
+    c: ItemsContext,
+    error: EmbeddingServiceError,
+): Response => {
+    const status =
+        error.code === "EMBEDDING_INVALID_INPUT"
+            ? 400
+            : error.code === "EMBEDDING_NOT_CONFIGURED"
+              ? 503
+              : 502;
+    return c.json(
+        {
+            error: {
+                code: error.code,
+                message: error.message,
+            },
+        } satisfies ErrorResponse,
+        status,
+    );
+};
+
 itemsApp.get("/", async (c) => {
     try {
         return c.json(await listItems(c.env.DB, c.req.query()), 200);
     } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+// registerPath の query スキーマは OpenAPI ドキュメント用で実行時の検証はしないため、
+// ここで itemSemanticSearchQuerySchema を明示的に検証する
+itemsApp.get("/search/semantic", async (c) => {
+    const parsed = itemSemanticSearchQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) {
+        return c.json(
+            {
+                error: {
+                    code: "VALIDATION_ERROR",
+                    message:
+                        parsed.error.issues[0]?.message ??
+                        "the query is invalid",
+                },
+            } satisfies ErrorResponse,
+            400,
+        );
+    }
+    try {
+        const items = await searchItemsByVector(c.env, parsed.data.q, {
+            topK: parsed.data.topK,
+        });
+        return c.json({ items }, 200);
+    } catch (error) {
+        if (error instanceof EmbeddingServiceError) {
+            return embeddingErrorResponse(c, error);
+        }
+        return errorResponse(c, error);
+    }
+});
+
+// 全品目の embedding を作り直す更新系エンドポイント。副作用は OpenAPI の
+// description に明記する
+itemsApp.post("/reindex", async (c) => {
+    try {
+        return c.json(await reindexAllItems(c.env), 200);
+    } catch (error) {
+        if (error instanceof EmbeddingServiceError) {
+            return embeddingErrorResponse(c, error);
+        }
         return errorResponse(c, error);
     }
 });
@@ -230,7 +358,11 @@ itemsApp.get("/:id", async (c) => {
 
 itemsApp.post("/", async (c) => {
     try {
-        return c.json(await createItem(c.env.DB, await parseJson(c)), 201);
+        const created = await createItem(c.env.DB, await parseJson(c));
+        // 索引更新は best-effort（内部で例外を握り潰す）。この worker には
+        // ExecutionContext が渡らないため waitUntil は使えず、応答を返す前に await する
+        await indexItem(c.env, created.id);
+        return c.json(created, 201);
     } catch (error) {
         return errorResponse(c, error);
     }
@@ -238,10 +370,14 @@ itemsApp.post("/", async (c) => {
 
 itemsApp.patch("/:id", async (c) => {
     try {
-        return c.json(
-            await updateItem(c.env.DB, c.req.param("id"), await parseJson(c)),
-            200,
-        );
+        const body = await parseJson(c);
+        const updated = await updateItem(c.env.DB, c.req.param("id"), body);
+        // 埋め込み対象は品目名だけなので、name を送っていない更新では索引を触らない
+        const parsedUpdate = itemUpdateSchema.safeParse(body);
+        if (parsedUpdate.success && parsedUpdate.data.name !== undefined) {
+            await indexItem(c.env, updated.id);
+        }
+        return c.json(updated, 200);
     } catch (error) {
         return errorResponse(c, error);
     }
@@ -249,7 +385,9 @@ itemsApp.patch("/:id", async (c) => {
 
 itemsApp.delete("/:id", async (c) => {
     try {
-        await deleteItem(c.env.DB, c.req.param("id"));
+        const id = c.req.param("id");
+        await deleteItem(c.env.DB, id);
+        await removeItemFromIndex(c.env, id);
         return c.json({ deleted: true }, 200);
     } catch (error) {
         return errorResponse(c, error);

@@ -66,6 +66,7 @@ import {
     getOpenRouterApiKey,
     getOpenRouterIntegrationStatus,
 } from "./integrationService";
+import { type ItemSearchEnv, indexItems } from "./itemSearchService";
 import { createItem, ItemServiceError } from "./itemService";
 import { adjustStock, StockServiceError } from "./stockService";
 
@@ -817,6 +818,8 @@ export const applyReceipt = async (
     db: D1Database,
     receiptId: string,
     input: unknown,
+    // 新規作成した品目の索引更新に使う binding
+    searchEnv: ItemSearchEnv,
 ): Promise<ReceiptApplyResult> => {
     const validated = receiptApplyInputSchema.safeParse(input);
     if (!validated.success) {
@@ -874,6 +877,9 @@ export const applyReceipt = async (
     ];
     const pricingByItemId = await listItemPricingContexts(db, knownItemIds);
     const results: ReceiptApplyLineResult[] = [];
+    // ループ中に新規作成した品目 ID。索引更新は品目ごとに直列で OpenRouter を
+    // 叩かないよう、ループを抜けた後に indexItems でまとめて 1 回だけ行う
+    const createdItemIds: string[] = [];
     try {
         for (const lineInput of parsed.lines) {
             const line = lineById.get(lineInput.lineId);
@@ -954,6 +960,7 @@ export const applyReceipt = async (
                         baseUnit: created.baseUnit,
                         baseDimension: created.baseDimension,
                     };
+                    createdItemIds.push(created.id);
                 }
                 pricingByItemId.set(itemId, pricing);
                 await setReceiptLineMatch(db, line.id, {
@@ -1036,6 +1043,10 @@ export const applyReceipt = async (
         }
     } catch (error) {
         return mapApplyError(error);
+    } finally {
+        // indexItems 自体が best-effort なので、失敗しても反映は止めない。
+        // 途中で失敗しても、それまでに作成した品目は finally で索引する
+        await indexItems(searchEnv, createdItemIds);
     }
     const appliedAt = receipt.appliedAt ?? new Date().toISOString();
     if (

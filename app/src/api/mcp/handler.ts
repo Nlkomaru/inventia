@@ -4,7 +4,7 @@ import type { ApiBindings } from "../bindings";
 import { createMcpServer } from "./server";
 
 export const handleMcpRequest = async (c: Context<ApiBindings>) => {
-    const server = createMcpServer(c.env.DB);
+    const server = createMcpServer(c.env);
     const transport = new StreamableHTTPTransport({
         sessionIdGenerator: undefined,
         enableJsonResponse: true,

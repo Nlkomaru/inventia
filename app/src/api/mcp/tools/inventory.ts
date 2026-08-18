@@ -5,6 +5,8 @@ import {
     itemDetailDtoSchema,
     itemDtoSchema,
     itemListQuerySchema,
+    itemSemanticSearchQuerySchema,
+    itemSemanticSearchResultSchema,
 } from "../../../domain/item";
 import {
     priceComparisonListInputSchema,
@@ -16,6 +18,11 @@ import {
     staleStocktakeListDtoSchema,
     staleStocktakeQuerySchema,
 } from "../../../domain/stock";
+import { EmbeddingServiceError } from "../../../services/embeddingService";
+import {
+    type ItemSearchEnv,
+    searchItemsByVector,
+} from "../../../services/itemSearchService";
 import {
     getItem,
     ItemServiceError,
@@ -57,6 +64,13 @@ const inventoryError = (error: unknown, fallback: string) =>
             : `INTERNAL_ERROR: ${fallback}`,
     );
 
+const semanticSearchError = (error: unknown, fallback: string) =>
+    mcpError(
+        error instanceof EmbeddingServiceError
+            ? `${error.code}: ${error.message}`
+            : `INTERNAL_ERROR: ${fallback}`,
+    );
+
 const priceError = (error: unknown, fallback: string) =>
     mcpError(
         error instanceof PriceServiceError
@@ -78,10 +92,14 @@ const stockError = (error: unknown, fallback: string) =>
             : `INTERNAL_ERROR: ${fallback}`,
     );
 
+// search_inventory_semantic は itemSearchService.searchItemsByVector を呼ぶため、
+// D1Database だけでなく VECTORIZE と SETTINGS_ENCRYPTION_KEY も要る。この登録関数を
+// ItemSearchEnv で受け、他の tool へは env.DB を渡す
 export const registerInventoryTools = (
     server: McpServer,
-    db: D1Database,
+    env: ItemSearchEnv,
 ): void => {
+    const db = env.DB;
     server.registerTool(
         "search_inventory",
         {
@@ -180,6 +198,28 @@ export const registerInventoryTools = (
                 return mcpSuccess(await listStaleStocktakeItems(db, input));
             } catch (error) {
                 return stockError(error, "stale stocktake listing failed");
+            }
+        },
+    );
+
+    server.registerTool(
+        "search_inventory_semantic",
+        {
+            title: "Search inventory by meaning",
+            description:
+                "Finds inventory items whose stored name is semantically similar to the query, using a vector index built from item names. This is a supplement to search_inventory's exact/partial name match, not a replacement: it can find items even when the query uses different wording, but only items that have been indexed can be returned. Indexing runs best-effort whenever an item is created or updated, so an item can be missing from the index (and therefore from these results) when the OpenRouter API key was not configured or the indexing call failed; the item-reindexing endpoint recovers from that by rebuilding the index for every item. There is no cursor: results are cut off at topK (default 20, maximum 100) because the underlying vector query has no paging.",
+            inputSchema: itemSemanticSearchQuerySchema,
+            outputSchema: itemSemanticSearchResultSchema,
+        },
+        async ({ q, topK }) => {
+            try {
+                const items = await searchItemsByVector(env, q, { topK });
+                return mcpSuccess({ items });
+            } catch (error) {
+                return semanticSearchError(
+                    error,
+                    "semantic inventory search failed",
+                );
             }
         },
     );
