@@ -324,6 +324,28 @@ export const locationExists = async (
             .first<{ id: string }>(),
     );
 
+export interface LocationItemCountRow {
+    locationId: string;
+    itemCount: number;
+}
+
+/**
+ * 保管場所ごとの品目件数。品目が 1 件も無い場所は行を返さないため、
+ * 呼び出し側は欠けた場所を 0 件として扱うこと。子孫の合算は行わない。
+ */
+export const countItemsByLocation = async (
+    db: D1Database,
+): Promise<LocationItemCountRow[]> => {
+    const result = await db
+        .prepare(
+            `SELECT location_id AS locationId, COUNT(*) AS itemCount
+				FROM items
+				GROUP BY location_id`,
+        )
+        .all<LocationItemCountRow>();
+    return result.results;
+};
+
 /**
  * 品目を作る。`options.id` を渡すと採番済みの ID で作る。
  * 呼び出し側が作成前に ID を確定させておきたい場合（再実行で同じ品目へ収束させる

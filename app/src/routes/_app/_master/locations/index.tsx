@@ -18,8 +18,13 @@ export const Route = createFileRoute("/_app/_master/locations/")({
 });
 
 function LocationsPage() {
-    const { data: locations } = useSuspenseQuery(locationTreeQueryOptions());
-    return <LocationMasterPage locations={locations} />;
+    const { data } = useSuspenseQuery(locationTreeQueryOptions());
+    return (
+        <LocationMasterPage
+            locations={data.locations}
+            itemCounts={data.itemCounts}
+        />
+    );
 }
 
 function LocationsPending() {
