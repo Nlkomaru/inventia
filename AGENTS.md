@@ -60,7 +60,9 @@ Inventia は Web UI、HTTP API、MCP から同じデータと業務ルールを�
 2. 変更をレビューしやすい単位に分けてコミットします。
 3. ブランチを push します。
 4. base を `main` にして PR を作成します。
+5. migration を追加した場合は `wrangler d1 migrations apply <database> --remote` で本番 D1 へ適用します。
 
+既存データを失う migration（列やテーブルの削除、既存行の書き換え）だけは、適用前にユーザーへ確認します。
 作業が途中で、動作確認まで終わっていない場合はコミットまでに留め、残りをユーザーへ伝えます。
 
 ## コミット
