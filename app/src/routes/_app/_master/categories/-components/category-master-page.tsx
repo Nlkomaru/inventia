@@ -105,13 +105,7 @@ export function CategoryMasterPage({
     return (
         <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
             <header>
-                <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                    Master data
-                </p>
                 <h1 className="mt-1 text-2xl font-bold">カテゴリマスタ</h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                    品目の分類を階層で整理します。種別を設定しないカテゴリは祖先の種別を引き継ぎます。
-                </p>
             </header>
             {truncated ? (
                 <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">

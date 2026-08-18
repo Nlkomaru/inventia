@@ -9,14 +9,6 @@ import {
 import { type FormEvent, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import {
     Field,
     FieldDescription,
     FieldError,
@@ -191,162 +183,150 @@ export function IntegrationsSettingsPage() {
     };
 
     return (
-        <main className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-            <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-semibold">AI・ベクトル検索</h1>
-                <p className="text-muted-foreground">
-                    OpenRouter の認証情報と、利用するモデルを設定します。
-                </p>
-            </div>
+        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+            <header>
+                <h1 className="mt-1 text-2xl font-bold">AI・ベクトル検索</h1>
+            </header>
 
             <form onSubmit={handleSubmit}>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>OpenRouter</CardTitle>
-                        <CardDescription>
-                            API key
-                            はサーバー側で暗号化して保存され、保存後に画面や API
-                            へ再表示されません。
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <FieldGroup>
-                            <Field data-invalid={validation?.success === false}>
-                                <FieldLabel htmlFor="openrouter-api-key">
-                                    API key
-                                </FieldLabel>
-                                <Input
-                                    aria-invalid={validation?.success === false}
-                                    autoComplete="new-password"
-                                    id="openrouter-api-key"
-                                    onChange={(event) =>
-                                        setApiKey(event.target.value)
-                                    }
-                                    placeholder={
-                                        status.configured
-                                            ? "新しい key で置き換える"
-                                            : "OpenRouter API key"
-                                    }
-                                    spellCheck={false}
-                                    type="password"
-                                    value={apiKey}
-                                />
-                                <FieldDescription>
-                                    {status.configured
-                                        ? `設定済み（最終更新: ${new Date(
-                                              status.updatedAt ?? "",
-                                          ).toLocaleString(
-                                              "ja-JP",
-                                              updatedAtFormat,
-                                          )}）`
-                                        : "未設定です。"}
-                                </FieldDescription>
-                                <FieldError
-                                    errors={
-                                        validation?.success === false
-                                            ? validation.error.issues
-                                            : undefined
-                                    }
-                                />
-                            </Field>
-
-                            <Field
-                                data-invalid={
-                                    chatModelValidation.success === false
+                <section aria-labelledby="openrouter-title">
+                    <div className="mb-5 flex items-center gap-3">
+                        <h2 id="openrouter-title" className="font-bold">
+                            OpenRouter
+                        </h2>
+                    </div>
+                    <FieldGroup>
+                        <Field data-invalid={validation?.success === false}>
+                            <FieldLabel htmlFor="openrouter-api-key">
+                                API key
+                            </FieldLabel>
+                            <Input
+                                aria-invalid={validation?.success === false}
+                                autoComplete="new-password"
+                                id="openrouter-api-key"
+                                onChange={(event) =>
+                                    setApiKey(event.target.value)
                                 }
-                            >
-                                <FieldLabel htmlFor="openrouter-chat-model">
-                                    利用する LLM モデル
-                                </FieldLabel>
-                                <Select
-                                    items={modelItems}
-                                    value={chatModel}
-                                    onValueChange={(value) => {
-                                        if (value !== null) {
-                                            setChatModelDraft(value);
-                                        }
-                                    }}
-                                >
-                                    <SelectTrigger
-                                        aria-invalid={
-                                            chatModelValidation.success ===
-                                            false
-                                        }
-                                        className="w-full"
-                                        disabled={modelsQuery.isPending}
-                                        id="openrouter-chat-model"
-                                    >
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectGroup>
-                                            {modelItems.map((model) => (
-                                                <SelectItem
-                                                    key={model.value}
-                                                    value={model.value}
-                                                >
-                                                    {model.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    </SelectContent>
-                                </Select>
-                                <FieldDescription>
-                                    レシート読み取りなど画像を読む処理に使う、画像入力対応モデルです。
-                                    {modelsQuery.isPending
-                                        ? "モデル一覧を取得しています。"
-                                        : `選択中: ${chatModel}`}
-                                    {status.chatModelConfigured
-                                        ? null
-                                        : "（既定値。まだ保存されていません）"}
-                                </FieldDescription>
-                                <div aria-live="polite">
-                                    {modelsError ? (
-                                        <FieldError>
-                                            {`${
-                                                modelsError instanceof Error
-                                                    ? modelsError.message
-                                                    : "モデル一覧を取得できませんでした。"
-                                            }現在のモデルはそのまま保存できます。`}
-                                        </FieldError>
-                                    ) : null}
-                                </div>
-                                <FieldError
-                                    errors={
-                                        chatModelValidation.success === false
-                                            ? chatModelValidation.error.issues
-                                            : undefined
-                                    }
-                                />
-                            </Field>
+                                placeholder={
+                                    status.configured
+                                        ? "新しい key で置き換える"
+                                        : "OpenRouter API key"
+                                }
+                                spellCheck={false}
+                                type="password"
+                                value={apiKey}
+                            />
+                            <FieldDescription>
+                                API key
+                                はサーバー側で暗号化して保存され、保存後に画面や
+                                API へ再表示されません。
+                            </FieldDescription>
+                            <FieldDescription>
+                                {status.configured
+                                    ? `設定済み（最終更新: ${new Date(
+                                          status.updatedAt ?? "",
+                                      ).toLocaleString(
+                                          "ja-JP",
+                                          updatedAtFormat,
+                                      )}）`
+                                    : "未設定です。"}
+                            </FieldDescription>
+                            <FieldError
+                                errors={
+                                    validation?.success === false
+                                        ? validation.error.issues
+                                        : undefined
+                                }
+                            />
+                        </Field>
 
-                            <Field data-disabled>
-                                <FieldLabel htmlFor="vectorization-model">
-                                    ベクトル化モデル
-                                </FieldLabel>
-                                <Input
-                                    disabled
-                                    id="vectorization-model"
-                                    value={openRouterEmbeddingModel}
-                                />
-                                <FieldDescription>
-                                    OpenRouter 経由で{" "}
-                                    {openRouterEmbeddingDimensions}
-                                    次元の embedding
-                                    を生成します。このモデルは変更できません。
-                                </FieldDescription>
-                            </Field>
-                        </FieldGroup>
-                        <div aria-live="polite" className="mt-5">
-                            {message ? (
-                                <p className="text-sm text-muted-foreground">
-                                    {message}
-                                </p>
-                            ) : null}
-                            {error ? <FieldError>{error}</FieldError> : null}
-                        </div>
-                    </CardContent>
-                    <CardFooter className="justify-end">
+                        <Field
+                            data-invalid={chatModelValidation.success === false}
+                        >
+                            <FieldLabel htmlFor="openrouter-chat-model">
+                                利用する LLM モデル
+                            </FieldLabel>
+                            <Select
+                                items={modelItems}
+                                value={chatModel}
+                                onValueChange={(value) => {
+                                    if (value !== null) {
+                                        setChatModelDraft(value);
+                                    }
+                                }}
+                            >
+                                <SelectTrigger
+                                    aria-invalid={
+                                        chatModelValidation.success === false
+                                    }
+                                    className="w-full"
+                                    disabled={modelsQuery.isPending}
+                                    id="openrouter-chat-model"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        {modelItems.map((model) => (
+                                            <SelectItem
+                                                key={model.value}
+                                                value={model.value}
+                                            >
+                                                {model.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                            <FieldDescription>
+                                {modelsQuery.isPending
+                                    ? "モデル一覧を取得しています。"
+                                    : `選択中: ${chatModel}`}
+                                {status.chatModelConfigured
+                                    ? null
+                                    : "（既定値。まだ保存されていません）"}
+                            </FieldDescription>
+                            <div aria-live="polite">
+                                {modelsError ? (
+                                    <FieldError>
+                                        {`${
+                                            modelsError instanceof Error
+                                                ? modelsError.message
+                                                : "モデル一覧を取得できませんでした。"
+                                        }現在のモデルはそのまま保存できます。`}
+                                    </FieldError>
+                                ) : null}
+                            </div>
+                            <FieldError
+                                errors={
+                                    chatModelValidation.success === false
+                                        ? chatModelValidation.error.issues
+                                        : undefined
+                                }
+                            />
+                        </Field>
+
+                        <Field data-disabled>
+                            <FieldLabel htmlFor="vectorization-model">
+                                ベクトル化モデル（
+                                {openRouterEmbeddingDimensions} 次元）
+                            </FieldLabel>
+                            <Input
+                                disabled
+                                id="vectorization-model"
+                                value={openRouterEmbeddingModel}
+                            />
+                        </Field>
+                    </FieldGroup>
+                    <div aria-live="polite" className="mt-5">
+                        {message ? (
+                            <p className="text-sm text-muted-foreground">
+                                {message}
+                            </p>
+                        ) : null}
+                        {error ? <FieldError>{error}</FieldError> : null}
+                    </div>
+                    <div className="flex justify-end">
                         <Button
                             disabled={
                                 saving || chatModelValidation.success === false
@@ -355,73 +335,64 @@ export function IntegrationsSettingsPage() {
                         >
                             {saving ? "保存中…" : "保存"}
                         </Button>
-                    </CardFooter>
-                </Card>
+                    </div>
+                </section>
             </form>
 
             <form onSubmit={handleReceiptSubmit}>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>レシート読み取り</CardTitle>
-                        <CardDescription>
-                            レシート画像を解析するときに LLM
-                            へ渡す指示です。出力の形はアプリ側のスキーマが決めるため、指示を変えても取り込める項目は変わりません。
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <FieldGroup>
-                            <Field
-                                data-invalid={
+                <section aria-labelledby="receipt-parse-title">
+                    <div className="mb-5 flex items-center gap-3">
+                        <h2 id="receipt-parse-title" className="font-bold">
+                            レシート読み取り
+                        </h2>
+                    </div>
+                    <FieldGroup>
+                        <Field
+                            data-invalid={
+                                receiptPromptValidation?.success === false
+                            }
+                        >
+                            <FieldLabel htmlFor="receipt-parse-prompt">
+                                解析の指示
+                            </FieldLabel>
+                            <Textarea
+                                aria-invalid={
                                     receiptPromptValidation?.success === false
                                 }
-                            >
-                                <FieldLabel htmlFor="receipt-parse-prompt">
-                                    解析の指示
-                                </FieldLabel>
-                                <Textarea
-                                    aria-invalid={
-                                        receiptPromptValidation?.success ===
-                                        false
-                                    }
-                                    className="min-h-64 font-mono text-xs"
-                                    id="receipt-parse-prompt"
-                                    onChange={(event) =>
-                                        setReceiptPromptDraft(
-                                            event.target.value,
-                                        )
-                                    }
-                                    spellCheck={false}
-                                    value={receiptPrompt}
-                                />
-                                <FieldDescription>
-                                    {status.receiptPromptConfigured
-                                        ? "既定から変更されています。空欄で保存すると既定へ戻ります。"
-                                        : "既定の指示を使用中です。"}
-                                    画像に写った文章を指示として扱わせない行は、レシート写真を使った指示の混入を防ぐためのものです。書き換える場合も残すことを勧めます。
-                                </FieldDescription>
-                                <FieldError
-                                    errors={
-                                        receiptPromptValidation?.success ===
-                                        false
-                                            ? receiptPromptValidation.error
-                                                  .issues
-                                            : undefined
-                                    }
-                                />
-                            </Field>
-                        </FieldGroup>
-                        <div aria-live="polite" className="mt-5">
-                            {receiptMessage ? (
-                                <p className="text-sm text-muted-foreground">
-                                    {receiptMessage}
-                                </p>
-                            ) : null}
-                            {receiptError ? (
-                                <FieldError>{receiptError}</FieldError>
-                            ) : null}
-                        </div>
-                    </CardContent>
-                    <CardFooter className="justify-end gap-2">
+                                className="min-h-64 font-mono text-xs"
+                                id="receipt-parse-prompt"
+                                onChange={(event) =>
+                                    setReceiptPromptDraft(event.target.value)
+                                }
+                                spellCheck={false}
+                                value={receiptPrompt}
+                            />
+                            <FieldDescription>
+                                {status.receiptPromptConfigured
+                                    ? "既定から変更されています。空欄で保存すると既定へ戻ります。"
+                                    : "既定の指示を使用中です。"}
+                                画像に写った文章を指示として扱わせない行は、レシート写真を使った指示の混入を防ぐためのものです。書き換える場合も残すことを勧めます。
+                            </FieldDescription>
+                            <FieldError
+                                errors={
+                                    receiptPromptValidation?.success === false
+                                        ? receiptPromptValidation.error.issues
+                                        : undefined
+                                }
+                            />
+                        </Field>
+                    </FieldGroup>
+                    <div aria-live="polite" className="mt-5">
+                        {receiptMessage ? (
+                            <p className="text-sm text-muted-foreground">
+                                {receiptMessage}
+                            </p>
+                        ) : null}
+                        {receiptError ? (
+                            <FieldError>{receiptError}</FieldError>
+                        ) : null}
+                    </div>
+                    <div className="flex justify-end gap-2">
                         <Button
                             disabled={
                                 saving ||
@@ -447,8 +418,8 @@ export function IntegrationsSettingsPage() {
                         >
                             {saving ? "保存中…" : "保存"}
                         </Button>
-                    </CardFooter>
-                </Card>
+                    </div>
+                </section>
             </form>
         </main>
     );

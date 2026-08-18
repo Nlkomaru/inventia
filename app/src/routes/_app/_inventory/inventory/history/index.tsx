@@ -11,14 +11,6 @@ import {
 import { useMemo } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
     Select,
@@ -83,8 +75,7 @@ export const Route = createFileRoute("/_app/_inventory/inventory/history/")({
     errorComponent: StockHistoryError,
 });
 
-const pageClassName =
-    "mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
 
 const reasonLabels: Record<StockMovementReason, string> = {
     purchase: "購入",
@@ -163,23 +154,14 @@ function StockHistoryPage() {
     return (
         <main className={pageClassName}>
             <header>
-                <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                    Inventory
-                </p>
                 <h1 className="mt-1 text-2xl font-bold">在庫履歴</h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                    入庫、出庫、棚卸・調整の履歴を、期限別の内訳つきで新しい順に表示します。
-                </p>
             </header>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>履歴</CardTitle>
-                    <CardDescription>
-                        ロット追跡を導入する前に記録された履歴には内訳がありません。
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-4">
+            <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <div className="border-b p-5">
+                    <h2 className="font-bold">履歴</h2>
+                </div>
+                <div className="flex flex-col gap-4 p-5">
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Field>
                             <FieldLabel htmlFor="history-item">品目</FieldLabel>
@@ -262,7 +244,7 @@ function StockHistoryPage() {
                             aria-live="polite"
                             className="text-sm text-muted-foreground"
                         >
-                            履歴がありません。入庫・出庫・棚卸しを記録すると表示されます。
+                            履歴がありません。
                         </p>
                     ) : (
                         <Table>
@@ -333,8 +315,8 @@ function StockHistoryPage() {
                             </TableBody>
                         </Table>
                     )}
-                </CardContent>
-                <CardFooter className="justify-between">
+                </div>
+                <div className="flex items-center justify-between border-t p-5">
                     <p className="text-sm text-muted-foreground">
                         {movements.length} 件を表示中
                         {historyQuery.hasNextPage ? "" : "（すべて表示）"}
@@ -352,8 +334,8 @@ function StockHistoryPage() {
                             ? "読み込み中…"
                             : "続きを読み込む"}
                     </Button>
-                </CardFooter>
-            </Card>
+                </div>
+            </section>
         </main>
     );
 }

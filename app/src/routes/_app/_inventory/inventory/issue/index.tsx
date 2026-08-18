@@ -12,14 +12,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import {
     Field,
     FieldDescription,
     FieldError,
@@ -72,8 +64,7 @@ export const Route = createFileRoute("/_app/_inventory/inventory/issue/")({
     errorComponent: IssueError,
 });
 
-const pageClassName =
-    "mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
 
 // 出庫の理由は減少側のものだけを出す（購入は入庫画面、棚卸しは棚卸画面で扱う）
 const reasonOptions: { label: string; value: StockMovementReason }[] = [
@@ -281,56 +272,177 @@ function IssueStockPage() {
     return (
         <main className={pageClassName}>
             <header>
-                <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                    Inventory
-                </p>
                 <h1 className="mt-1 text-2xl font-bold">出庫</h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                    消費・廃棄した数量を、期限が早いロットから順に減らします。
-                </p>
             </header>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>出庫を記録</CardTitle>
-                    <CardDescription>
-                        既定では期限が早いロットから自動で引きます。ロットを指定して引くこともできます。
-                    </CardDescription>
-                </CardHeader>
-                <form onSubmit={submit}>
-                    <CardContent>
-                        <FieldGroup>
-                            <Field data-invalid={Boolean(selectionError)}>
-                                <FieldLabel htmlFor="issue-item">
-                                    品目
+            <section aria-labelledby="issue-form-title">
+                <div className="mb-5 flex items-center gap-3">
+                    <h2 id="issue-form-title" className="font-bold">
+                        出庫を記録
+                    </h2>
+                </div>
+                <form
+                    className="flex max-w-2xl flex-col gap-6"
+                    onSubmit={submit}
+                >
+                    <FieldGroup>
+                        <Field data-invalid={Boolean(selectionError)}>
+                            <FieldLabel htmlFor="issue-item">品目</FieldLabel>
+                            <Select
+                                disabled={items.length === 0}
+                                items={itemOptions}
+                                onValueChange={handleItemChange}
+                                value={selectedItemId || null}
+                            >
+                                <SelectTrigger
+                                    aria-describedby={
+                                        selectionError
+                                            ? "issue-item-error"
+                                            : undefined
+                                    }
+                                    aria-invalid={Boolean(selectionError)}
+                                    className="w-full"
+                                    id="issue-item"
+                                >
+                                    <SelectValue
+                                        placeholder={
+                                            items.length === 0
+                                                ? "品目がありません"
+                                                : "品目を選択"
+                                        }
+                                    />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        {itemOptions.map((option) => (
+                                            <SelectItem
+                                                key={option.value}
+                                                value={option.value}
+                                            >
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                            {selectionError ? (
+                                <FieldError id="issue-item-error">
+                                    {selectionError}
+                                </FieldError>
+                            ) : null}
+                        </Field>
+
+                        <Field data-invalid={Boolean(quantityError)}>
+                            <FieldLabel htmlFor="issue-quantity">
+                                出庫数量{selectedItem ? `（${baseUnit}）` : ""}
+                            </FieldLabel>
+                            <Input
+                                aria-describedby={
+                                    [
+                                        selectedItem
+                                            ? "issue-quantity-description"
+                                            : null,
+                                        quantityError
+                                            ? "issue-quantity-error"
+                                            : null,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(" ") || undefined
+                                }
+                                aria-invalid={Boolean(quantityError)}
+                                disabled={!selectedItem || saving}
+                                id="issue-quantity"
+                                inputMode="numeric"
+                                min={1}
+                                onChange={(event) =>
+                                    handleQuantityChange(event.target.value)
+                                }
+                                step={1}
+                                type="number"
+                                value={quantity}
+                            />
+                            {selectedItem ? (
+                                <FieldDescription id="issue-quantity-description">
+                                    現在庫 {selectedItem.currentQuantity}{" "}
+                                    {baseUnit}
+                                </FieldDescription>
+                            ) : null}
+                            {quantityError ? (
+                                <FieldError id="issue-quantity-error">
+                                    {quantityError}
+                                </FieldError>
+                            ) : null}
+                        </Field>
+
+                        <Field>
+                            <FieldLabel htmlFor="issue-mode">
+                                引き当て方法
+                            </FieldLabel>
+                            <Select
+                                disabled={!selectedItem || saving}
+                                items={modeOptions}
+                                onValueChange={handleModeChange}
+                                value={mode}
+                            >
+                                <SelectTrigger
+                                    className="w-full"
+                                    id="issue-mode"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        {modeOptions.map((option) => (
+                                            <SelectItem
+                                                key={option.value}
+                                                value={option.value}
+                                            >
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                        </Field>
+
+                        {mode === "lot" ? (
+                            <Field data-invalid={Boolean(lotError)}>
+                                <FieldLabel htmlFor="issue-lot">
+                                    出庫するロット
                                 </FieldLabel>
                                 <Select
-                                    disabled={items.length === 0}
-                                    items={itemOptions}
-                                    onValueChange={handleItemChange}
-                                    value={selectedItemId || null}
+                                    disabled={
+                                        !selectedItem ||
+                                        saving ||
+                                        lotOptions.length === 0
+                                    }
+                                    items={lotOptions}
+                                    onValueChange={handleLotChange}
+                                    value={selectedLotId || null}
                                 >
                                     <SelectTrigger
                                         aria-describedby={
-                                            selectionError
-                                                ? "issue-item-error"
+                                            lotError
+                                                ? "issue-lot-error"
                                                 : undefined
                                         }
-                                        aria-invalid={Boolean(selectionError)}
+                                        aria-invalid={Boolean(lotError)}
                                         className="w-full"
-                                        id="issue-item"
+                                        id="issue-lot"
                                     >
                                         <SelectValue
                                             placeholder={
-                                                items.length === 0
-                                                    ? "品目がありません"
-                                                    : "品目を選択"
+                                                lotsLoading
+                                                    ? "ロットを読み込み中…"
+                                                    : lotOptions.length === 0
+                                                      ? "在庫のあるロットがありません"
+                                                      : "ロットを選択"
                                             }
                                         />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectGroup>
-                                            {itemOptions.map((option) => (
+                                            {lotOptions.map((option) => (
                                                 <SelectItem
                                                     key={option.value}
                                                     value={option.value}
@@ -341,174 +453,44 @@ function IssueStockPage() {
                                         </SelectGroup>
                                     </SelectContent>
                                 </Select>
-                                {selectionError ? (
-                                    <FieldError id="issue-item-error">
-                                        {selectionError}
+                                {lotError ? (
+                                    <FieldError id="issue-lot-error">
+                                        {lotError}
                                     </FieldError>
                                 ) : null}
                             </Field>
+                        ) : null}
 
-                            <Field data-invalid={Boolean(quantityError)}>
-                                <FieldLabel htmlFor="issue-quantity">
-                                    出庫数量
-                                </FieldLabel>
-                                <Input
-                                    aria-describedby={
-                                        quantityError
-                                            ? "issue-quantity-description issue-quantity-error"
-                                            : "issue-quantity-description"
-                                    }
-                                    aria-invalid={Boolean(quantityError)}
-                                    disabled={!selectedItem || saving}
-                                    id="issue-quantity"
-                                    inputMode="numeric"
-                                    min={1}
-                                    onChange={(event) =>
-                                        handleQuantityChange(event.target.value)
-                                    }
-                                    step={1}
-                                    type="number"
-                                    value={quantity}
-                                />
-                                <FieldDescription id="issue-quantity-description">
-                                    1以上の整数を、品目の基準単位（{baseUnit}
-                                    ）で入力します。現在庫は{" "}
-                                    {selectedItem?.currentQuantity ?? 0}{" "}
-                                    {baseUnit} です。
-                                </FieldDescription>
-                                {quantityError ? (
-                                    <FieldError id="issue-quantity-error">
-                                        {quantityError}
-                                    </FieldError>
-                                ) : null}
-                            </Field>
-
-                            <Field>
-                                <FieldLabel htmlFor="issue-mode">
-                                    引き当て方法
-                                </FieldLabel>
-                                <Select
-                                    disabled={!selectedItem || saving}
-                                    items={modeOptions}
-                                    onValueChange={handleModeChange}
-                                    value={mode}
+                        <Field>
+                            <FieldLabel htmlFor="issue-reason">理由</FieldLabel>
+                            <Select
+                                disabled={!selectedItem || saving}
+                                items={reasonOptions}
+                                onValueChange={handleReasonChange}
+                                value={reason}
+                            >
+                                <SelectTrigger
+                                    className="w-full"
+                                    id="issue-reason"
                                 >
-                                    <SelectTrigger
-                                        aria-describedby="issue-mode-description"
-                                        className="w-full"
-                                        id="issue-mode"
-                                    >
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectGroup>
-                                            {modeOptions.map((option) => (
-                                                <SelectItem
-                                                    key={option.value}
-                                                    value={option.value}
-                                                >
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    </SelectContent>
-                                </Select>
-                                <FieldDescription id="issue-mode-description">
-                                    FEFO
-                                    は期限が早いロットから順に引きます。期限なしのロットは最後に引きます。
-                                </FieldDescription>
-                            </Field>
-
-                            {mode === "lot" ? (
-                                <Field data-invalid={Boolean(lotError)}>
-                                    <FieldLabel htmlFor="issue-lot">
-                                        出庫するロット
-                                    </FieldLabel>
-                                    <Select
-                                        disabled={
-                                            !selectedItem ||
-                                            saving ||
-                                            lotOptions.length === 0
-                                        }
-                                        items={lotOptions}
-                                        onValueChange={handleLotChange}
-                                        value={selectedLotId || null}
-                                    >
-                                        <SelectTrigger
-                                            aria-describedby={
-                                                lotError
-                                                    ? "issue-lot-error"
-                                                    : undefined
-                                            }
-                                            aria-invalid={Boolean(lotError)}
-                                            className="w-full"
-                                            id="issue-lot"
-                                        >
-                                            <SelectValue
-                                                placeholder={
-                                                    lotsLoading
-                                                        ? "ロットを読み込み中…"
-                                                        : lotOptions.length ===
-                                                            0
-                                                          ? "在庫のあるロットがありません"
-                                                          : "ロットを選択"
-                                                }
-                                            />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectGroup>
-                                                {lotOptions.map((option) => (
-                                                    <SelectItem
-                                                        key={option.value}
-                                                        value={option.value}
-                                                    >
-                                                        {option.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectGroup>
-                                        </SelectContent>
-                                    </Select>
-                                    {lotError ? (
-                                        <FieldError id="issue-lot-error">
-                                            {lotError}
-                                        </FieldError>
-                                    ) : null}
-                                </Field>
-                            ) : null}
-
-                            <Field>
-                                <FieldLabel htmlFor="issue-reason">
-                                    理由
-                                </FieldLabel>
-                                <Select
-                                    disabled={!selectedItem || saving}
-                                    items={reasonOptions}
-                                    onValueChange={handleReasonChange}
-                                    value={reason}
-                                >
-                                    <SelectTrigger
-                                        className="w-full"
-                                        id="issue-reason"
-                                    >
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectGroup>
-                                            {reasonOptions.map((option) => (
-                                                <SelectItem
-                                                    key={option.value}
-                                                    value={option.value}
-                                                >
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-                        </FieldGroup>
-                    </CardContent>
-                    <CardFooter className="justify-end">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        {reasonOptions.map((option) => (
+                                            <SelectItem
+                                                key={option.value}
+                                                value={option.value}
+                                            >
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                        </Field>
+                    </FieldGroup>
+                    <div className="flex justify-end gap-2">
                         <Button
                             disabled={
                                 saving ||
@@ -523,18 +505,15 @@ function IssueStockPage() {
                                   ? "出庫を再送"
                                   : "出庫を記録"}
                         </Button>
-                    </CardFooter>
+                    </div>
                 </form>
-            </Card>
+            </section>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>引き当てプレビュー</CardTitle>
-                    <CardDescription>
-                        送信するとこの内訳でロットの数量が減ります。
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-3">
+            <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <div className="border-b p-5">
+                    <h2 className="font-bold">引き当てプレビュー</h2>
+                </div>
+                <div className="flex flex-col gap-3 p-5">
                     {lotsError ? (
                         <div
                             aria-live="polite"
@@ -611,8 +590,8 @@ function IssueStockPage() {
                             </p>
                         ) : null}
                     </output>
-                </CardContent>
-            </Card>
+                </div>
+            </section>
 
             {submitError ? (
                 <div
@@ -620,7 +599,7 @@ function IssueStockPage() {
                     className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
                     role="alert"
                 >
-                    {submitError} 内容を変えずに、もう一度送信できます。
+                    {submitError}
                 </div>
             ) : null}
             {notice ? (

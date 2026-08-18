@@ -39,21 +39,16 @@ export function StocktakeRow({
                 {isExistingLot ? (
                     formatExpiry(row.expiryDate)
                 ) : (
-                    <div className="flex flex-col gap-1">
-                        <Input
-                            aria-invalid={Boolean(expiryError)}
-                            aria-label={`${position}行目の期限日時`}
-                            disabled={disabled}
-                            onChange={(event) =>
-                                onChange({ expiryInput: event.target.value })
-                            }
-                            type="datetime-local"
-                            value={row.expiryInput ?? ""}
-                        />
-                        <span className="text-xs text-muted-foreground">
-                            空欄のままにすると期限なしロットになります。
-                        </span>
-                    </div>
+                    <Input
+                        aria-invalid={Boolean(expiryError)}
+                        aria-label={`${position}行目の期限日時`}
+                        disabled={disabled}
+                        onChange={(event) =>
+                            onChange({ expiryInput: event.target.value })
+                        }
+                        type="datetime-local"
+                        value={row.expiryInput ?? ""}
+                    />
                 )}
                 {expiryError ? <FieldError>{expiryError}</FieldError> : null}
             </TableCell>

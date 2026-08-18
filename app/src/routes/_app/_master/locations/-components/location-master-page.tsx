@@ -69,7 +69,7 @@ export function LocationMasterPage({
             {error ? (
                 <p
                     role="alert"
-                    className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700"
+                    className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
                 >
                     {error}
                 </p>

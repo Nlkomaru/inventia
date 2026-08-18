@@ -30,7 +30,7 @@ function LocationsPage() {
 function LocationsPending() {
     return (
         <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
                 保管場所を読み込んでいます…
             </p>
         </main>
@@ -42,7 +42,7 @@ function LocationsError({ error }: ErrorComponentProps) {
         <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
             <p
                 role="alert"
-                className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700"
+                className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
             >
                 {error instanceof Error
                     ? error.message

@@ -293,15 +293,15 @@ export function LocationTable({
                 <div>
                     <h2 className="font-bold">登録済み保管場所</h2>
                     <p className="text-xs text-muted-foreground">
-                        {locations.length} 件 · D1に保存された場所
+                        {locations.length} 件
                     </p>
                 </div>
                 <label className="relative" htmlFor="location-search">
-                    <Search className="absolute top-2.5 left-3 size-4" />
+                    <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                     <span className="sr-only">検索</span>
                     <Input
                         id="location-search"
-                        className="pl-9"
+                        className="pl-8"
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                     />

@@ -19,11 +19,11 @@ import {
 import {
     Sheet,
     SheetContent,
-    SheetDescription,
     SheetFooter,
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
 import type { CategoryDto } from "@/domain/category";
 import {
     type ItemCreateInput,
@@ -443,11 +443,6 @@ export function ItemForm({
                     <SheetTitle>
                         {item ? "品目を編集" : "品目を登録"}
                     </SheetTitle>
-                    <SheetDescription>
-                        {item
-                            ? "表示情報と保管場所を更新します。単位と在庫数量は変更できません。期限は在庫画面のロット操作で変更します。"
-                            : "在庫として管理する品目の基本情報を入力します。"}
-                    </SheetDescription>
                 </SheetHeader>
                 <form
                     className="flex flex-1 flex-col gap-5 px-4"
@@ -599,14 +594,7 @@ export function ItemForm({
                                 />
                             </Field>
                         </FieldGroup>
-                    ) : isDocument ? (
-                        <Field>
-                            <FieldLabel>文書の数量</FieldLabel>
-                            <FieldDescription>
-                                文書カテゴリはサービスの既定値（1件・count）を使用します。
-                            </FieldDescription>
-                        </Field>
-                    ) : (
+                    ) : isDocument ? null : (
                         <FieldGroup>
                             <Field data-invalid={Boolean(fieldErrors.baseUnit)}>
                                 <FieldLabel htmlFor="item-base-unit">
@@ -762,7 +750,7 @@ export function ItemForm({
                                 <FieldDescription>
                                     {readingStateLoading
                                         ? "保存済みの読書状態を読み込み中です。"
-                                        : "書籍カテゴリの品目だけが読書状態を持ちます。未設定を選ぶと保存済みの読書状態を削除します。"}
+                                        : "未設定を選ぶと保存済みの読書状態を削除します。"}
                                 </FieldDescription>
                                 <FieldError>
                                     {fieldErrors.readingStatus}
@@ -834,9 +822,6 @@ export function ItemForm({
                                         )
                                     }
                                 />
-                                <FieldDescription>
-                                    日付は UTC の暦日として保存します。
-                                </FieldDescription>
                                 <FieldError>
                                     {fieldErrors.readingFinishedAt}
                                 </FieldError>
@@ -863,11 +848,6 @@ export function ItemForm({
                                         update("expiryDate", event.target.value)
                                     }
                                 />
-                                <FieldDescription>
-                                    登録時に作る最初のロットの期限です。入力した日時は
-                                    UTC の ISO 8601
-                                    形式で保存します。以後の期限は在庫画面のロット操作で変更します。
-                                </FieldDescription>
                                 <FieldError>
                                     {fieldErrors.expiryDate}
                                 </FieldError>
@@ -904,9 +884,9 @@ export function ItemForm({
                             <FieldLabel htmlFor="item-memo">
                                 メモ（任意）
                             </FieldLabel>
-                            <textarea
+                            <Textarea
                                 aria-invalid={Boolean(fieldErrors.memo)}
-                                className="min-h-24 w-full resize-y rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50"
+                                className="min-h-24 resize-y"
                                 id="item-memo"
                                 maxLength={2000}
                                 placeholder="補足情報"

@@ -268,17 +268,9 @@ export function ItemMasterPage({
             : null);
 
     return (
-        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
-            <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                        Master data
-                    </p>
-                    <h1 className="mt-1 text-2xl font-bold">品目マスタ</h1>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                        在庫数量と保管場所を紐づけて管理する品目を登録します。
-                    </p>
-                </div>
+        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+            <header className="flex items-center justify-between gap-4">
+                <h1 className="mt-1 text-2xl font-bold">品目マスタ</h1>
                 <Button onClick={openCreate} type="button">
                     <Plus data-icon="inline-start" />
                     品目を登録
@@ -304,19 +296,16 @@ export function ItemMasterPage({
                 </div>
             ) : null}
 
-            <section
-                aria-label="品目の検索と絞り込み"
-                className="rounded-xl bg-card p-4 ring-1 ring-foreground/10 sm:p-5"
-            >
+            <section aria-label="品目の検索と絞り込み">
                 <FieldGroup className="gap-4 md:grid md:grid-cols-[minmax(0,1.5fr)_minmax(10rem,1fr)_minmax(10rem,1fr)]">
                     <Field>
                         <FieldLabel htmlFor="item-search">
                             品目を検索
                         </FieldLabel>
                         <div className="relative">
-                            <Search className="pointer-events-none absolute top-2 left-2.5 text-muted-foreground" />
+                            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
-                                className="pl-9"
+                                className="pl-8"
                                 id="item-search"
                                 placeholder="品目名で検索"
                                 value={query}

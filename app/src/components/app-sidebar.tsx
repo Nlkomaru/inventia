@@ -3,7 +3,6 @@
 import { useRouterState } from "@tanstack/react-router";
 import { ExternalLinkIcon, WarehouseIcon } from "lucide-react";
 import type * as React from "react";
-import { SearchForm } from "@/components/search-form";
 import {
     Sidebar,
     SidebarContent,
@@ -113,7 +112,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
-                <SearchForm />
             </SidebarHeader>
             <SidebarContent>
                 {data.navMain.map((group) => (

@@ -12,14 +12,6 @@ import { Trash2Icon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
     Select,
@@ -71,8 +63,7 @@ export const Route = createFileRoute("/_app/_inventory/receipts/")({
     errorComponent: ReceiptListError,
 });
 
-const pageClassName =
-    "mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
 
 const allFilterValue = "all";
 
@@ -129,17 +120,10 @@ function ReceiptListPage() {
 
     return (
         <main className={pageClassName}>
-            <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                        Inventory
-                    </p>
-                    <h1 className="mt-1 text-2xl font-bold">レシート取込</h1>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                        取り込んだレシートの履歴です。未反映のレシートは、続きから確認・反映できます。
-                    </p>
-                </div>
+            <header className="flex items-center justify-between gap-3">
+                <h1 className="mt-1 text-2xl font-bold">レシート取込</h1>
                 <Button
+                    nativeButton={false}
                     render={
                         // biome-ignore lint/a11y/useAnchorContent: Base UI forwards Button children to this anchor.
                         <a
@@ -152,14 +136,9 @@ function ReceiptListPage() {
                 </Button>
             </header>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>取込履歴</CardTitle>
-                    <CardDescription>
-                        新しい順に表示します。反映済みのレシートは購入として記録されています。
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-4">
+            <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b p-5">
+                    <h2 className="font-bold">取込履歴</h2>
                     <Field className="sm:max-w-64">
                         <FieldLabel htmlFor="receipt-status">状態</FieldLabel>
                         <Select
@@ -187,8 +166,10 @@ function ReceiptListPage() {
                             </SelectContent>
                         </Select>
                     </Field>
+                </div>
 
-                    {error ? (
+                {error ? (
+                    <div className="border-b p-5">
                         <div
                             aria-live="assertive"
                             className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
@@ -204,125 +185,122 @@ function ReceiptListPage() {
                                 再読み込み
                             </Button>
                         </div>
-                    ) : null}
+                    </div>
+                ) : null}
 
-                    {receipts.length === 0 ? (
-                        <p
-                            aria-live="polite"
-                            className="text-sm text-muted-foreground"
-                        >
-                            取込履歴がありません。レシート画像をアップロードすると表示されます。
-                        </p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>取込日時</TableHead>
-                                        <TableHead>状態</TableHead>
-                                        <TableHead>店舗</TableHead>
-                                        <TableHead>購入日時</TableHead>
-                                        <TableHead className="text-right">
-                                            合計
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            明細
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            操作
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {receipts.map((receipt) => (
-                                        <TableRow key={receipt.id}>
-                                            <TableCell className="align-top whitespace-nowrap">
-                                                {formatDateTimeOrDash(
-                                                    receipt.createdAt,
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="align-top">
-                                                <span
-                                                    className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${receiptStatusClassNames[receipt.status]}`}
-                                                >
-                                                    {
-                                                        receiptStatusLabels[
-                                                            receipt.status
-                                                        ]
-                                                    }
-                                                </span>
-                                                {receipt.status === "failed" &&
-                                                receipt.errorMessage !==
-                                                    null ? (
-                                                    <p className="mt-1 max-w-56 break-words text-xs text-destructive">
-                                                        {receipt.errorMessage}
-                                                    </p>
-                                                ) : null}
-                                            </TableCell>
-                                            <TableCell className="max-w-48 break-words align-top">
-                                                {receipt.storeName ?? "—"}
-                                            </TableCell>
-                                            <TableCell className="align-top whitespace-nowrap">
-                                                {formatDateTimeOrDash(
-                                                    receipt.purchasedAt,
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right align-top whitespace-nowrap">
-                                                {formatYen(receipt.totalPrice)}
-                                            </TableCell>
-                                            <TableCell className="text-right align-top">
-                                                {receipt.lineCount}
-                                            </TableCell>
-                                            <TableCell className="text-right align-top">
-                                                <Button
-                                                    render={
-                                                        // biome-ignore lint/a11y/useAnchorContent: Base UI forwards Button children to this anchor.
-                                                        <a
-                                                            aria-label={`${receipt.storeName ?? "レシート"}の取込を開く`}
-                                                            href={resumeHref(
-                                                                receipt.id,
-                                                            )}
-                                                        />
-                                                    }
-                                                    size="sm"
-                                                    variant="outline"
-                                                >
-                                                    {receipt.status ===
-                                                    "applied"
-                                                        ? "内容を見る"
-                                                        : "続きから確認"}
-                                                </Button>
-                                                {/* 反映を開始したレシートは在庫の根拠として残す */}
-                                                <Button
-                                                    aria-label={`${receipt.storeName ?? "レシート"}の取込を削除`}
-                                                    className="ml-2"
-                                                    disabled={
-                                                        deleting ||
-                                                        receipt.status ===
-                                                            "applied" ||
-                                                        receipt.purchaseId !==
-                                                            null
-                                                    }
-                                                    onClick={() =>
-                                                        void removeReceipt(
-                                                            receipt.id,
-                                                        )
-                                                    }
-                                                    size="icon-sm"
-                                                    type="button"
-                                                    variant="ghost"
-                                                >
-                                                    <Trash2Icon />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
-                </CardContent>
-                <CardFooter className="flex-col items-stretch gap-3">
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>取込日時</TableHead>
+                                <TableHead>状態</TableHead>
+                                <TableHead>店舗</TableHead>
+                                <TableHead>購入日時</TableHead>
+                                <TableHead className="text-right">
+                                    合計
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    明細
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    操作
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {receipts.length === 0 ? (
+                                <TableRow>
+                                    <TableCell
+                                        aria-live="polite"
+                                        className="h-24 text-center text-muted-foreground"
+                                        colSpan={7}
+                                    >
+                                        取込履歴がありません。
+                                    </TableCell>
+                                </TableRow>
+                            ) : null}
+                            {receipts.map((receipt) => (
+                                <TableRow key={receipt.id}>
+                                    <TableCell className="align-top whitespace-nowrap">
+                                        {formatDateTimeOrDash(
+                                            receipt.createdAt,
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="align-top">
+                                        <span
+                                            className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${receiptStatusClassNames[receipt.status]}`}
+                                        >
+                                            {
+                                                receiptStatusLabels[
+                                                    receipt.status
+                                                ]
+                                            }
+                                        </span>
+                                        {receipt.status === "failed" &&
+                                        receipt.errorMessage !== null ? (
+                                            <p className="mt-1 max-w-56 break-words text-xs text-destructive">
+                                                {receipt.errorMessage}
+                                            </p>
+                                        ) : null}
+                                    </TableCell>
+                                    <TableCell className="max-w-48 break-words align-top">
+                                        {receipt.storeName ?? "—"}
+                                    </TableCell>
+                                    <TableCell className="align-top whitespace-nowrap">
+                                        {formatDateTimeOrDash(
+                                            receipt.purchasedAt,
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-right align-top whitespace-nowrap">
+                                        {formatYen(receipt.totalPrice)}
+                                    </TableCell>
+                                    <TableCell className="text-right align-top">
+                                        {receipt.lineCount}
+                                    </TableCell>
+                                    <TableCell className="text-right align-top">
+                                        <Button
+                                            nativeButton={false}
+                                            render={
+                                                // biome-ignore lint/a11y/useAnchorContent: Base UI forwards Button children to this anchor.
+                                                <a
+                                                    aria-label={`${receipt.storeName ?? "レシート"}の取込を開く`}
+                                                    href={resumeHref(
+                                                        receipt.id,
+                                                    )}
+                                                />
+                                            }
+                                            size="sm"
+                                            variant="outline"
+                                        >
+                                            {receipt.status === "applied"
+                                                ? "内容を見る"
+                                                : "続きから確認"}
+                                        </Button>
+                                        {/* 反映を開始したレシートは在庫の根拠として残す */}
+                                        <Button
+                                            aria-label={`${receipt.storeName ?? "レシート"}の取込を削除`}
+                                            className="ml-2"
+                                            disabled={
+                                                deleting ||
+                                                receipt.status === "applied" ||
+                                                receipt.purchaseId !== null
+                                            }
+                                            onClick={() =>
+                                                void removeReceipt(receipt.id)
+                                            }
+                                            size="icon-sm"
+                                            type="button"
+                                            variant="ghost"
+                                        >
+                                            <Trash2Icon />
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+                <div className="flex flex-col items-stretch gap-3 border-t p-5">
                     <div aria-live="assertive">
                         {deleteError ? (
                             <p
@@ -352,8 +330,8 @@ function ReceiptListPage() {
                                 : "続きを読み込む"}
                         </Button>
                     </div>
-                </CardFooter>
-            </Card>
+                </div>
+            </section>
         </main>
     );
 }

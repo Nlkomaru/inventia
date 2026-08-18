@@ -12,20 +12,7 @@ import {
 import { useCallback, useMemo, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import {
-    Field,
-    FieldDescription,
-    FieldError,
-    FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
     Table,
@@ -35,11 +22,11 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import {
-    type ReceiptApplyInput,
-    type ReceiptApplyResult,
-    type ReceiptDetailDto,
-    receiptMaxByteSize,
+import { Textarea } from "@/components/ui/textarea";
+import type {
+    ReceiptApplyInput,
+    ReceiptApplyResult,
+    ReceiptDetailDto,
 } from "@/domain/receipt";
 import {
     applyReceipt,
@@ -67,7 +54,7 @@ import { ReceiptDropzone } from "./-components/receipt-dropzone";
 import type { SelectOption } from "./-components/receipt-review-detail";
 import { ReceiptReviewTable } from "./-components/receipt-review-table";
 import { buildHierarchyLabels } from "./-functions/hierarchy-labels";
-import { megabytes, validateFile } from "./-functions/receipt-file";
+import { validateFile } from "./-functions/receipt-file";
 import {
     actionLabels,
     buildApplyInput,
@@ -117,8 +104,7 @@ export const Route = createFileRoute("/_app/_inventory/receipts/new/")({
     errorComponent: ReceiptIntakeError,
 });
 
-const pageClassName =
-    "mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
 
 const emptyIssueIndex: ReadonlyMap<
     string,
@@ -337,8 +323,7 @@ function ReceiptIntakePage() {
         });
         if (!built.ok) {
             setApplyError(
-                built.storeNameError ??
-                    "入力内容を確認してください。赤字の項目を直すと反映できます。",
+                built.storeNameError ?? "入力内容を確認してください。",
             );
             return;
         }
@@ -364,18 +349,10 @@ function ReceiptIntakePage() {
 
     return (
         <main className={pageClassName}>
-            <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                        Inventory
-                    </p>
-                    <h1 className="mt-1 text-2xl font-bold">レシート取込</h1>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                        レシート画像を読み取り、1
-                        行ずつ確認してから購入・在庫へ反映します。承認するまで在庫は変わりません。
-                    </p>
-                </div>
+            <header className="flex items-center justify-between gap-3">
+                <h1 className="mt-1 text-2xl font-bold">レシート取込</h1>
                 <Button
+                    nativeButton={false}
                     render={
                         // biome-ignore lint/a11y/useAnchorContent: Base UI forwards Button children to this anchor.
                         <a aria-label="取込履歴" href="/receipts" />
@@ -387,16 +364,13 @@ function ReceiptIntakePage() {
                 </Button>
             </header>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>1. レシート画像を取り込む</CardTitle>
-                    <CardDescription>
-                        画像を選ぶとそのままアップロードして解析します。JPEG・PNG・WebP
-                        の画像を {megabytes(receiptMaxByteSize)}{" "}
-                        まで受け付けます。
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
+            <section aria-labelledby="receipt-upload-title">
+                <div className="mb-5 flex items-center gap-3">
+                    <h2 className="font-bold" id="receipt-upload-title">
+                        1. レシート画像を取り込む
+                    </h2>
+                </div>
+                <div className="flex flex-col gap-5">
                     <ReceiptDropzone
                         disabled={busy}
                         error={fileError}
@@ -414,40 +388,41 @@ function ReceiptIntakePage() {
                                     : null
                         }
                     />
-                </CardContent>
-                {receiptId === "" && !canRetryUpload ? null : (
-                    <CardFooter className="justify-end gap-2">
-                        {receiptId === "" ? null : (
-                            <Button
-                                disabled={busy}
-                                onClick={() => {
-                                    setApplyResult(null);
-                                    setSubmitted(false);
-                                    void navigate({
-                                        replace: true,
-                                        search: {},
-                                    });
-                                }}
-                                type="button"
-                                variant="ghost"
-                            >
-                                取込をやめる
-                            </Button>
-                        )}
-                        {canRetryUpload ? (
-                            <Button
-                                disabled={busy}
-                                onClick={() => {
-                                    if (file !== null) void startUpload(file);
-                                }}
-                                type="button"
-                            >
-                                もう一度アップロード
-                            </Button>
-                        ) : null}
-                    </CardFooter>
-                )}
-            </Card>
+                    {receiptId === "" && !canRetryUpload ? null : (
+                        <div className="flex justify-end gap-2">
+                            {receiptId === "" ? null : (
+                                <Button
+                                    disabled={busy}
+                                    onClick={() => {
+                                        setApplyResult(null);
+                                        setSubmitted(false);
+                                        void navigate({
+                                            replace: true,
+                                            search: {},
+                                        });
+                                    }}
+                                    type="button"
+                                    variant="ghost"
+                                >
+                                    取込をやめる
+                                </Button>
+                            )}
+                            {canRetryUpload ? (
+                                <Button
+                                    disabled={busy}
+                                    onClick={() => {
+                                        if (file !== null)
+                                            void startUpload(file);
+                                    }}
+                                    type="button"
+                                >
+                                    もう一度アップロード
+                                </Button>
+                            ) : null}
+                        </div>
+                    )}
+                </div>
+            </section>
 
             {uploadError ? (
                 <div
@@ -477,22 +452,21 @@ function ReceiptIntakePage() {
             ) : null}
 
             {receipt === null ? null : (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex flex-wrap items-center gap-2">
+                <section aria-labelledby="receipt-result-title">
+                    <div className="mb-5 flex items-center gap-3">
+                        <h2
+                            className="flex flex-wrap items-center gap-2 font-bold"
+                            id="receipt-result-title"
+                        >
                             2. 読み取り結果
                             <span
                                 className={`rounded-full border px-2 py-0.5 text-xs font-medium ${receiptStatusClassNames[receipt.status]}`}
                             >
                                 {receiptStatusLabels[receipt.status]}
                             </span>
-                        </CardTitle>
-                        <CardDescription>
-                            AI
-                            の読み取り結果です。誤りがあれば次の確認欄で直せます。
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-col gap-4">
+                        </h2>
+                    </div>
+                    <div className="flex flex-col gap-4">
                         <dl className="grid gap-3 sm:grid-cols-2">
                             <SummaryItem
                                 label="店舗"
@@ -537,40 +511,37 @@ function ReceiptIntakePage() {
                                 aria-live="polite"
                                 className="text-sm text-muted-foreground"
                             >
-                                解析中です。時間がかかる場合は、もう一度解析を実行してください。
+                                解析中です。
                             </p>
                         ) : null}
-                    </CardContent>
-                    {receipt.status === "applied" ||
-                    receipt.purchaseId !== null ? null : (
-                        <CardFooter className="justify-end">
-                            <Button
-                                disabled={busy}
-                                onClick={() => void runParse(receipt.id)}
-                                type="button"
-                                variant="outline"
-                            >
-                                {parsing
-                                    ? "解析中…"
-                                    : receipt.status === "parsed"
-                                      ? "もう一度解析する"
-                                      : "解析する"}
-                            </Button>
-                        </CardFooter>
-                    )}
-                </Card>
+                        {receipt.status === "applied" ||
+                        receipt.purchaseId !== null ? null : (
+                            <div className="flex justify-end">
+                                <Button
+                                    disabled={busy}
+                                    onClick={() => void runParse(receipt.id)}
+                                    type="button"
+                                    variant="outline"
+                                >
+                                    {parsing
+                                        ? "解析中…"
+                                        : receipt.status === "parsed"
+                                          ? "もう一度解析する"
+                                          : "解析する"}
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </section>
             )}
 
             {receipt !== null && receipt.status === "parsed" ? (
                 <form onSubmit={submitApply}>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>3. 明細を確認して反映</CardTitle>
-                            <CardDescription>
-                                反映方法・数量・金額・期限を行ごとに確認します。「反映する」を押すまで在庫は変わりません。
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-5">
+                    <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                        <div className="border-b p-5">
+                            <h2 className="font-bold">3. 明細を確認して反映</h2>
+                        </div>
+                        <div className="flex flex-col gap-5 p-5">
                             {receipt.storeName === null ? (
                                 <Field data-invalid={Boolean(storeNameError)}>
                                     <FieldLabel htmlFor="receipt-store-name">
@@ -579,8 +550,8 @@ function ReceiptIntakePage() {
                                     <Input
                                         aria-describedby={
                                             storeNameError
-                                                ? "receipt-store-name-description receipt-store-name-error"
-                                                : "receipt-store-name-description"
+                                                ? "receipt-store-name-error"
+                                                : undefined
                                         }
                                         aria-invalid={Boolean(storeNameError)}
                                         disabled={applying}
@@ -591,9 +562,6 @@ function ReceiptIntakePage() {
                                         }
                                         value={storeName}
                                     />
-                                    <FieldDescription id="receipt-store-name-description">
-                                        購入記録に残す店舗名です。レシートから読み取れなかったため入力が必要です。
-                                    </FieldDescription>
                                     {storeNameError ? (
                                         <FieldError id="receipt-store-name-error">
                                             {storeNameError}
@@ -604,7 +572,7 @@ function ReceiptIntakePage() {
 
                             {lines.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">
-                                    明細がありません。画像を撮り直して再解析してください。
+                                    明細がありません。
                                 </p>
                             ) : (
                                 <ReceiptReviewTable
@@ -624,8 +592,8 @@ function ReceiptIntakePage() {
                                 <FieldLabel htmlFor="receipt-note">
                                     メモ（任意）
                                 </FieldLabel>
-                                <textarea
-                                    className="min-h-20 w-full resize-y rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50"
+                                <Textarea
+                                    className="min-h-20"
                                     disabled={applying}
                                     id="receipt-note"
                                     maxLength={2000}
@@ -636,7 +604,7 @@ function ReceiptIntakePage() {
                                 />
                             </Field>
 
-                            <dl className="grid gap-3 rounded-lg border border-border bg-muted/40 p-3 text-sm sm:grid-cols-3">
+                            <dl className="grid gap-3 text-sm sm:grid-cols-3">
                                 <SummaryItem
                                     label="レシート記載の合計"
                                     value={formatYen(receipt.totalPrice)}
@@ -664,8 +632,8 @@ function ReceiptIntakePage() {
                             >
                                 {reconcileMessage(receipt, totals)}
                             </p>
-                        </CardContent>
-                        <CardFooter className="flex-col items-stretch gap-3">
+                        </div>
+                        <div className="flex flex-col items-stretch gap-3 border-t p-5">
                             {applyError ? (
                                 <div
                                     aria-live="assertive"
@@ -691,82 +659,69 @@ function ReceiptIntakePage() {
                                           : "確認した内容で反映する"}
                                 </Button>
                             </div>
-                        </CardFooter>
-                    </Card>
+                        </div>
+                    </section>
                 </form>
             ) : null}
 
             {applyResult === null ? null : (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>反映しました</CardTitle>
-                        <CardDescription>
+                <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                    <div className="border-b p-5">
+                        <h2 className="font-bold">反映しました</h2>
+                        <p className="text-xs text-muted-foreground">
                             {formatDateTimeOrDash(applyResult.appliedAt)}{" "}
                             に購入として記録しました。
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>明細</TableHead>
-                                        <TableHead>反映方法</TableHead>
-                                        <TableHead className="text-right">
-                                            数量
-                                        </TableHead>
-                                        <TableHead>期限</TableHead>
-                                        <TableHead>備考</TableHead>
+                        </p>
+                    </div>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>明細</TableHead>
+                                <TableHead>反映方法</TableHead>
+                                <TableHead className="text-right">
+                                    数量
+                                </TableHead>
+                                <TableHead>期限</TableHead>
+                                <TableHead>備考</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {applyResult.lines.map((resultLine) => {
+                                const line = lines.find(
+                                    (candidate) =>
+                                        candidate.id === resultLine.lineId,
+                                );
+                                return (
+                                    <TableRow key={resultLine.lineId}>
+                                        <TableCell className="max-w-56 break-words align-top">
+                                            {line?.rawName ?? resultLine.lineId}
+                                        </TableCell>
+                                        <TableCell className="align-top">
+                                            {actionLabels[resultLine.action]}
+                                        </TableCell>
+                                        <TableCell className="text-right align-top">
+                                            {resultLine.action === "skip"
+                                                ? "—"
+                                                : resultLine.quantity}
+                                        </TableCell>
+                                        <TableCell className="align-top whitespace-nowrap">
+                                            {resultLine.action === "skip"
+                                                ? "—"
+                                                : resultLine.expiryDate === null
+                                                  ? "期限なし"
+                                                  : formatDateTimeOrDash(
+                                                        resultLine.expiryDate,
+                                                    )}
+                                        </TableCell>
+                                        <TableCell className="align-top">
+                                            {resultNotes(resultLine)}
+                                        </TableCell>
                                     </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {applyResult.lines.map((resultLine) => {
-                                        const line = lines.find(
-                                            (candidate) =>
-                                                candidate.id ===
-                                                resultLine.lineId,
-                                        );
-                                        return (
-                                            <TableRow key={resultLine.lineId}>
-                                                <TableCell className="max-w-56 break-words align-top">
-                                                    {line?.rawName ??
-                                                        resultLine.lineId}
-                                                </TableCell>
-                                                <TableCell className="align-top">
-                                                    {
-                                                        actionLabels[
-                                                            resultLine.action
-                                                        ]
-                                                    }
-                                                </TableCell>
-                                                <TableCell className="text-right align-top">
-                                                    {resultLine.action ===
-                                                    "skip"
-                                                        ? "—"
-                                                        : resultLine.quantity}
-                                                </TableCell>
-                                                <TableCell className="align-top whitespace-nowrap">
-                                                    {resultLine.action ===
-                                                    "skip"
-                                                        ? "—"
-                                                        : resultLine.expiryDate ===
-                                                            null
-                                                          ? "期限なし"
-                                                          : formatDateTimeOrDash(
-                                                                resultLine.expiryDate,
-                                                            )}
-                                                </TableCell>
-                                                <TableCell className="align-top">
-                                                    {resultNotes(resultLine)}
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="justify-end gap-2">
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                    <div className="flex items-center justify-end gap-2 border-t p-5">
                         <Button
                             onClick={() => {
                                 setApplyResult(null);
@@ -781,6 +736,7 @@ function ReceiptIntakePage() {
                             次のレシートを取り込む
                         </Button>
                         <Button
+                            nativeButton={false}
                             render={
                                 // biome-ignore lint/a11y/useAnchorContent: Base UI forwards Button children to this anchor.
                                 <a
@@ -791,67 +747,61 @@ function ReceiptIntakePage() {
                         >
                             在庫一覧を見る
                         </Button>
-                    </CardFooter>
-                </Card>
+                    </div>
+                </section>
             )}
 
             {receipt !== null &&
             receipt.status === "applied" &&
             applyResult === null ? (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>反映済みの明細</CardTitle>
-                        <CardDescription>
+                <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                    <div className="border-b p-5">
+                        <h2 className="font-bold">反映済みの明細</h2>
+                        <p className="text-xs text-muted-foreground">
                             このレシートは
                             {formatDateTimeOrDash(receipt.appliedAt)}
                             に反映済みです。もう一度反映することはできません。
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>明細</TableHead>
-                                        <TableHead className="text-right">
-                                            数量
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            金額
-                                        </TableHead>
-                                        <TableHead>反映先</TableHead>
-                                        <TableHead>
-                                            期限（読み取り値）
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {lines.map((line) => (
-                                        <TableRow key={line.id}>
-                                            <TableCell className="max-w-56 break-words align-top">
-                                                {line.rawName}
-                                            </TableCell>
-                                            <TableCell className="text-right align-top">
-                                                {line.quantity}
-                                            </TableCell>
-                                            <TableCell className="text-right align-top whitespace-nowrap">
-                                                {formatYen(line.price)}
-                                            </TableCell>
-                                            <TableCell className="align-top">
-                                                {line.matchedItemName ?? "—"}
-                                            </TableCell>
-                                            <TableCell className="align-top whitespace-nowrap">
-                                                {formatExpiryDate(
-                                                    line.suggestedExpiryDate,
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
+                        </p>
+                    </div>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>明細</TableHead>
+                                <TableHead className="text-right">
+                                    数量
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    金額
+                                </TableHead>
+                                <TableHead>反映先</TableHead>
+                                <TableHead>期限（読み取り値）</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {lines.map((line) => (
+                                <TableRow key={line.id}>
+                                    <TableCell className="max-w-56 break-words align-top">
+                                        {line.rawName}
+                                    </TableCell>
+                                    <TableCell className="text-right align-top">
+                                        {line.quantity}
+                                    </TableCell>
+                                    <TableCell className="text-right align-top whitespace-nowrap">
+                                        {formatYen(line.price)}
+                                    </TableCell>
+                                    <TableCell className="align-top">
+                                        {line.matchedItemName ?? "—"}
+                                    </TableCell>
+                                    <TableCell className="align-top whitespace-nowrap">
+                                        {formatExpiryDate(
+                                            line.suggestedExpiryDate,
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </section>
             ) : null}
         </main>
     );
@@ -927,7 +877,7 @@ const reconcileMessage = (
     if (diff === 0) return "レシート記載の合計と明細の合計は一致しています。";
     return `明細の合計がレシート記載より ${formatYen(Math.abs(diff))} ${
         diff > 0 ? "多い" : "少ない"
-    }です。値引きや税の扱いを確認してください。`;
+    }です。`;
 };
 
 const resultNotes = (line: ReceiptApplyResult["lines"][number]): string => {

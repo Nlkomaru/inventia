@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PagePlaceholder } from "../../-page-placeholder";
 
 export const Route = createFileRoute("/_app/_master/references/")({
     staticData: {
@@ -10,9 +9,13 @@ export const Route = createFileRoute("/_app/_master/references/")({
 
 function ReferencesPage() {
     return (
-        <PagePlaceholder
-            title="識別子・外部リンク"
-            description="識別子用のD1スキーマとAPIの実装後に登録機能を提供します。"
-        />
+        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+            <header>
+                <h1 className="mt-1 text-2xl font-bold">識別子・外部リンク</h1>
+            </header>
+            <p className="text-sm text-muted-foreground">
+                登録機能は未実装です。
+            </p>
+        </main>
     );
 }

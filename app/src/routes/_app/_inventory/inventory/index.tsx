@@ -233,16 +233,10 @@ function InventoryPage() {
     };
 
     return (
-        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
             <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                        Inventory
-                    </p>
                     <h1 className="mt-1 text-2xl font-bold">在庫一覧</h1>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                        数量は期限別ロットの合計です。最短期限と内訳を確認できます。
-                    </p>
                 </div>
                 <Button
                     disabled={reloading}
@@ -255,19 +249,16 @@ function InventoryPage() {
                 </Button>
             </header>
 
-            <section
-                aria-label="在庫の検索と絞り込み"
-                className="rounded-xl bg-card p-4 ring-1 ring-foreground/10 sm:p-5"
-            >
+            <section aria-label="在庫の検索と絞り込み">
                 <FieldGroup className="gap-4 md:grid md:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(9rem,1fr))]">
                     <Field>
                         <FieldLabel htmlFor="inventory-search">
                             品目を検索
                         </FieldLabel>
                         <div className="relative">
-                            <Search className="pointer-events-none absolute top-2 left-2.5 text-muted-foreground" />
+                            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
-                                className="pl-9"
+                                className="pl-8"
                                 id="inventory-search"
                                 placeholder="品目名で検索"
                                 value={queryText}
@@ -415,7 +406,7 @@ function InventoryPage() {
 
 function InventoryPending() {
     return (
-        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
             <p className="text-sm text-muted-foreground">
                 在庫を読み込んでいます…
             </p>
@@ -426,7 +417,7 @@ function InventoryPending() {
 function InventoryError({ error }: ErrorComponentProps) {
     const router = useRouter();
     return (
-        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
             <div
                 aria-live="polite"
                 className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"

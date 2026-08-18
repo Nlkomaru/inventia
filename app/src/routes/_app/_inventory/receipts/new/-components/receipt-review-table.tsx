@@ -102,7 +102,7 @@ const columns = columnHelper.columns([
             const { line, row: review, detailInvalid } = row.original;
             return (
                 <div className="flex max-w-72 min-w-52 flex-col gap-1 whitespace-normal">
-                    <span className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                         {review.lineNo} 行目
                     </span>
                     {/* 長い商品名でも折り返して崩さない */}
