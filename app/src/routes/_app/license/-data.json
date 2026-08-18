@@ -527,6 +527,12 @@
                 "homepage": "https://github.com/mui/base-ui#readme"
             },
             {
+                "name": "@cfworker/json-schema",
+                "versions": ["4.1.1"],
+                "author": "Jeremy Danyow",
+                "homepage": "https://github.com/cfworker/cfworker/tree/master/packages/json-schema/README.md"
+            },
+            {
                 "name": "@esbuild/linux-x64",
                 "versions": ["0.28.1"],
                 "homepage": "https://github.com/evanw/esbuild#readme"

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { receiptParsePromptSchema } from "./receipt";
 
 export const openRouterProvider = "openrouter" as const;
 export const openRouterEmbeddingModel =
@@ -25,17 +26,25 @@ export const openRouterChatModelSchema = z
         "モデル ID は provider/model の形式で入力してください。",
     );
 
+// レシート解析の指示は未指定なら既定を使う。null は「既定へ戻す」を表し、
+// undefined は「今回は変更しない」を表すため、両者を区別できる形にする
 export const openRouterIntegrationUpdateSchema = z
     .object({
         apiKey: openRouterApiKeySchema.optional(),
         chatModel: openRouterChatModelSchema.optional(),
+        receiptPrompt: receiptParsePromptSchema.nullable().optional(),
+        receiptToolsEnabled: z.boolean().optional(),
     })
     .strict()
     .refine(
-        (value) => value.apiKey !== undefined || value.chatModel !== undefined,
+        (value) =>
+            value.apiKey !== undefined ||
+            value.chatModel !== undefined ||
+            value.receiptPrompt !== undefined ||
+            value.receiptToolsEnabled !== undefined,
         {
             message:
-                "apiKey か chatModel のいずれかを指定してください。API key を入力しなくてもモデルだけ保存できます。",
+                "apiKey、chatModel、receiptPrompt、receiptToolsEnabled のいずれかを指定してください。API key を入力しなくても他の設定だけ保存できます。",
         },
     );
 
@@ -47,6 +56,10 @@ export const openRouterIntegrationStatusSchema = z
         dimensions: z.literal(openRouterEmbeddingDimensions),
         chatModel: z.string(),
         chatModelConfigured: z.boolean(),
+        // 解析へ実際に渡る指示。未設定なら既定の内容がそのまま入る
+        receiptPrompt: z.string().min(1),
+        receiptPromptConfigured: z.boolean(),
+        receiptToolsEnabled: z.boolean(),
         updatedAt: z.string().datetime().nullable(),
     })
     .strict();

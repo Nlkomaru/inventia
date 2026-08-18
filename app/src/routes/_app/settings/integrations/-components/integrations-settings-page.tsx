@@ -16,6 +16,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     Field,
     FieldDescription,
@@ -32,6 +33,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
     type OpenRouterIntegrationUpdate,
     openRouterApiKeySchema,
@@ -39,6 +41,10 @@ import {
     openRouterEmbeddingDimensions,
     openRouterEmbeddingModel,
 } from "@/domain/integration";
+import {
+    receiptParseDefaultInstructions,
+    receiptParsePromptSchema,
+} from "@/domain/receipt";
 import { updateOpenRouterIntegration } from "../-api/integration-api";
 import {
     integrationKeys,
@@ -67,6 +73,23 @@ export function IntegrationsSettingsPage() {
     const chatModel = chatModelDraft ?? status.chatModel;
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // 解析設定も同じく編集値だけを持ち、確定値は status を情報源にする。
+    const [receiptPromptDraft, setReceiptPromptDraft] = useState<string | null>(
+        null,
+    );
+    const receiptPrompt = receiptPromptDraft ?? status.receiptPrompt;
+    const [receiptToolsDraft, setReceiptToolsDraft] = useState<boolean | null>(
+        null,
+    );
+    const receiptToolsEnabled = receiptToolsDraft ?? status.receiptToolsEnabled;
+    const [receiptMessage, setReceiptMessage] = useState<string | null>(null);
+    const [receiptError, setReceiptError] = useState<string | null>(null);
+    // 空欄は「既定へ戻す」を表すため、長さの検証だけを事前に行う。
+    const receiptPromptTrimmed = receiptPrompt.trim();
+    const receiptPromptValidation =
+        receiptPromptTrimmed.length === 0
+            ? null
+            : receiptParsePromptSchema.safeParse(receiptPromptTrimmed);
     const validation = apiKey ? openRouterApiKeySchema.safeParse(apiKey) : null;
     const chatModelValidation = openRouterChatModelSchema.safeParse(chatModel);
 
@@ -135,6 +158,41 @@ export function IntegrationsSettingsPage() {
                 saveError instanceof Error
                     ? saveError.message
                     : "連携設定を保存できませんでした。",
+            );
+        }
+    };
+
+    const handleReceiptSubmit = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        setReceiptMessage(null);
+        setReceiptError(null);
+        if (receiptPromptValidation && !receiptPromptValidation.success) {
+            setReceiptError(
+                receiptPromptValidation.error.issues[0]?.message ??
+                    "指示を確認してください。",
+            );
+            return;
+        }
+        try {
+            const result = await saveMutation.mutateAsync({
+                // 空欄と既定と同じ内容はどちらも「既定を使う」として保存される。
+                receiptPrompt: receiptPromptValidation
+                    ? receiptPromptValidation.data
+                    : null,
+                receiptToolsEnabled,
+            });
+            setReceiptPromptDraft(null);
+            setReceiptToolsDraft(null);
+            setReceiptMessage(
+                result.receiptPromptConfigured
+                    ? "レシート読み取りの指示を保存しました。"
+                    : "既定の指示に戻しました。",
+            );
+        } catch (saveError) {
+            setReceiptError(
+                saveError instanceof Error
+                    ? saveError.message
+                    : "レシート読み取りの設定を保存できませんでした。",
             );
         }
     };
@@ -299,6 +357,117 @@ export function IntegrationsSettingsPage() {
                         <Button
                             disabled={
                                 saving || chatModelValidation.success === false
+                            }
+                            type="submit"
+                        >
+                            {saving ? "保存中…" : "保存"}
+                        </Button>
+                    </CardFooter>
+                </Card>
+            </form>
+
+            <form onSubmit={handleReceiptSubmit}>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>レシート読み取り</CardTitle>
+                        <CardDescription>
+                            レシート画像を解析するときに LLM
+                            へ渡す指示です。出力の形はアプリ側のスキーマが決めるため、指示を変えても取り込める項目は変わりません。
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <FieldGroup>
+                            <Field
+                                data-invalid={
+                                    receiptPromptValidation?.success === false
+                                }
+                            >
+                                <FieldLabel htmlFor="receipt-parse-prompt">
+                                    解析の指示
+                                </FieldLabel>
+                                <Textarea
+                                    aria-invalid={
+                                        receiptPromptValidation?.success ===
+                                        false
+                                    }
+                                    className="min-h-64 font-mono text-xs"
+                                    id="receipt-parse-prompt"
+                                    onChange={(event) =>
+                                        setReceiptPromptDraft(
+                                            event.target.value,
+                                        )
+                                    }
+                                    spellCheck={false}
+                                    value={receiptPrompt}
+                                />
+                                <FieldDescription>
+                                    {status.receiptPromptConfigured
+                                        ? "既定から変更されています。空欄で保存すると既定へ戻ります。"
+                                        : "既定の指示を使用中です。"}
+                                    画像に写った文章を指示として扱わせない行は、レシート写真を使った指示の混入を防ぐためのものです。書き換える場合も残すことを勧めます。
+                                </FieldDescription>
+                                <FieldError
+                                    errors={
+                                        receiptPromptValidation?.success ===
+                                        false
+                                            ? receiptPromptValidation.error
+                                                  .issues
+                                            : undefined
+                                    }
+                                />
+                            </Field>
+
+                            <Field orientation="horizontal">
+                                <Checkbox
+                                    checked={receiptToolsEnabled}
+                                    id="receipt-parse-tools"
+                                    onCheckedChange={(checked) =>
+                                        setReceiptToolsDraft(checked === true)
+                                    }
+                                />
+                                <FieldLabel htmlFor="receipt-parse-tools">
+                                    在庫の読み取り tool を渡す
+                                </FieldLabel>
+                                <FieldDescription>
+                                    解析中に在庫検索・カテゴリ・保管場所・価格履歴の読み取り
+                                    tool を LLM へ渡します。在庫を書き換える
+                                    tool
+                                    は渡しません。実際に使うかはモデル次第で、上の指示で使い方を書くと効果が出ます。往復が増えるぶん解析は遅く、費用も増えます。
+                                </FieldDescription>
+                            </Field>
+                        </FieldGroup>
+                        <div aria-live="polite" className="mt-5">
+                            {receiptMessage ? (
+                                <p className="text-sm text-muted-foreground">
+                                    {receiptMessage}
+                                </p>
+                            ) : null}
+                            {receiptError ? (
+                                <FieldError>{receiptError}</FieldError>
+                            ) : null}
+                        </div>
+                    </CardContent>
+                    <CardFooter className="justify-end gap-2">
+                        <Button
+                            disabled={
+                                saving ||
+                                receiptPrompt ===
+                                    receiptParseDefaultInstructions
+                            }
+                            onClick={() =>
+                                setReceiptPromptDraft(
+                                    receiptParseDefaultInstructions,
+                                )
+                            }
+                            type="button"
+                            variant="outline"
+                        >
+                            既定に戻す
+                        </Button>
+                        <Button
+                            disabled={
+                                saving ||
+                                receiptPromptValidation?.success === false
                             }
                             type="submit"
                         >

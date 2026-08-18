@@ -18,7 +18,17 @@ import {
     SidebarRail,
 } from "@/components/ui/sidebar";
 
-const data = {
+interface NavItem {
+    title: string;
+    url: string;
+    /** SPA のルートではない画面は、取込作業などを中断させないため別タブで開く */
+    opensInNewTab?: boolean;
+}
+
+const data: {
+    navMain: { title: string; items: NavItem[] }[];
+    resources: NavItem[];
+} = {
     navMain: [
         {
             title: "在庫管理",
@@ -44,7 +54,11 @@ const data = {
             title: "連携・設定",
             items: [
                 { title: "AI・ベクトル検索", url: "/settings/integrations" },
-                { title: "API リファレンス", url: "/api/scalar" },
+                {
+                    title: "API リファレンス",
+                    url: "/api/scalar",
+                    opensInNewTab: true,
+                },
                 { title: "MCP エンドポイント", url: "/settings/mcp" },
             ],
         },
@@ -114,12 +128,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                             render={
                                                 // biome-ignore lint/a11y/useAnchorContent: Base UI forwards SidebarMenuButton children to this anchor.
                                                 <a
-                                                    aria-label={item.title}
+                                                    aria-label={
+                                                        item.opensInNewTab
+                                                            ? `${item.title}（新しいタブで開く）`
+                                                            : item.title
+                                                    }
                                                     href={item.url}
+                                                    rel={
+                                                        item.opensInNewTab
+                                                            ? "noreferrer"
+                                                            : undefined
+                                                    }
+                                                    target={
+                                                        item.opensInNewTab
+                                                            ? "_blank"
+                                                            : undefined
+                                                    }
                                                 />
                                             }
                                         >
                                             {item.title}
+                                            {item.opensInNewTab ? (
+                                                <ExternalLinkIcon />
+                                            ) : null}
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
                                 ))}
@@ -131,7 +162,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarFooter className="mt-auto">
                 <SidebarMenu>
                     {data.resources.map((item) => {
-                        const isExternal = item.url.startsWith("https://");
+                        // 別オリジンは常に別タブ。同一オリジンでも opensInNewTab で明示できる
+                        const isExternal =
+                            item.opensInNewTab ??
+                            item.url.startsWith("https://");
 
                         return (
                             <SidebarMenuItem key={item.title}>

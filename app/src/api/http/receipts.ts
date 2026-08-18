@@ -19,6 +19,7 @@ import {
     uploadReceipt,
 } from "../../services/receiptService";
 import type { ApiBindings } from "../bindings";
+import { createInProcessMcpToolSet } from "../mcp/in-process";
 
 type ReceiptsContext = Context<ApiBindings>;
 
@@ -408,7 +409,14 @@ receiptsApp.post("/:id/parse", async (c) => {
     try {
         // 解析の失敗は status = 'failed' として 200 で返す契約であり、
         // ここでエラー応答へ写さない
-        return c.json(await parseReceipt(c.env, c.req.param("id")), 200);
+        return c.json(
+            await parseReceipt(c.env, c.req.param("id"), {
+                // tool を実際に渡すかは連携設定で決まる。transport の構築は
+                // API 層が持ち、service を MCP 実装へ依存させない
+                createToolSet: () => createInProcessMcpToolSet(c.env.DB),
+            }),
+            200,
+        );
     } catch (error) {
         return errorResponse(c, error);
     }
