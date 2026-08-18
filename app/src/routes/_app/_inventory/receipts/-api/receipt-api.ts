@@ -97,32 +97,17 @@ export const listAllItems = createServerFn({ method: "GET" }).handler(
     },
 );
 
+// 新規品目の選択肢はツリー全体を 1 query で取る。categoryTreeMaxSize を超える分は
+// 選択肢に出ないため、その場合はカテゴリマスタで整理してから取り込む
 export const listCategoryTree = createServerFn({ method: "GET" }).handler(
     async (): Promise<CategoryDto[]> => {
-        const [{ env }, { listCategories }] = await Promise.all([
-            import("cloudflare:workers"),
-            import("@/services/categoryService"),
-        ]);
-        const result: CategoryDto[] = [];
-        const listLevel = async (parentId: string | null) => {
-            let cursor: string | undefined;
-            do {
-                const page = await listCategories(env.DB, {
-                    parentId,
-                    limit: 100,
-                    ...(cursor === undefined ? {} : { cursor }),
-                });
-                result.push(...page.items);
-                cursor = page.nextCursor ?? undefined;
-            } while (cursor);
-        };
-        const visit = async (parentId: string | null) => {
-            const start = result.length;
-            await listLevel(parentId);
-            for (const child of result.slice(start)) await visit(child.id);
-        };
-        await visit(null);
-        return result;
+        const [{ env }, { listCategoryTree: fetchCategoryTree }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/categoryService"),
+            ]);
+        const tree = await fetchCategoryTree(env.DB);
+        return tree.items;
     },
 );
 

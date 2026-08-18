@@ -1049,6 +1049,12 @@
                 "homepage": "https://github.com/fabiospampinato/atomically#readme"
             },
             {
+                "name": "attr-accept",
+                "versions": ["2.2.5"],
+                "author": "Andrey Okonetchnikov @okonetchnikov",
+                "homepage": "https://github.com/react-dropzone/attr-accept#readme"
+            },
+            {
                 "name": "babel-dead-code-elimination",
                 "versions": ["1.0.12"],
                 "author": "pcattori",
@@ -1431,6 +1437,12 @@
                 "versions": ["6.1.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/figures#readme"
+            },
+            {
+                "name": "file-selector",
+                "versions": ["4.1.0"],
+                "author": "Roland Groza",
+                "homepage": "https://github.com/react-dropzone/file-selector"
             },
             {
                 "name": "fill-range",
@@ -2062,6 +2074,12 @@
                 "name": "react-dom",
                 "versions": ["19.2.8"],
                 "homepage": "https://react.dev/"
+            },
+            {
+                "name": "react-dropzone",
+                "versions": ["20.1.0"],
+                "author": "Param Aggarwal",
+                "homepage": "https://github.com/react-dropzone/react-dropzone"
             },
             {
                 "name": "readdirp",
