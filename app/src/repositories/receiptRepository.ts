@@ -32,6 +32,7 @@ export interface ReceiptLineRow {
     receiptId: string;
     lineNo: number;
     rawName: string;
+    completedName: string | null;
     normalizedName: string;
     quantity: number;
     price: number | null;
@@ -53,6 +54,7 @@ export interface ReceiptLineRow {
 export interface ReceiptLineWrite {
     lineNo: number;
     rawName: string;
+    completedName: string | null;
     normalizedName: string;
     quantity: number;
     price: number | null;
@@ -126,6 +128,7 @@ const receiptLineColumns = `id,
     receipt_id AS receiptId,
     line_no AS lineNo,
     raw_name AS rawName,
+    completed_name AS completedName,
     normalized_name AS normalizedName,
     quantity,
     price,
@@ -276,16 +279,17 @@ export const saveReceiptParseResult = async (
             db
                 .prepare(
                     `INSERT INTO receipt_lines
-                        (id, receipt_id, line_no, raw_name, normalized_name, quantity, price,
+                        (id, receipt_id, line_no, raw_name, completed_name, normalized_name, quantity, price,
                          printed_expiry_date, estimated_expiry_date, expiry_source,
                          expiry_confidence, expiry_reason, created_at, updated_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)`,
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14)`,
                 )
                 .bind(
                     newId(),
                     id,
                     line.lineNo,
                     line.rawName,
+                    line.completedName,
                     line.normalizedName,
                     line.quantity,
                     line.price,

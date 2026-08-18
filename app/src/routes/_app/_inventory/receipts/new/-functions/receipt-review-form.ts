@@ -98,7 +98,8 @@ export const createReviewRow = (line: ReceiptLineDto): ReceiptReviewRow => ({
     expiryMode: line.suggestedExpiryDate === null ? "none" : "date",
     expiryDate: line.suggestedExpiryDate ?? "",
     registerAlias: true,
-    newItem: emptyNewItem(line.rawName),
+    // 印字が途切れていた行は補完名を初期値にする。表記辞書の見出しは rawName のまま
+    newItem: emptyNewItem(line.completedName ?? line.rawName),
 });
 
 export const createReviewRows = (

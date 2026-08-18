@@ -14,6 +14,7 @@ import {
     type ReceiptLineDto,
     type ReceiptListDto,
     receiptApplyInputSchema,
+    receiptCompletedNameMaxLength,
     receiptContentTypeExtensions,
     receiptContentTypeSchema,
     receiptListQuerySchema,
@@ -219,6 +220,7 @@ const toLineDto = (
     id: row.id,
     lineNo: row.lineNo,
     rawName: row.rawName,
+    completedName: row.completedName,
     normalizedName: row.normalizedName,
     quantity: row.quantity,
     price: row.price,
@@ -403,9 +405,22 @@ export const uploadReceipt = async (
     }
 };
 
+/** 補完名は rawName と同じ値・空文字を保存しない。表記辞書の見出しは rawName のまま使う。 */
+const normalizeCompletedName = (
+    value: string | null,
+    rawName: string,
+): string | null => {
+    if (value === null) {
+        return null;
+    }
+    const trimmed = value.trim().slice(0, receiptCompletedNameMaxLength);
+    return trimmed.length === 0 || trimmed === rawName ? null : trimmed;
+};
+
 const toLineWrites = (
     lines: readonly {
         name: string;
+        completedName: string | null;
         quantity: number;
         price: number | null;
         printedExpiryDate: string | null;
@@ -434,6 +449,7 @@ const toLineWrites = (
         writes.push({
             lineNo: writes.length + 1,
             rawName,
+            completedName: normalizeCompletedName(line.completedName, rawName),
             normalizedName: normalizeReceiptName(rawName),
             quantity: line.quantity,
             price: line.price,
