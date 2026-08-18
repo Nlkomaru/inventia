@@ -413,7 +413,7 @@ receiptsApp.post("/:id/parse", async (c) => {
             await parseReceipt(c.env, c.req.param("id"), {
                 // tool を実際に渡すかは連携設定で決まる。transport の構築は
                 // API 層が持ち、service を MCP 実装へ依存させない
-                createToolSet: () => createInProcessMcpToolSet(c.env.DB),
+                createToolSet: () => createInProcessMcpToolSet(c.env),
             }),
             200,
         );
@@ -425,7 +425,12 @@ receiptsApp.post("/:id/parse", async (c) => {
 receiptsApp.post("/:id/apply", async (c) => {
     try {
         return c.json(
-            await applyReceipt(c.env.DB, c.req.param("id"), await parseJson(c)),
+            await applyReceipt(
+                c.env.DB,
+                c.req.param("id"),
+                await parseJson(c),
+                c.env,
+            ),
             200,
         );
     } catch (error) {

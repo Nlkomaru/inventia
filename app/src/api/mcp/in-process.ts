@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
 import { dynamicTool, jsonSchema, type ToolSet } from "ai";
+import type { ItemSearchEnv } from "../../services/itemSearchService";
 import { createMcpServer } from "./server";
 
 /**
@@ -10,6 +11,12 @@ import { createMcpServer } from "./server";
  */
 export const receiptParseToolAllowlist = [
     "search_inventory",
+    // レシートの表記（略称やブランド名の前置きなど）は在庫の品目名と語彙が
+    // ずれやすく、search_inventory の LIKE 検索だけでは既存品目を見落とす。
+    // 意味検索を補助として足すことで既存品目とのマッチ率を上げる。読み取り専用で
+    // 副作用が無く、解析はそもそも OpenRouter を呼ぶ経路なので API key 未設定
+    // による失敗もこの経路では起きない
+    "search_inventory_semantic",
     "get_inventory_item",
     "list_expiring_inventory",
     "get_price_history",
@@ -60,15 +67,16 @@ const flattenToolResult = (result: object): unknown => {
 /**
  * /api/mcp と同じ MCP server をプロセス内で接続し、AI SDK の tool として返す。
  * HTTP を経由しないため Cloudflare Access の資格情報は要らず、tool の説明も
- * MCP の定義をそのまま使う。
+ * MCP の定義をそのまま使う。createMcpServer が ItemSearchEnv を要求するため、
+ * ここも D1Database ではなく env を受け取る。
  */
 export const createInProcessMcpToolSet = async (
-    db: D1Database,
+    env: ItemSearchEnv,
     allowlist: readonly string[] = receiptParseToolAllowlist,
 ): Promise<InProcessMcpToolSet> => {
     const [clientTransport, serverTransport] =
         InMemoryTransport.createLinkedPair();
-    const server = createMcpServer(db);
+    const server = createMcpServer(env);
     const client = new Client(
         {
             name: "inventia-in-process",

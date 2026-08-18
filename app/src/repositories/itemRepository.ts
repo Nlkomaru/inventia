@@ -125,6 +125,45 @@ export const getItem = async (
         .bind(id)
         .first<ItemRow>();
 
+// D1 の 1 クエリあたりのバインドパラメータ上限は 100。IN 句だけでちょうど使い切ると
+// 呼び出し元が絞り込み条件を 1 つ足しただけで壊れるため、余裕を残したチャンク単位に
+// 分割してクエリを結合する
+const getItemsByIdsChunkSize = 90;
+
+/**
+ * ID の配列でまとめて品目行を引く。IN 句のプレースホルダ数はチャンクサイズ以下に
+ * 保たれ、値は必ず bind して ID を SQL 文字列へ連結しない。結果順は DB 依存で不定な
+ * ため、呼び出し元が希望の順序（例: ベクトル検索の類似度順）へ並べ直すこと。
+ */
+export const getItemsByIds = async (
+    db: D1Database,
+    ids: readonly string[],
+): Promise<ItemRow[]> => {
+    if (ids.length === 0) {
+        return [];
+    }
+    const chunks: string[][] = [];
+    for (
+        let offset = 0;
+        offset < ids.length;
+        offset += getItemsByIdsChunkSize
+    ) {
+        chunks.push(ids.slice(offset, offset + getItemsByIdsChunkSize));
+    }
+    const results = await Promise.all(
+        chunks.map((chunk) => {
+            const placeholders = chunk.map(() => "?").join(", ");
+            return db
+                .prepare(
+                    `SELECT ${itemColumns} FROM items WHERE id IN (${placeholders})`,
+                )
+                .bind(...chunk)
+                .all<ItemRow>();
+        }),
+    );
+    return results.flatMap((result) => result.results);
+};
+
 export const listItems = async (
     db: D1Database,
     query: ItemListQuery,

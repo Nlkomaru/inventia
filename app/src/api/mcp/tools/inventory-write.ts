@@ -16,6 +16,10 @@ import {
     stocktakeSchema,
 } from "../../../domain/stock";
 import {
+    type ItemSearchEnv,
+    indexItem,
+} from "../../../services/itemSearchService";
+import {
     createItem,
     ItemServiceError,
     updateItem,
@@ -75,10 +79,15 @@ const serviceError = (error: unknown, fallback: string) =>
             : `INTERNAL_ERROR: ${fallback}`,
     );
 
+// create_inventory_item / update_inventory_item は品目作成・更新後に
+// itemSearchService の indexItem を呼ぶ。indexItem は best-effort（内部で例外を
+// 握り潰す）なので、失敗しても tool 自体は成功を返す。tool handler には
+// waitUntil に相当する実行コンテキストが無いため、応答を返す前に await する
 export const registerInventoryWriteTools = (
     server: McpServer,
-    db: D1Database,
+    env: ItemSearchEnv,
 ): void => {
+    const db = env.DB;
     server.registerTool(
         "create_inventory_item",
         {
@@ -90,7 +99,9 @@ export const registerInventoryWriteTools = (
         },
         async (input) => {
             try {
-                return mcpSuccess(await createItem(db, input));
+                const created = await createItem(db, input);
+                await indexItem(env, created.id);
+                return mcpSuccess(created);
             } catch (error) {
                 return serviceError(error, "inventory item creation failed");
             }
@@ -108,7 +119,12 @@ export const registerInventoryWriteTools = (
         },
         async ({ id, ...fields }) => {
             try {
-                return mcpSuccess(await updateItem(db, id, fields));
+                const updated = await updateItem(db, id, fields);
+                // 埋め込み対象は品目名だけなので、name を送っていない更新では索引を触らない
+                if (fields.name !== undefined) {
+                    await indexItem(env, updated.id);
+                }
+                return mcpSuccess(updated);
             } catch (error) {
                 return serviceError(error, "inventory item update failed");
             }
