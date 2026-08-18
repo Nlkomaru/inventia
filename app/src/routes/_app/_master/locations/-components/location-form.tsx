@@ -14,7 +14,9 @@ import {
 import type { LocationDto } from "@/domain/location";
 import {
     editingLocationAtom,
+    finishLocationSaveAtom,
     locationFormAtom,
+    locationFormGenerationAtom,
     locationFormSavingAtom,
     startLocationEditAtom,
 } from "./location-atoms";
@@ -30,7 +32,9 @@ type Props = {
 
 export function LocationForm({ locations, onSave }: Props) {
     const editing = useAtomValue(editingLocationAtom);
+    const generation = useAtomValue(locationFormGenerationAtom);
     const startEdit = useSetAtom(startLocationEditAtom);
+    const finishSave = useSetAtom(finishLocationSaveAtom);
     const [form, setForm] = useAtom(locationFormAtom);
     const [saving, setSaving] = useAtom(locationFormSavingAtom);
     const parentOptions = [
@@ -43,6 +47,8 @@ export function LocationForm({ locations, onSave }: Props) {
     const submit = async (event: FormEvent) => {
         event.preventDefault();
         if (!form.name.trim()) return;
+        // 保存を待つ間に別の行を選び直したかを、完了時に連番で判定する
+        const saved = generation;
         setSaving(true);
         try {
             await onSave({
@@ -50,7 +56,7 @@ export function LocationForm({ locations, onSave }: Props) {
                 parentId: form.parentId,
                 sortOrder: Number(form.sortOrder),
             });
-            startEdit(null);
+            finishSave(saved);
         } finally {
             setSaving(false);
         }

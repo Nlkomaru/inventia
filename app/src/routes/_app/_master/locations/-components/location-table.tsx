@@ -68,21 +68,30 @@ export function LocationTable({
     const [expanded, setExpanded] = useAtom(expandedLocationIdsAtom);
     const startEdit = useSetAtom(startLocationEditAtom);
     const startChild = useSetAtom(startLocationChildAtom);
-    // トーストを持たないので、コピー結果は読み上げ専用の領域だけで伝える
-    const [copyMessage, setCopyMessage] = useState("");
-    const copyLocationId = useCallback((location: LocationDto) => {
-        // 安全なコンテキスト以外では navigator.clipboard 自体が存在しない
-        if (!navigator.clipboard) {
-            setCopyMessage("場所IDをコピーできませんでした");
-            return;
-        }
-        void navigator.clipboard
-            .writeText(location.id)
-            .then(() =>
-                setCopyMessage(`${location.name}の場所IDをコピーしました`),
-            )
-            .catch(() => setCopyMessage("場所IDをコピーできませんでした"));
-    }, []);
+    // トーストを持たないので、コピー結果は読み上げ専用の領域だけで伝える。
+    // 同じ文言でも読み上げ直すよう、連番を key にして要素ごと差し替える
+    const [copyMessage, setCopyMessage] = useState({ seq: 0, text: "" });
+    const announce = useCallback(
+        (text: string) =>
+            setCopyMessage((current) => ({ seq: current.seq + 1, text })),
+        [],
+    );
+    const copyLocationId = useCallback(
+        (location: LocationDto) => {
+            // 安全なコンテキスト以外では navigator.clipboard 自体が存在しない
+            if (!navigator.clipboard) {
+                announce("場所IDをコピーできませんでした");
+                return;
+            }
+            void navigator.clipboard
+                .writeText(location.id)
+                .then(() =>
+                    announce(`${location.name}の場所IDをコピーしました`),
+                )
+                .catch(() => announce("場所IDをコピーできませんでした"));
+        },
+        [announce],
+    );
     // 子孫を含む件数。親を閉じていても配下の在庫量が分かるように合算する
     const totalItemCounts = useMemo(() => {
         const childrenByParent = new Map<string | null, LocationDto[]>();
@@ -148,12 +157,14 @@ export function LocationTable({
                     cell: ({ row }) => {
                         const { depth, hasChildren, item } = row.original;
                         const isExpanded = expanded.has(item.id);
+                        // 検索中の一覧は平坦なので、展開しても子行は増えない
+                        const canExpand = hasChildren && !query.trim();
                         return (
                             <div
                                 className="flex items-center"
                                 style={{ paddingLeft: depth * 24 }}
                             >
-                                {hasChildren ? (
+                                {canExpand ? (
                                     <Button
                                         aria-expanded={isExpanded}
                                         aria-label={`${item.name}を展開`}
@@ -268,6 +279,7 @@ export function LocationTable({
             copyLocationId,
             expanded,
             onDelete,
+            query,
             setExpanded,
             startChild,
             startEdit,
@@ -343,7 +355,7 @@ export function LocationTable({
                 </TableBody>
             </Table>
             <div aria-live="polite" className="sr-only">
-                {copyMessage}
+                <span key={copyMessage.seq}>{copyMessage.text}</span>
             </div>
         </section>
     );

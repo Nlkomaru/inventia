@@ -27,6 +27,8 @@ export const expandedLocationIdsAtom = atom<Set<string>>(new Set<string>());
 export const editingLocationAtom = atom<LocationDto | null>(null);
 export const locationFormAtom = atom<LocationFormState>(emptyForm);
 export const locationFormSavingAtom = atom(false);
+/** 入力欄を切り替えるたびに増える連番。保存完了時の初期化の要否判定に使う。 */
+export const locationFormGenerationAtom = atom(0);
 
 /**
  * 編集対象と入力欄を同時に切り替える。null を渡すと新規登録の初期状態に戻る。
@@ -35,17 +37,33 @@ export const locationFormSavingAtom = atom(false);
  */
 export const startLocationEditAtom = atom(
     null,
-    (_get, set, target: LocationDto | null) => {
+    (get, set, target: LocationDto | null) => {
         set(editingLocationAtom, target);
         set(locationFormAtom, formStateOf(target));
+        set(locationFormGenerationAtom, get(locationFormGenerationAtom) + 1);
     },
 );
 
 /** 指定した場所を親にした新規登録を始める。 */
 export const startLocationChildAtom = atom(
     null,
-    (_get, set, parent: LocationDto) => {
+    (get, set, parent: LocationDto) => {
         set(editingLocationAtom, null);
         set(locationFormAtom, { ...emptyForm, parentId: parent.id });
+        set(locationFormGenerationAtom, get(locationFormGenerationAtom) + 1);
+    },
+);
+
+/**
+ * 保存完了後に入力欄を新規登録の初期状態へ戻す。保存を待つ間に別の行を選び
+ * 直していた場合は連番が進んでいるので、その入力内容を消さずに何もしない。
+ */
+export const finishLocationSaveAtom = atom(
+    null,
+    (get, set, generation: number) => {
+        if (get(locationFormGenerationAtom) !== generation) return;
+        set(editingLocationAtom, null);
+        set(locationFormAtom, emptyForm);
+        set(locationFormGenerationAtom, generation + 1);
     },
 );
