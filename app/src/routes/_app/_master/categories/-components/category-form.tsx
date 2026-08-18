@@ -1,7 +1,7 @@
-import { useAtom } from "jotai";
-import { CirclePlus } from "lucide-react";
-import { type FormEvent, useEffect, useRef } from "react";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { type FormEvent, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
     Select,
@@ -22,9 +22,11 @@ import {
 } from "../-functions/effective-kind";
 import {
     categoryFormAtom,
+    categoryFormGenerationAtom,
     categoryFormSavingAtom,
     editingCategoryIdAtom,
-    initialCategoryFormState,
+    finishCategorySaveAtom,
+    startCategoryEditAtom,
 } from "./category-atoms";
 
 type Props = {
@@ -46,7 +48,10 @@ const kindOptions: { label: string; value: CategoryKind | null }[] = [
 ];
 
 export function CategoryForm({ categories, onSave }: Props) {
-    const [editingId, setEditingId] = useAtom(editingCategoryIdAtom);
+    const editingId = useAtomValue(editingCategoryIdAtom);
+    const generation = useAtomValue(categoryFormGenerationAtom);
+    const startEdit = useSetAtom(startCategoryEditAtom);
+    const finishSave = useSetAtom(finishCategorySaveAtom);
     const [form, setForm] = useAtom(categoryFormAtom);
     const [saving, setSaving] = useAtom(categoryFormSavingAtom);
     const parentOptions: { label: string; value: string | null }[] = [
@@ -56,41 +61,21 @@ export function CategoryForm({ categories, onSave }: Props) {
             .map((category) => ({ label: category.name, value: category.id })),
     ];
 
-    // 初期化 effect より先に走らせて、editingId が変わった時点の一覧を読ませる
-    const categoriesRef = useRef(categories);
-    useEffect(() => {
-        categoriesRef.current = categories;
-    });
-
-    // 一覧の再取得で入力中の値を消さないよう、初期化は editingId の変化にだけ反応させる
-    useEffect(() => {
-        const target =
-            editingId === null
-                ? null
-                : (categoriesRef.current.find(
-                      (category) => category.id === editingId,
-                  ) ?? null);
-        setForm({
-            name: target?.name ?? "",
-            parentId: target?.parentId ?? null,
-            kind: target?.kind ?? null,
-            sortOrder: String(target?.sortOrder ?? 0),
-        });
-    }, [editingId, setForm]);
-
     // 他所で削除されたカテゴリを編集し続けると保存が 404 になるため、編集を解除する
     useEffect(() => {
         if (
             editingId !== null &&
             !categories.some((category) => category.id === editingId)
         ) {
-            setEditingId(null);
+            startEdit(null);
         }
-    }, [categories, editingId, setEditingId]);
+    }, [categories, editingId, startEdit]);
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
         if (!form.name.trim()) return;
+        // 保存を待つ間に別の行を選び直したかを、完了時に連番で判定する
+        const saved = generation;
         setSaving(true);
         try {
             await onSave({
@@ -99,26 +84,15 @@ export function CategoryForm({ categories, onSave }: Props) {
                 kind: form.kind,
                 sortOrder: Number(form.sortOrder),
             });
-            // 新規登録では editingId が変わらず初期化 effect が走らないため明示的に戻す
-            if (editingId === null) {
-                setForm(initialCategoryFormState);
-            } else {
-                setEditingId(null);
-            }
+            finishSave(saved);
         } finally {
             setSaving(false);
         }
     };
 
     return (
-        <section
-            className="rounded-2xl border bg-card p-5 shadow-sm"
-            aria-labelledby="category-registration-title"
-        >
+        <section aria-labelledby="category-registration-title">
             <div className="mb-5 flex items-center gap-3">
-                <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
-                    <CirclePlus className="size-4" />
-                </span>
                 <h2 id="category-registration-title" className="font-bold">
                     {editingId === null
                         ? "新しいカテゴリを登録"
@@ -126,11 +100,8 @@ export function CategoryForm({ categories, onSave }: Props) {
                 </h2>
             </div>
             <form className="grid gap-4 md:grid-cols-5" onSubmit={submit}>
-                <label
-                    className="space-y-1.5 text-xs font-semibold"
-                    htmlFor="category-name"
-                >
-                    カテゴリ名
+                <Field>
+                    <FieldLabel htmlFor="category-name">カテゴリ名</FieldLabel>
                     <Input
                         id="category-name"
                         required
@@ -142,12 +113,9 @@ export function CategoryForm({ categories, onSave }: Props) {
                             }))
                         }
                     />
-                </label>
-                <label
-                    className="space-y-1.5 text-xs font-semibold"
-                    htmlFor="category-parent"
-                >
-                    親階層
+                </Field>
+                <Field>
+                    <FieldLabel htmlFor="category-parent">親階層</FieldLabel>
                     <Select
                         items={parentOptions}
                         value={form.parentId}
@@ -171,12 +139,9 @@ export function CategoryForm({ categories, onSave }: Props) {
                             </SelectGroup>
                         </SelectContent>
                     </Select>
-                </label>
-                <label
-                    className="space-y-1.5 text-xs font-semibold"
-                    htmlFor="category-kind"
-                >
-                    種別
+                </Field>
+                <Field>
+                    <FieldLabel htmlFor="category-kind">種別</FieldLabel>
                     <Select
                         items={kindOptions}
                         value={form.kind}
@@ -200,12 +165,11 @@ export function CategoryForm({ categories, onSave }: Props) {
                             </SelectGroup>
                         </SelectContent>
                     </Select>
-                </label>
-                <label
-                    className="space-y-1.5 text-xs font-semibold"
-                    htmlFor="category-sort-order"
-                >
-                    並び順
+                </Field>
+                <Field>
+                    <FieldLabel htmlFor="category-sort-order">
+                        並び順
+                    </FieldLabel>
                     <Input
                         id="category-sort-order"
                         type="number"
@@ -217,7 +181,7 @@ export function CategoryForm({ categories, onSave }: Props) {
                             }))
                         }
                     />
-                </label>
+                </Field>
                 <div className="flex items-end gap-2">
                     <Button className="flex-1" disabled={saving} type="submit">
                         {saving
@@ -230,7 +194,7 @@ export function CategoryForm({ categories, onSave }: Props) {
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={() => setEditingId(null)}
+                            onClick={() => startEdit(null)}
                         >
                             取消
                         </Button>

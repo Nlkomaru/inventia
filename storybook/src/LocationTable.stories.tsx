@@ -36,6 +36,7 @@ const meta = {
 	},
 	args: {
 		locations,
+		itemCounts: { "warehouse-1": 3, "shelf-a": 5 },
 		onDelete: async () => undefined,
 	},
 } satisfies Meta<typeof LocationTable>;

@@ -22,25 +22,19 @@ export const Route = createFileRoute("/_app/license/")({
 
 function LicensePage() {
     return (
-        <main className="flex flex-1 flex-col gap-8 p-4 md:p-6">
-            <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-semibold">
+        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+            <header>
+                <h1 className="mt-1 text-2xl font-bold">
                     オープンソースソフトウェアライセンス一覧
                 </h1>
-                <p className="text-muted-foreground">
-                    Inventia が利用する本番依存パッケージのライセンス情報です。
-                </p>
-            </div>
+            </header>
 
             {licenseGroups.map((group) => (
                 <section className="flex flex-col gap-4" key={group.license}>
                     <div className="flex flex-col gap-1">
-                        <h2 className="text-xl font-semibold">
-                            {group.license}
-                        </h2>
-                        <p className="text-sm text-muted-foreground">
-                            {getLicenseDescription(group.license)}（
-                            {group.packages.length} パッケージ）
+                        <h2 className="font-bold">{group.license}</h2>
+                        <p className="text-xs text-muted-foreground">
+                            {group.packages.length} パッケージ
                         </p>
                     </div>
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -100,22 +94,4 @@ function PackageLicenseCard({ packageInfo }: { packageInfo: PackageInfo }) {
     }
 
     return card;
-}
-
-const licenseDescriptions: Readonly<Record<string, string>> = {
-    MIT: "著作権表示を条件に、改変・再配布・商用利用を許可するライセンス",
-    "Apache-2.0": "特許権の明示的な許諾を含むライセンス",
-    "BSD-2-Clause": "2 条項からなる簡潔なパーミッシブライセンス",
-    "BSD-3-Clause": "開発者名の宣伝利用を制限するパーミッシブライセンス",
-    ISC: "MIT と同様の条件を簡潔に記したライセンス",
-    "MPL-2.0": "変更したファイル単位でソース公開を求めるライセンス",
-    "OFL-1.1": "フォントの利用・改変・再配布を認めるライセンス",
-    Unlicense: "著作物をパブリックドメイン相当として扱うライセンス",
-};
-
-function getLicenseDescription(license: string) {
-    return (
-        licenseDescriptions[license] ??
-        "利用条件は各パッケージのライセンスを参照してください"
-    );
 }

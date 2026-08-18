@@ -16,6 +16,7 @@ import {
 import { type ReadingStatus, toReadingStateDto } from "../domain/reading";
 import {
     categoryExists,
+    countItemsByLocation as countItemRecordsByLocation,
     createItem as createItemRecord,
     deleteItem as deleteItemRecord,
     getCategoryKind,
@@ -151,6 +152,19 @@ export const listItems = async (
         }
         throw error;
     }
+};
+
+/**
+ * 保管場所 id ごとの品目件数を返す。件数が 0 の場所は含まれない。
+ * 階層をまたぐ合算は保管場所ツリーを持つ呼び出し側の責務とする。
+ */
+export const countItemsByLocation = async (
+    db: D1Database,
+): Promise<Record<string, number>> => {
+    const rows = await countItemRecordsByLocation(db);
+    return Object.fromEntries(
+        rows.map((row) => [row.locationId, row.itemCount]),
+    );
 };
 
 export const getItem = async (

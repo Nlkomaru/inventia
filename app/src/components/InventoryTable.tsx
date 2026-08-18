@@ -15,13 +15,6 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     Table,
@@ -431,130 +424,130 @@ export function InventoryTable({
     const rows = table.getRowModel().rows;
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>品目と期限別ロット</CardTitle>
-                <CardDescription>
-                    {loading
-                        ? "在庫を読み込み中…"
-                        : `${items.length} 件の品目。数量は期限別ロットの合計です。`}
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-                <Table
-                    aria-busy={loading}
-                    aria-label="在庫一覧"
-                    className="min-w-[980px]"
-                >
-                    <TableHeader className="bg-muted/50">
-                        {table.getHeaderGroups().map((headerGroup) => (
-                            <TableRow key={headerGroup.id}>
-                                {headerGroup.headers.map((header) => {
-                                    const sortDirection =
-                                        header.column.getIsSorted();
-                                    const label =
-                                        columnLabels[header.column.id] ??
-                                        header.column.id;
-                                    const numeric =
-                                        header.column.id === "currentQuantity";
+        <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+            <div className="border-b p-5">
+                <h2 className="font-bold">品目と期限別ロット</h2>
+                <p className="text-xs text-muted-foreground">
+                    {loading ? "在庫を読み込み中…" : `${items.length} 件`}
+                </p>
+            </div>
+            <Table
+                aria-busy={loading}
+                aria-label="在庫一覧"
+                className="min-w-[980px]"
+            >
+                <TableHeader className="bg-muted/50">
+                    {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id}>
+                            {headerGroup.headers.map((header) => {
+                                const sortDirection =
+                                    header.column.getIsSorted();
+                                const label =
+                                    columnLabels[header.column.id] ??
+                                    header.column.id;
+                                const numeric =
+                                    header.column.id === "currentQuantity";
 
-                                    return (
-                                        <TableHead
-                                            aria-sort={
-                                                sortDirection === "asc"
-                                                    ? "ascending"
-                                                    : sortDirection === "desc"
-                                                      ? "descending"
-                                                      : "none"
-                                            }
-                                            className={cn(
-                                                numeric && "text-right",
-                                            )}
-                                            key={header.id}
-                                            scope="col"
-                                        >
-                                            {header.isPlaceholder ? null : header.column.getCanSort() ? (
-                                                <Button
-                                                    aria-label={`${label}で並べ替え`}
-                                                    className={cn(
-                                                        // 見出しの文字色は TableHead の text-foreground を保つ。
-                                                        // muted へ落とすとヘッダー背景との比が 4.5:1 を下回る
-                                                        "-mx-2.5 font-medium",
-                                                        numeric && "ml-auto",
-                                                    )}
-                                                    onClick={header.column.getToggleSortingHandler()}
-                                                    size="sm"
-                                                    type="button"
-                                                    variant="ghost"
-                                                >
-                                                    {table.FlexRender({
-                                                        header,
-                                                    })}
-                                                    {sortDirection ? (
-                                                        <ChevronDown
-                                                            aria-hidden="true"
-                                                            className={cn(
-                                                                "transition-transform",
-                                                                sortDirection ===
-                                                                    "asc" &&
-                                                                    "rotate-180",
-                                                            )}
-                                                            data-icon="inline-end"
-                                                        />
-                                                    ) : (
-                                                        <ArrowUpDown
-                                                            aria-hidden="true"
-                                                            className="opacity-50"
-                                                            data-icon="inline-end"
-                                                        />
-                                                    )}
-                                                </Button>
-                                            ) : (
-                                                table.FlexRender({ header })
-                                            )}
-                                        </TableHead>
-                                    );
-                                })}
+                                return (
+                                    <TableHead
+                                        aria-sort={
+                                            sortDirection === "asc"
+                                                ? "ascending"
+                                                : sortDirection === "desc"
+                                                  ? "descending"
+                                                  : "none"
+                                        }
+                                        className={cn(
+                                            "px-5",
+                                            numeric && "text-right",
+                                        )}
+                                        key={header.id}
+                                        scope="col"
+                                    >
+                                        {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                                            <Button
+                                                aria-label={`${label}で並べ替え`}
+                                                className={cn(
+                                                    // 見出しの文字色は TableHead の text-foreground を保つ。
+                                                    // muted へ落とすとヘッダー背景との比が 4.5:1 を下回る
+                                                    "-mx-2.5 font-medium",
+                                                    numeric && "ml-auto",
+                                                )}
+                                                onClick={header.column.getToggleSortingHandler()}
+                                                size="sm"
+                                                type="button"
+                                                variant="ghost"
+                                            >
+                                                {table.FlexRender({
+                                                    header,
+                                                })}
+                                                {sortDirection ? (
+                                                    <ChevronDown
+                                                        aria-hidden="true"
+                                                        className={cn(
+                                                            "transition-transform",
+                                                            sortDirection ===
+                                                                "asc" &&
+                                                                "rotate-180",
+                                                        )}
+                                                        data-icon="inline-end"
+                                                    />
+                                                ) : (
+                                                    <ArrowUpDown
+                                                        aria-hidden="true"
+                                                        className="opacity-50"
+                                                        data-icon="inline-end"
+                                                    />
+                                                )}
+                                            </Button>
+                                        ) : (
+                                            table.FlexRender({ header })
+                                        )}
+                                    </TableHead>
+                                );
+                            })}
+                        </TableRow>
+                    ))}
+                </TableHeader>
+                <TableBody>
+                    {loading ? (
+                        loadingRowKeys.map((rowKey) => (
+                            <TableRow key={rowKey}>
+                                {columns.map((column) => (
+                                    <TableCell
+                                        className="px-5 py-3"
+                                        key={column.id}
+                                    >
+                                        <Skeleton className="h-4 w-24" />
+                                    </TableCell>
+                                ))}
                             </TableRow>
-                        ))}
-                    </TableHeader>
-                    <TableBody>
-                        {loading ? (
-                            loadingRowKeys.map((rowKey) => (
-                                <TableRow key={rowKey}>
-                                    {columns.map((column) => (
-                                        <TableCell key={column.id}>
-                                            <Skeleton className="h-4 w-24" />
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            ))
-                        ) : rows.length > 0 ? (
-                            rows.map((row) => (
-                                <TableRow key={row.id}>
-                                    {row.getAllCells().map((cell) => (
-                                        <TableCell
-                                            className="align-top"
-                                            key={cell.id}
-                                        >
-                                            {table.FlexRender({ cell })}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            ))
-                        ) : (
-                            <TableRow>
-                                <TableCell
-                                    className="h-28 text-center text-muted-foreground"
-                                    colSpan={columns.length}
-                                >
-                                    該当する品目がありません
-                                </TableCell>
+                        ))
+                    ) : rows.length > 0 ? (
+                        rows.map((row) => (
+                            <TableRow key={row.id}>
+                                {row.getAllCells().map((cell) => (
+                                    <TableCell
+                                        className="px-5 py-3 align-top"
+                                        key={cell.id}
+                                    >
+                                        {table.FlexRender({ cell })}
+                                    </TableCell>
+                                ))}
                             </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
+                        ))
+                    ) : (
+                        <TableRow>
+                            <TableCell
+                                className="h-28 text-center text-muted-foreground"
+                                colSpan={columns.length}
+                            >
+                                該当する品目がありません
+                            </TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </section>
     );
 }

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     Field,
-    FieldDescription,
     FieldError,
     FieldGroup,
     FieldLabel,
@@ -15,6 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type { ReceiptLineDto } from "@/domain/receipt";
 import {
     expiryConfidenceLabels,
@@ -74,9 +75,9 @@ export function ReceiptReviewDetail({
     };
 
     return (
-        <div className="flex flex-col gap-4 border-l-2 border-primary/40 bg-muted/30 p-4">
+        <div className="flex flex-col gap-4 bg-muted/30 p-4">
             <div className="flex flex-col gap-1">
-                <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                     {row.lineNo} 行目の詳細
                 </p>
                 <p className="text-sm text-muted-foreground">
@@ -93,7 +94,7 @@ export function ReceiptReviewDetail({
                         className="text-sm text-muted-foreground"
                         id={fieldId("candidates")}
                     >
-                        照合候補（名前が似ているだけの候補は自動で確定しません）
+                        照合候補
                     </p>
                     <ul
                         aria-labelledby={fieldId("candidates")}
@@ -135,7 +136,7 @@ export function ReceiptReviewDetail({
             ) : null}
 
             {row.action === "create_item" ? (
-                <FieldGroup className="gap-4 rounded-lg border border-dashed border-border bg-card p-3">
+                <FieldGroup className="gap-4">
                     <Field data-invalid={Boolean(issues.newItemName)}>
                         <FieldLabel htmlFor={fieldId("new-name")}>
                             新しい品目名
@@ -266,7 +267,6 @@ export function ReceiptReviewDetail({
                                 aria-describedby={describedBy(
                                     "newItemBaseUnit",
                                     "new-unit",
-                                    fieldId("new-unit-description"),
                                 )}
                                 aria-invalid={Boolean(issues.newItemBaseUnit)}
                                 disabled={disabled}
@@ -279,11 +279,6 @@ export function ReceiptReviewDetail({
                                 placeholder="個、袋、g など"
                                 value={row.newItem.baseUnit}
                             />
-                            <FieldDescription
-                                id={fieldId("new-unit-description")}
-                            >
-                                空欄にすると既定の単位で登録します。
-                            </FieldDescription>
                             {issues.newItemBaseUnit ? (
                                 <FieldError id={errorId("new-unit")}>
                                     {issues.newItemBaseUnit}
@@ -345,8 +340,8 @@ export function ReceiptReviewDetail({
                         <FieldLabel htmlFor={fieldId("new-memo")}>
                             メモ（任意）
                         </FieldLabel>
-                        <textarea
-                            className="min-h-16 w-full resize-y rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50"
+                        <Textarea
+                            className="min-h-16"
                             disabled={disabled}
                             id={fieldId("new-memo")}
                             maxLength={2000}
@@ -361,15 +356,13 @@ export function ReceiptReviewDetail({
 
             {row.action === "skip" ? null : (
                 <Field orientation="horizontal">
-                    <input
+                    <Checkbox
                         checked={row.registerAlias}
-                        className="size-4 rounded border-input accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={disabled}
                         id={fieldId("alias")}
-                        onChange={(event) =>
-                            onChange({ registerAlias: event.target.checked })
+                        onCheckedChange={(checked) =>
+                            onChange({ registerAlias: checked })
                         }
-                        type="checkbox"
                     />
                     <FieldLabel htmlFor={fieldId("alias")}>
                         このレシート表記を次回以降の照合に使う
@@ -384,8 +377,8 @@ export function ReceiptReviewDetail({
 const matchSummary = (line: ReceiptLineDto): string => {
     if (line.matchedItemId === null) {
         return line.candidates.length === 0
-            ? "一致する品目が見つかりませんでした。取り込む場合は品目を選ぶか、新規作成してください。"
-            : "候補は見つかりましたが自動では確定していません。反映先を選んでください。";
+            ? "一致する品目が見つかりませんでした。"
+            : "候補は見つかりましたが自動では確定していません。";
     }
     const method =
         line.matchMethod === null
@@ -403,9 +396,6 @@ const expirySummary = (line: ReceiptLineDto): string => {
     }
     if (line.expiryEstimateReason !== null) {
         parts.push(`根拠: ${line.expiryEstimateReason}`);
-    }
-    if (line.expirySource === "unknown") {
-        parts.push("推測できなかったため初期値は「期限なし」です。");
     }
     return parts.join(" / ");
 };

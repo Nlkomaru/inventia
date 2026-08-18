@@ -25,23 +25,17 @@ export const Route = createFileRoute("/_app/settings/integrations/")({
 
 function IntegrationsSettingsPending() {
     return (
-        <main className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-            <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-semibold">AI・ベクトル検索</h1>
-                <p className="text-muted-foreground">
-                    連携設定を読み込んでいます…
-                </p>
-            </div>
+        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+            <p className="text-sm text-muted-foreground">
+                連携設定を読み込んでいます…
+            </p>
         </main>
     );
 }
 
 function IntegrationsSettingsError({ error }: ErrorComponentProps) {
     return (
-        <main className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-            <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-semibold">AI・ベクトル検索</h1>
-            </div>
+        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
             <p
                 role="alert"
                 className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"

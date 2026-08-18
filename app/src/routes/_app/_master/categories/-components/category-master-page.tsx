@@ -9,12 +9,11 @@ import {
 } from "../-api/category-api";
 import { categoryKeys } from "../-api/category-queries";
 import {
-    categoryFormAtom,
     categoryFormSavingAtom,
     categoryQueryAtom,
     editingCategoryIdAtom,
     expandedCategoryIdsAtom,
-    initialCategoryFormState,
+    startCategoryEditAtom,
 } from "./category-atoms";
 import { CategoryForm } from "./category-form";
 import { CategoryTable } from "./category-table";
@@ -36,8 +35,7 @@ export function CategoryMasterPage({
 }) {
     const queryClient = useQueryClient();
     const editingId = useAtomValue(editingCategoryIdAtom);
-    const setEditingId = useSetAtom(editingCategoryIdAtom);
-    const setForm = useSetAtom(categoryFormAtom);
+    const resetEdit = useSetAtom(startCategoryEditAtom);
     const setSaving = useSetAtom(categoryFormSavingAtom);
     const setQuery = useSetAtom(categoryQueryAtom);
     const setExpanded = useSetAtom(expandedCategoryIdsAtom);
@@ -45,13 +43,12 @@ export function CategoryMasterPage({
     // atom はモジュールスコープに残るため、画面を離れるときに編集状態を破棄する
     useEffect(
         () => () => {
-            setEditingId(null);
-            setForm(initialCategoryFormState);
+            resetEdit(null);
             setSaving(false);
             setQuery("");
             setExpanded(new Set<string>());
         },
-        [setEditingId, setExpanded, setForm, setQuery, setSaving],
+        [resetEdit, setExpanded, setQuery, setSaving],
     );
     // onSuccess の Promise を返すと mutateAsync が再取得完了まで待つ。
     const invalidateCategories = () =>
@@ -105,13 +102,7 @@ export function CategoryMasterPage({
     return (
         <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
             <header>
-                <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                    Master data
-                </p>
                 <h1 className="mt-1 text-2xl font-bold">カテゴリマスタ</h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                    品目の分類を階層で整理します。種別を設定しないカテゴリは祖先の種別を引き継ぎます。
-                </p>
             </header>
             {truncated ? (
                 <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">

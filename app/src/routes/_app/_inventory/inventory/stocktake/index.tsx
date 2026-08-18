@@ -13,14 +13,6 @@ import { Plus } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import {
     Field,
     FieldDescription,
     FieldError,
@@ -75,8 +67,7 @@ export const Route = createFileRoute("/_app/_inventory/inventory/stocktake/")({
     errorComponent: StocktakeError,
 });
 
-const pageClassName =
-    "mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
 
 // 未取得時の既定値は参照を固定する。毎描画で新しい配列を作ると
 // ロットに依存する useMemo が毎回作り直される
@@ -266,11 +257,11 @@ function StocktakePage() {
                 setNotice(
                     result.movement
                         ? "棚卸し結果を再表示しました（再送）。"
-                        : "棚卸し結果を再表示しました。差分はなく、在庫は変わっていません（再送・no-op）。",
+                        : "棚卸し結果を再表示しました。差分はなく、在庫は変わっていません。",
                 );
             } else if (result.movement === null) {
                 setNotice(
-                    "棚卸しを記録しました。差分はなく、在庫は変わっていません（no-op）。",
+                    "棚卸しを記録しました。差分はなく、在庫は変わっていません。",
                 );
             } else {
                 setNotice(
@@ -291,236 +282,221 @@ function StocktakePage() {
     return (
         <main className={pageClassName}>
             <header>
-                <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                    Inventory
-                </p>
                 <h1 className="mt-1 text-2xl font-bold">棚卸・調整</h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                    期限ごとの実在庫を入力し、帳簿上の在庫との差分を履歴へ記録します。
-                </p>
             </header>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>棚卸しを記録</CardTitle>
-                    <CardDescription>
-                        品目を選び、期限ごとに現在確認できる絶対数量を入力してください。
-                    </CardDescription>
-                </CardHeader>
-                <form onSubmit={submit}>
-                    <CardContent>
-                        <FieldGroup>
-                            <Field data-invalid={Boolean(selectionError)}>
-                                <FieldLabel htmlFor="stocktake-item">
-                                    品目
-                                </FieldLabel>
-                                <Select
-                                    disabled={items.length === 0}
-                                    items={itemOptions}
-                                    onValueChange={handleItemChange}
-                                    value={selectedItemId || null}
+            <section aria-labelledby="stocktake-form-title">
+                <div className="mb-5 flex items-center gap-3">
+                    <h2 className="font-bold" id="stocktake-form-title">
+                        棚卸しを記録
+                    </h2>
+                </div>
+                <form className="flex flex-col gap-6" onSubmit={submit}>
+                    <FieldGroup>
+                        <Field data-invalid={Boolean(selectionError)}>
+                            <FieldLabel htmlFor="stocktake-item">
+                                品目
+                            </FieldLabel>
+                            <Select
+                                disabled={items.length === 0}
+                                items={itemOptions}
+                                onValueChange={handleItemChange}
+                                value={selectedItemId || null}
+                            >
+                                <SelectTrigger
+                                    aria-describedby={
+                                        selectionError
+                                            ? "stocktake-item-error"
+                                            : undefined
+                                    }
+                                    aria-invalid={Boolean(selectionError)}
+                                    className="w-full"
+                                    id="stocktake-item"
                                 >
-                                    <SelectTrigger
-                                        aria-describedby={
-                                            selectionError
-                                                ? "stocktake-item-error"
-                                                : undefined
+                                    <SelectValue
+                                        placeholder={
+                                            items.length === 0
+                                                ? "品目がありません"
+                                                : "品目を選択"
                                         }
-                                        aria-invalid={Boolean(selectionError)}
-                                        className="w-full"
-                                        id="stocktake-item"
-                                    >
-                                        <SelectValue
-                                            placeholder={
-                                                items.length === 0
-                                                    ? "品目がありません"
-                                                    : "品目を選択"
-                                            }
-                                        />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectGroup>
-                                            {itemOptions.map((option) => (
-                                                <SelectItem
-                                                    key={option.value}
-                                                    value={option.value}
-                                                >
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    </SelectContent>
-                                </Select>
-                                {selectionError ? (
-                                    <FieldError id="stocktake-item-error">
-                                        {selectionError}
-                                    </FieldError>
-                                ) : null}
-                            </Field>
-
-                            {selectedItem ? (
-                                <div className="grid gap-4 rounded-lg bg-muted/50 p-4 sm:grid-cols-3">
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            現在庫（合計）
-                                        </p>
-                                        <p
-                                            aria-live="polite"
-                                            className="mt-1 text-xl font-semibold"
-                                        >
-                                            {currentTotal} {baseUnit}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            入力の合計
-                                        </p>
-                                        <p
-                                            aria-live="polite"
-                                            className="mt-1 text-xl font-semibold"
-                                        >
-                                            {inputTotal === null
-                                                ? "—"
-                                                : `${inputTotal} ${baseUnit}`}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            差分
-                                        </p>
-                                        <p
-                                            aria-live="polite"
-                                            className="mt-1 text-xl font-semibold"
-                                        >
-                                            {inputTotal === null
-                                                ? "—"
-                                                : `${formatDelta(inputTotal - currentTotal)} ${baseUnit}`}
-                                        </p>
-                                    </div>
-                                </div>
-                            ) : null}
-
-                            <Field>
-                                <FieldLabel htmlFor="stocktake-rows">
-                                    期限ごとの実在庫（絶対数量）
-                                </FieldLabel>
-                                <FieldDescription id="stocktake-rows-description">
-                                    棚卸しは全数確定です。
-                                    <strong className="font-semibold">
-                                        この一覧から外した既存ロットは 0
-                                        になります。
-                                    </strong>
-                                    数えられなかったロットは、行を残して現在の数量を入力してください。
-                                </FieldDescription>
-                                <div
-                                    aria-describedby="stocktake-rows-description"
-                                    className="flex flex-col gap-3"
-                                    id="stocktake-rows"
-                                >
-                                    {lotsError ? (
-                                        <div
-                                            aria-live="polite"
-                                            className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
-                                            role="alert"
-                                        >
-                                            <span>{lotsError}</span>
-                                            <Button
-                                                onClick={() =>
-                                                    void lotsQuery.refetch()
-                                                }
-                                                size="sm"
-                                                type="button"
-                                                variant="outline"
+                                    />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        {itemOptions.map((option) => (
+                                            <SelectItem
+                                                key={option.value}
+                                                value={option.value}
                                             >
-                                                再読み込み
-                                            </Button>
-                                        </div>
-                                    ) : null}
-                                    {!selectedItem ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            品目を選ぶと、期限ごとの行を表示します。
-                                        </p>
-                                    ) : lotsLoading ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            ロットを読み込み中…
-                                        </p>
-                                    ) : rows.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            行がありません。「期限を追加」で数えた在庫を入力してください。この状態で記録すると在庫は
-                                            0 になります。
-                                        </p>
-                                    ) : (
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>期限</TableHead>
-                                                    <TableHead className="text-right">
-                                                        現在庫
-                                                    </TableHead>
-                                                    <TableHead>
-                                                        実在庫
-                                                    </TableHead>
-                                                    <TableHead className="text-right">
-                                                        操作
-                                                    </TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {rows.map((row, index) => (
-                                                    <StocktakeRow
-                                                        baseUnit={baseUnit}
-                                                        currentQuantity={currentLotQuantity(
-                                                            lots,
-                                                            row,
-                                                        )}
-                                                        disabled={saving}
-                                                        expiryError={issueMessage(
-                                                            rowIssues,
-                                                            row.key,
-                                                            "expiry",
-                                                        )}
-                                                        formatExpiry={
-                                                            formatExpiry
-                                                        }
-                                                        key={row.key}
-                                                        onChange={(patch) =>
-                                                            updateRow(
-                                                                row.key,
-                                                                patch,
-                                                            )
-                                                        }
-                                                        onRemove={() =>
-                                                            removeRow(row.key)
-                                                        }
-                                                        position={index + 1}
-                                                        quantityError={issueMessage(
-                                                            rowIssues,
-                                                            row.key,
-                                                            "quantity",
-                                                        )}
-                                                        row={row}
-                                                    />
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    )}
-                                    <div>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                            {selectionError ? (
+                                <FieldError id="stocktake-item-error">
+                                    {selectionError}
+                                </FieldError>
+                            ) : null}
+                        </Field>
+
+                        {selectedItem ? (
+                            <div className="grid gap-4 sm:grid-cols-3">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">
+                                        現在庫（合計）
+                                    </p>
+                                    <p
+                                        aria-live="polite"
+                                        className="mt-1 text-xl font-semibold"
+                                    >
+                                        {currentTotal} {baseUnit}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">
+                                        入力の合計
+                                    </p>
+                                    <p
+                                        aria-live="polite"
+                                        className="mt-1 text-xl font-semibold"
+                                    >
+                                        {inputTotal === null
+                                            ? "—"
+                                            : `${inputTotal} ${baseUnit}`}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">
+                                        差分
+                                    </p>
+                                    <p
+                                        aria-live="polite"
+                                        className="mt-1 text-xl font-semibold"
+                                    >
+                                        {inputTotal === null
+                                            ? "—"
+                                            : `${formatDelta(inputTotal - currentTotal)} ${baseUnit}`}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : null}
+
+                        <Field>
+                            <FieldLabel htmlFor="stocktake-rows">
+                                期限ごとの実在庫（絶対数量）
+                            </FieldLabel>
+                            <FieldDescription id="stocktake-rows-description">
+                                <strong className="font-semibold">
+                                    この一覧から外した既存ロットは 0
+                                    になります。
+                                </strong>
+                            </FieldDescription>
+                            <div
+                                aria-describedby="stocktake-rows-description"
+                                className="flex flex-col gap-3"
+                                id="stocktake-rows"
+                            >
+                                {lotsError ? (
+                                    <div
+                                        aria-live="polite"
+                                        className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+                                        role="alert"
+                                    >
+                                        <span>{lotsError}</span>
                                         <Button
-                                            disabled={!selectedItem || saving}
-                                            onClick={addRow}
+                                            onClick={() =>
+                                                void lotsQuery.refetch()
+                                            }
                                             size="sm"
                                             type="button"
                                             variant="outline"
                                         >
-                                            <Plus data-icon="inline-start" />
-                                            期限を追加
+                                            再読み込み
                                         </Button>
                                     </div>
+                                ) : null}
+                                {!selectedItem ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        品目を選ぶと、期限ごとの行を表示します。
+                                    </p>
+                                ) : lotsLoading ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        ロットを読み込み中…
+                                    </p>
+                                ) : rows.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        行がありません。この状態で記録すると在庫は
+                                        0 になります。
+                                    </p>
+                                ) : (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>期限</TableHead>
+                                                <TableHead className="text-right">
+                                                    現在庫
+                                                </TableHead>
+                                                <TableHead>実在庫</TableHead>
+                                                <TableHead className="text-right">
+                                                    操作
+                                                </TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {rows.map((row, index) => (
+                                                <StocktakeRow
+                                                    baseUnit={baseUnit}
+                                                    currentQuantity={currentLotQuantity(
+                                                        lots,
+                                                        row,
+                                                    )}
+                                                    disabled={saving}
+                                                    expiryError={issueMessage(
+                                                        rowIssues,
+                                                        row.key,
+                                                        "expiry",
+                                                    )}
+                                                    formatExpiry={formatExpiry}
+                                                    key={row.key}
+                                                    onChange={(patch) =>
+                                                        updateRow(
+                                                            row.key,
+                                                            patch,
+                                                        )
+                                                    }
+                                                    onRemove={() =>
+                                                        removeRow(row.key)
+                                                    }
+                                                    position={index + 1}
+                                                    quantityError={issueMessage(
+                                                        rowIssues,
+                                                        row.key,
+                                                        "quantity",
+                                                    )}
+                                                    row={row}
+                                                />
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                )}
+                                <div>
+                                    <Button
+                                        disabled={!selectedItem || saving}
+                                        onClick={addRow}
+                                        size="sm"
+                                        type="button"
+                                        variant="outline"
+                                    >
+                                        <Plus data-icon="inline-start" />
+                                        期限を追加
+                                    </Button>
                                 </div>
-                            </Field>
-                        </FieldGroup>
-                    </CardContent>
-                    <CardFooter className="justify-end">
+                            </div>
+                        </Field>
+                    </FieldGroup>
+                    <div className="flex justify-end">
                         {/* 現在のロットを読めていない状態では送信させない。
                             行が空の送信は「全ロットを 0 にする」指定になるため、
                             読み込み失敗と利用者の意図を取り違えてはならない */}
@@ -539,66 +515,61 @@ function StocktakePage() {
                                   ? "棚卸しを再送"
                                   : "棚卸しを記録"}
                         </Button>
-                    </CardFooter>
+                    </div>
                 </form>
-            </Card>
+            </section>
 
             {selectedItem ? (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>確定内容</CardTitle>
-                        <CardDescription>
-                            送信するとロットの数量がこの絶対値へ確定します。
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <output aria-live="polite" className="block">
-                            {!built.ok ? (
-                                <p className="text-sm text-muted-foreground">
-                                    入力を修正すると確定内容を表示します。
-                                </p>
-                            ) : plan.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    変更はありません。
-                                </p>
-                            ) : (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>期限</TableHead>
-                                            <TableHead className="text-right">
-                                                確定後
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                差分
-                                            </TableHead>
+                <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                    <div className="border-b p-5">
+                        <h2 className="font-bold">確定内容</h2>
+                    </div>
+                    <output aria-live="polite" className="block">
+                        {!built.ok ? (
+                            <p className="p-5 text-sm text-muted-foreground">
+                                入力を修正すると確定内容を表示します。
+                            </p>
+                        ) : plan.length === 0 ? (
+                            <p className="p-5 text-sm text-muted-foreground">
+                                変更はありません。
+                            </p>
+                        ) : (
+                            <Table>
+                                <TableHeader className="bg-muted/50">
+                                    <TableRow>
+                                        <TableHead className="px-5">
+                                            期限
+                                        </TableHead>
+                                        <TableHead className="px-5 text-right">
+                                            確定後
+                                        </TableHead>
+                                        <TableHead className="px-5 text-right">
+                                            差分
+                                        </TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {plan.map((entry) => (
+                                        <TableRow
+                                            key={entry.expiryDate ?? "none"}
+                                        >
+                                            <TableCell className="px-5 py-3">
+                                                {formatExpiry(entry.expiryDate)}
+                                            </TableCell>
+                                            <TableCell className="px-5 py-3 text-right">
+                                                {entry.quantity} {baseUnit}
+                                            </TableCell>
+                                            <TableCell className="px-5 py-3 text-right">
+                                                {formatDelta(entry.delta)}{" "}
+                                                {baseUnit}
+                                            </TableCell>
                                         </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {plan.map((entry) => (
-                                            <TableRow
-                                                key={entry.expiryDate ?? "none"}
-                                            >
-                                                <TableCell>
-                                                    {formatExpiry(
-                                                        entry.expiryDate,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {entry.quantity} {baseUnit}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {formatDelta(entry.delta)}{" "}
-                                                    {baseUnit}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            )}
-                        </output>
-                    </CardContent>
-                </Card>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        )}
+                    </output>
+                </section>
             ) : null}
 
             {submitError ? (
@@ -607,7 +578,7 @@ function StocktakePage() {
                     className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
                     role="alert"
                 >
-                    {submitError} 内容を変えずに、もう一度送信できます。
+                    {submitError}
                 </div>
             ) : null}
             {notice ? (

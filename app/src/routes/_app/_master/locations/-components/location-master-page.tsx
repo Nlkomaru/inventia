@@ -20,8 +20,10 @@ type LocationSaveInput = {
 
 export function LocationMasterPage({
     locations,
+    itemCounts,
 }: {
     locations: LocationDto[];
+    itemCounts: Record<string, number>;
 }) {
     const queryClient = useQueryClient();
     const editing = useAtomValue(editingLocationAtom);
@@ -62,24 +64,22 @@ export function LocationMasterPage({
     return (
         <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
             <header>
-                <p className="text-xs font-semibold uppercase tracking-[.18em] text-slate-500">
-                    Master data
-                </p>
                 <h1 className="mt-1 text-2xl font-bold">保管場所マスタ</h1>
-                <p className="mt-2 text-sm text-slate-500">
-                    建物から棚まで、在庫の保管場所を階層で整理します。
-                </p>
             </header>
             {error ? (
                 <p
                     role="alert"
-                    className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700"
+                    className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
                 >
                     {error}
                 </p>
             ) : null}
             <LocationForm locations={locations} onSave={save} />
-            <LocationTable locations={locations} onDelete={remove} />
+            <LocationTable
+                locations={locations}
+                itemCounts={itemCounts}
+                onDelete={remove}
+            />
         </main>
     );
 }

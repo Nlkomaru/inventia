@@ -20,7 +20,6 @@ const dropzoneAccept: Accept = Object.fromEntries(
 );
 const cameraAccept = receiptAllowedContentTypes.join(",");
 
-const descriptionId = "receipt-dropzone-description";
 const statusId = "receipt-dropzone-status";
 const errorId = "receipt-dropzone-error";
 
@@ -91,11 +90,7 @@ export function ReceiptDropzone({
         onSelect(selected);
     };
 
-    const describedBy = [
-        descriptionId,
-        statusId,
-        error === null ? null : errorId,
-    ]
+    const describedBy = [statusId, error === null ? null : errorId]
         .filter((id): id is string => id !== null)
         .join(" ");
 
@@ -165,10 +160,6 @@ export function ReceiptDropzone({
                     カメラで撮影
                 </Button>
             </div>
-
-            <p className="text-sm text-muted-foreground" id={descriptionId}>
-                画像を選ぶとそのままアップロードして解析します。スマートフォンでは「カメラで撮影」からその場で撮影できます。
-            </p>
 
             {file === null ? null : (
                 <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">

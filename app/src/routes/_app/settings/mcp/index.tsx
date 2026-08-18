@@ -4,13 +4,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import {
     Field,
     FieldDescription,
     FieldError,
@@ -50,23 +43,18 @@ function McpSettingsPage() {
     });
 
     return (
-        <main className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-            <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-semibold">MCP 設定</h1>
-                <p className="text-muted-foreground">
-                    Hermes Agent へ Inventia の MCP サーバーを登録します。
-                </p>
-            </div>
+        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+            <header>
+                <h1 className="mt-1 text-2xl font-bold">MCP 設定</h1>
+            </header>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Hermes Agent</CardTitle>
-                    <CardDescription>
-                        Cloudflare Access のサービス トークンを入力すると、
-                        Hermes 用の設定コマンドへ自動的に反映されます。
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-6">
+            <section aria-labelledby="hermes-agent-title">
+                <div className="mb-5 flex items-center gap-3">
+                    <h2 className="font-bold" id="hermes-agent-title">
+                        Hermes Agent
+                    </h2>
+                </div>
+                <div className="flex flex-col gap-6">
                     <FieldGroup>
                         <Field data-invalid={!clientIdResult.success}>
                             <FieldLabel htmlFor="cloudflare-access-client-id">
@@ -122,7 +110,7 @@ function McpSettingsPage() {
                     </FieldGroup>
 
                     <div className="flex flex-col gap-2">
-                        <h2 className="font-medium">設定コマンド</h2>
+                        <h2 className="font-bold">設定コマンド</h2>
                         <pre className="overflow-x-auto rounded-lg bg-muted p-4 text-sm">
                             <code>{hermesCommand}</code>
                         </pre>
@@ -130,8 +118,8 @@ function McpSettingsPage() {
                             コマンドにはシークレットが平文で表示されます。安全な端末で実行し、シェル履歴の取り扱いに注意してください。
                         </p>
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </section>
         </main>
     );
 }

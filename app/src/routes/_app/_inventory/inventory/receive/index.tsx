@@ -12,16 +12,7 @@ import {
 import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import {
     Field,
-    FieldDescription,
     FieldError,
     FieldGroup,
     FieldLabel,
@@ -71,8 +62,7 @@ export const Route = createFileRoute("/_app/_inventory/inventory/receive/")({
     errorComponent: ReceiveError,
 });
 
-const pageClassName =
-    "mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
 
 // 入庫の理由は増加側のものだけを出す（消費・廃棄は出庫画面、棚卸しは棚卸画面で扱う）
 const reasonOptions: { label: string; value: StockMovementReason }[] = [
@@ -261,207 +251,188 @@ function ReceiveStockPage() {
     return (
         <main className={pageClassName}>
             <header>
-                <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                    Inventory
-                </p>
                 <h1 className="mt-1 text-2xl font-bold">入庫</h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                    購入・補充した数量を、期限ごとのロットへ加算します。
-                </p>
             </header>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>入庫を記録</CardTitle>
-                    <CardDescription>
-                        同じ期限のロットがあれば数量を加算し、なければロットを新しく作ります。
-                    </CardDescription>
-                </CardHeader>
-                <form onSubmit={submit}>
-                    <CardContent>
-                        <FieldGroup>
-                            <Field data-invalid={Boolean(selectionError)}>
-                                <FieldLabel htmlFor="receive-item">
-                                    品目
-                                </FieldLabel>
-                                <Select
-                                    disabled={items.length === 0}
-                                    items={itemOptions}
-                                    onValueChange={handleItemChange}
-                                    value={selectedItemId || null}
+            <section aria-labelledby="receive-form-title">
+                <div className="mb-5 flex items-center gap-3">
+                    <h2 className="font-bold" id="receive-form-title">
+                        入庫を記録
+                    </h2>
+                </div>
+                <form
+                    className="flex max-w-2xl flex-col gap-5"
+                    onSubmit={submit}
+                >
+                    <FieldGroup>
+                        <Field data-invalid={Boolean(selectionError)}>
+                            <FieldLabel htmlFor="receive-item">品目</FieldLabel>
+                            <Select
+                                disabled={items.length === 0}
+                                items={itemOptions}
+                                onValueChange={handleItemChange}
+                                value={selectedItemId || null}
+                            >
+                                <SelectTrigger
+                                    aria-describedby={
+                                        selectionError
+                                            ? "receive-item-error"
+                                            : undefined
+                                    }
+                                    aria-invalid={Boolean(selectionError)}
+                                    className="w-full"
+                                    id="receive-item"
                                 >
-                                    <SelectTrigger
-                                        aria-describedby={
-                                            selectionError
-                                                ? "receive-item-error"
-                                                : undefined
+                                    <SelectValue
+                                        placeholder={
+                                            items.length === 0
+                                                ? "品目がありません"
+                                                : "品目を選択"
                                         }
-                                        aria-invalid={Boolean(selectionError)}
-                                        className="w-full"
-                                        id="receive-item"
-                                    >
-                                        <SelectValue
-                                            placeholder={
-                                                items.length === 0
-                                                    ? "品目がありません"
-                                                    : "品目を選択"
-                                            }
-                                        />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectGroup>
-                                            {itemOptions.map((option) => (
-                                                <SelectItem
-                                                    key={option.value}
-                                                    value={option.value}
-                                                >
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    </SelectContent>
-                                </Select>
-                                {selectionError ? (
-                                    <FieldError id="receive-item-error">
-                                        {selectionError}
-                                    </FieldError>
-                                ) : null}
-                            </Field>
+                                    />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        {itemOptions.map((option) => (
+                                            <SelectItem
+                                                key={option.value}
+                                                value={option.value}
+                                            >
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                            {selectionError ? (
+                                <FieldError id="receive-item-error">
+                                    {selectionError}
+                                </FieldError>
+                            ) : null}
+                        </Field>
 
-                            <Field data-invalid={Boolean(quantityError)}>
-                                <FieldLabel htmlFor="receive-quantity">
-                                    入庫数量
+                        <Field data-invalid={Boolean(quantityError)}>
+                            <FieldLabel htmlFor="receive-quantity">
+                                入庫数量{selectedItem ? `（${baseUnit}）` : ""}
+                            </FieldLabel>
+                            <Input
+                                aria-describedby={
+                                    quantityError
+                                        ? "receive-quantity-error"
+                                        : undefined
+                                }
+                                aria-invalid={Boolean(quantityError)}
+                                disabled={!selectedItem || saving}
+                                id="receive-quantity"
+                                inputMode="numeric"
+                                min={1}
+                                onChange={(event) =>
+                                    handleQuantityChange(event.target.value)
+                                }
+                                step={1}
+                                type="number"
+                                value={quantity}
+                            />
+                            {quantityError ? (
+                                <FieldError id="receive-quantity-error">
+                                    {quantityError}
+                                </FieldError>
+                            ) : null}
+                        </Field>
+
+                        <Field>
+                            <FieldLabel htmlFor="receive-expiry-mode">
+                                期限の扱い
+                            </FieldLabel>
+                            <Select
+                                disabled={!selectedItem || saving}
+                                items={expiryModeOptions}
+                                onValueChange={handleExpiryModeChange}
+                                value={expiryMode}
+                            >
+                                <SelectTrigger
+                                    className="w-full"
+                                    id="receive-expiry-mode"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        {expiryModeOptions.map((option) => (
+                                            <SelectItem
+                                                key={option.value}
+                                                value={option.value}
+                                            >
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                        </Field>
+
+                        {expiryMode === "date" ? (
+                            <Field data-invalid={Boolean(expiryError)}>
+                                <FieldLabel htmlFor="receive-expiry-date">
+                                    期限日時
                                 </FieldLabel>
                                 <Input
                                     aria-describedby={
-                                        quantityError
-                                            ? "receive-quantity-description receive-quantity-error"
-                                            : "receive-quantity-description"
+                                        expiryError
+                                            ? "receive-expiry-error"
+                                            : undefined
                                     }
-                                    aria-invalid={Boolean(quantityError)}
+                                    aria-invalid={Boolean(expiryError)}
                                     disabled={!selectedItem || saving}
-                                    id="receive-quantity"
-                                    inputMode="numeric"
-                                    min={1}
+                                    id="receive-expiry-date"
                                     onChange={(event) =>
-                                        handleQuantityChange(event.target.value)
+                                        handleExpiryInputChange(
+                                            event.target.value,
+                                        )
                                     }
-                                    step={1}
-                                    type="number"
-                                    value={quantity}
+                                    type="datetime-local"
+                                    value={expiryInput}
                                 />
-                                <FieldDescription id="receive-quantity-description">
-                                    1以上の整数を、品目の基準単位（{baseUnit}
-                                    ）で入力します。
-                                </FieldDescription>
-                                {quantityError ? (
-                                    <FieldError id="receive-quantity-error">
-                                        {quantityError}
+                                {expiryError ? (
+                                    <FieldError id="receive-expiry-error">
+                                        {expiryError}
                                     </FieldError>
                                 ) : null}
                             </Field>
+                        ) : null}
 
-                            <Field>
-                                <FieldLabel htmlFor="receive-expiry-mode">
-                                    期限の扱い
-                                </FieldLabel>
-                                <Select
-                                    disabled={!selectedItem || saving}
-                                    items={expiryModeOptions}
-                                    onValueChange={handleExpiryModeChange}
-                                    value={expiryMode}
+                        <Field>
+                            <FieldLabel htmlFor="receive-reason">
+                                理由
+                            </FieldLabel>
+                            <Select
+                                disabled={!selectedItem || saving}
+                                items={reasonOptions}
+                                onValueChange={handleReasonChange}
+                                value={reason}
+                            >
+                                <SelectTrigger
+                                    className="w-full"
+                                    id="receive-reason"
                                 >
-                                    <SelectTrigger
-                                        aria-describedby="receive-expiry-mode-description"
-                                        className="w-full"
-                                        id="receive-expiry-mode"
-                                    >
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectGroup>
-                                            {expiryModeOptions.map((option) => (
-                                                <SelectItem
-                                                    key={option.value}
-                                                    value={option.value}
-                                                >
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    </SelectContent>
-                                </Select>
-                                <FieldDescription id="receive-expiry-mode-description">
-                                    「期限なし」を選ぶと、期限を持たないロットへ加算します。
-                                </FieldDescription>
-                            </Field>
-
-                            {expiryMode === "date" ? (
-                                <Field data-invalid={Boolean(expiryError)}>
-                                    <FieldLabel htmlFor="receive-expiry-date">
-                                        期限日時
-                                    </FieldLabel>
-                                    <Input
-                                        aria-describedby={
-                                            expiryError
-                                                ? "receive-expiry-description receive-expiry-error"
-                                                : "receive-expiry-description"
-                                        }
-                                        aria-invalid={Boolean(expiryError)}
-                                        disabled={!selectedItem || saving}
-                                        id="receive-expiry-date"
-                                        onChange={(event) =>
-                                            handleExpiryInputChange(
-                                                event.target.value,
-                                            )
-                                        }
-                                        type="datetime-local"
-                                        value={expiryInput}
-                                    />
-                                    <FieldDescription id="receive-expiry-description">
-                                        既存ロットと同じ期限を入力すると、そのロットへ合算されます。
-                                    </FieldDescription>
-                                    {expiryError ? (
-                                        <FieldError id="receive-expiry-error">
-                                            {expiryError}
-                                        </FieldError>
-                                    ) : null}
-                                </Field>
-                            ) : null}
-
-                            <Field>
-                                <FieldLabel htmlFor="receive-reason">
-                                    理由
-                                </FieldLabel>
-                                <Select
-                                    disabled={!selectedItem || saving}
-                                    items={reasonOptions}
-                                    onValueChange={handleReasonChange}
-                                    value={reason}
-                                >
-                                    <SelectTrigger
-                                        className="w-full"
-                                        id="receive-reason"
-                                    >
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectGroup>
-                                            {reasonOptions.map((option) => (
-                                                <SelectItem
-                                                    key={option.value}
-                                                    value={option.value}
-                                                >
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-                        </FieldGroup>
-                    </CardContent>
-                    <CardFooter className="justify-end">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        {reasonOptions.map((option) => (
+                                            <SelectItem
+                                                key={option.value}
+                                                value={option.value}
+                                            >
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                        </Field>
+                    </FieldGroup>
+                    <div className="flex justify-end gap-2">
                         <Button
                             disabled={saving || !selectedItem}
                             type="submit"
@@ -472,9 +443,9 @@ function ReceiveStockPage() {
                                   ? "入庫を再送"
                                   : "入庫を記録"}
                         </Button>
-                    </CardFooter>
+                    </div>
                 </form>
-            </Card>
+            </section>
 
             {submitError ? (
                 <div
@@ -482,7 +453,7 @@ function ReceiveStockPage() {
                     className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
                     role="alert"
                 >
-                    {submitError} 内容を変えずに、もう一度送信できます。
+                    {submitError}
                 </div>
             ) : null}
             {notice ? (
@@ -505,17 +476,16 @@ function ReceiveStockPage() {
             ) : null}
 
             {selectedItem ? (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>現在のロット</CardTitle>
-                        <CardDescription>
+                <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                    <div className="border-b p-5">
+                        <h2 className="font-bold">現在のロット</h2>
+                        <p className="text-xs text-muted-foreground">
                             {selectedItem.name}の在庫は合計{" "}
-                            {selectedItem.currentQuantity} {baseUnit}{" "}
-                            です。期限が早い順に表示します。
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {lotsError ? (
+                            {selectedItem.currentQuantity} {baseUnit} です。
+                        </p>
+                    </div>
+                    {lotsError ? (
+                        <div className="p-5">
                             <div
                                 aria-live="polite"
                                 className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
@@ -531,55 +501,55 @@ function ReceiveStockPage() {
                                     再読み込み
                                 </Button>
                             </div>
-                        ) : lotsLoading ? (
-                            <p className="text-sm text-muted-foreground">
-                                ロットを読み込み中…
-                            </p>
-                        ) : lots.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                在庫のあるロットはありません。入庫すると最初のロットが作られます。
-                            </p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>期限</TableHead>
-                                        <TableHead className="text-right">
-                                            数量
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            操作
-                                        </TableHead>
+                        </div>
+                    ) : lotsLoading ? (
+                        <p className="p-5 text-sm text-muted-foreground">
+                            ロットを読み込み中…
+                        </p>
+                    ) : lots.length === 0 ? (
+                        <p className="p-5 text-sm text-muted-foreground">
+                            在庫のあるロットはありません。
+                        </p>
+                    ) : (
+                        <Table>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                    <TableHead className="px-5">期限</TableHead>
+                                    <TableHead className="px-5 text-right">
+                                        数量
+                                    </TableHead>
+                                    <TableHead className="px-5 text-right">
+                                        操作
+                                    </TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {lots.map((lot) => (
+                                    <TableRow key={lot.id}>
+                                        <TableCell className="px-5 py-3">
+                                            {formatExpiry(lot.expiryDate)}
+                                        </TableCell>
+                                        <TableCell className="px-5 py-3 text-right">
+                                            {lot.quantity} {baseUnit}
+                                        </TableCell>
+                                        <TableCell className="px-5 py-3 text-right">
+                                            <Button
+                                                onClick={() =>
+                                                    applyExistingLot(lot)
+                                                }
+                                                size="sm"
+                                                type="button"
+                                                variant="outline"
+                                            >
+                                                この期限に追加
+                                            </Button>
+                                        </TableCell>
                                     </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {lots.map((lot) => (
-                                        <TableRow key={lot.id}>
-                                            <TableCell>
-                                                {formatExpiry(lot.expiryDate)}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {lot.quantity} {baseUnit}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button
-                                                    onClick={() =>
-                                                        applyExistingLot(lot)
-                                                    }
-                                                    size="sm"
-                                                    type="button"
-                                                    variant="outline"
-                                                >
-                                                    この期限に追加
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                </section>
             ) : null}
         </main>
     );

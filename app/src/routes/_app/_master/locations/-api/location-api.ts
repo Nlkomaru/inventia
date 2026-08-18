@@ -17,13 +17,22 @@ const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
     return (await response.json()) as T;
 };
 
+/** 保管場所ツリーと、場所ごとの品目件数（自身に直接紐づく件数のみ）。 */
+export type LocationTree = {
+    locations: LocationDto[];
+    /** 場所 id ごとの品目件数。件数が 0 の場所は含まれない。 */
+    itemCounts: Record<string, number>;
+};
+
 export const listLocationTree = createServerFn({ method: "GET" }).handler(
-    async () => {
-        const [{ env }, { listLocations }] = await Promise.all([
-            import("cloudflare:workers"),
-            import("@/services/locationService"),
-        ]);
-        const result: LocationDto[] = [];
+    async (): Promise<LocationTree> => {
+        const [{ env }, { listLocations }, { countItemsByLocation }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/locationService"),
+                import("@/services/itemService"),
+            ]);
+        const locations: LocationDto[] = [];
         const listLevel = async (parentId: string | null) => {
             let cursor: string | undefined;
             do {
@@ -32,17 +41,17 @@ export const listLocationTree = createServerFn({ method: "GET" }).handler(
                     limit: 100,
                     cursor,
                 });
-                result.push(...page.items);
+                locations.push(...page.items);
                 cursor = page.nextCursor ?? undefined;
             } while (cursor);
         };
         const visit = async (parentId: string | null) => {
-            const start = result.length;
+            const start = locations.length;
             await listLevel(parentId);
-            for (const child of result.slice(start)) await visit(child.id);
+            for (const child of locations.slice(start)) await visit(child.id);
         };
         await visit(null);
-        return result;
+        return { locations, itemCounts: await countItemsByLocation(env.DB) };
     },
 );
 
