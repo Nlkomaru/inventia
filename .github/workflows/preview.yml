@@ -207,32 +207,121 @@ jobs:
     runs-on: ubuntu-latest
     name: Comment Preview URLs
     steps:
+      # QR の置き場所は Storybook と同じくコミット単位にそろえる。
+      - name: Set short commit SHA
+        id: vars
+        run: |
+          sha="${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "commit_sha=${sha:0:7}" >> "$GITHUB_OUTPUT"
+
+      # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY は BSM(nikomaru プロジェクト)の
+      # nikomaru-ci バケット用共通キー。QR 画像のアップロードにだけ使う。
+      - name: Get secrets from Bitwarden Secrets Manager
+        uses: bitwarden/sm-action@v2
+        with:
+          access_token: ${{ secrets.BWS_ACCESS_TOKEN }}
+          secrets: |
+            7fca16ab-3904-4706-9849-b49900de563a > AWS_ACCESS_KEY_ID
+            769a462b-bf2d-466c-ae1f-b49900de56c8 > AWS_SECRET_ACCESS_KEY
+
+      # QR が作れなくてもプレビュー URL のコメントは出したいので、失敗しても続行する。
+      - name: Install qrencode
+        continue-on-error: true
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qrencode
+
+      # GitHub の Markdown は data: URI の画像を表示しないため、QR は R2 へ置いて参照する。
+      - name: Render and upload QR codes
+        id: qr
+        env:
+          COMMIT_SHORT_SHA: ${{ steps.vars.outputs.commit_sha }}
+          APP_PREVIEW_URL: ${{ needs.deploy-app-preview.outputs.deployment_url }}
+          STORYBOOK_PREVIEW_URL: ${{ needs.deploy-storybook-preview.outputs.deployment_url }}
+        run: |
+          # QR は補助情報なので、生成や配置に失敗してもコメント投稿までは止めない。
+          # 文字列は引数ではなく stdin へ渡し、URL が - で始まる場合でも壊れないようにする。
+          upload_qr() {
+            name="$1"
+            url="$2"
+            [ -n "$url" ] || return 0
+
+            if ! printf '%s' "$url" | qrencode -o "$name.png" -s 6 -m 2; then
+              echo "::warning::failed to render the $name QR code"
+              return 0
+            fi
+            if [ ! -s "$name.png" ]; then
+              echo "::warning::the rendered $name QR code is empty"
+              return 0
+            fi
+
+            if ! aws s3 cp "$name.png" \
+              "s3://${BUCKET_NAME}/inventia/${COMMIT_SHORT_SHA}/qr/$name.png" \
+              --endpoint-url "${S3_URL}" \
+              --content-type image/png \
+              --only-show-errors; then
+              echo "::warning::failed to upload the $name QR code"
+              return 0
+            fi
+
+            echo "${name}_qr_url=${PREVIEW_BASE_URL}/${COMMIT_SHORT_SHA}/qr/$name.png" >> "$GITHUB_OUTPUT"
+          }
+
+          upload_qr app "$APP_PREVIEW_URL"
+          upload_qr storybook "$STORYBOOK_PREVIEW_URL"
+
       - name: Create comment file
         env:
           APP_PREVIEW_URL: ${{ needs.deploy-app-preview.outputs.deployment_url }}
           STORYBOOK_PREVIEW_URL: ${{ needs.deploy-storybook-preview.outputs.deployment_url }}
+          APP_QR_URL: ${{ steps.qr.outputs.app_qr_url }}
+          STORYBOOK_QR_URL: ${{ steps.qr.outputs.storybook_qr_url }}
         run: |
-          cat << EOF > comment.md
+          # 表の1行を組み立てる。URL が無い場合も行は残し、状態が読み取れるようにする。
+          row() {
+            label="$1"
+            url="$2"
+            qr="$3"
+            if [ -z "$url" ]; then
+              printf '| %s | Not available | — |\n' "$label" >> comment.md
+              return
+            fi
+            if [ -n "$qr" ]; then
+              printf '| %s | <%s> | <img src="%s" width="120" height="120" alt="%s preview QR code"> |\n' \
+                "$label" "$url" "$qr" "$label" >> comment.md
+            else
+              printf '| %s | <%s> | — |\n' "$label" "$url" >> comment.md
+            fi
+          }
+
+          cat << 'EOF' > comment.md
           ## Deploy preview
+
+          | Target | URL | QR |
+          | --- | --- | --- |
           EOF
 
-          if [ -n "$APP_PREVIEW_URL" ]; then
-            echo "- App Preview URL: $APP_PREVIEW_URL" >> comment.md
-          else
-            echo "- App Preview URL: Not available" >> comment.md
-          fi
+          row App "$APP_PREVIEW_URL" "$APP_QR_URL"
+          row Storybook "$STORYBOOK_PREVIEW_URL" "$STORYBOOK_QR_URL"
 
-          if [ -n "$STORYBOOK_PREVIEW_URL" ]; then
-            echo "- Storybook Preview URL: $STORYBOOK_PREVIEW_URL" >> comment.md
-          else
-            echo "- Storybook Preview URL: Not available" >> comment.md
-          fi
+          cat << 'EOF' >> comment.md
+
+          スマートフォンから開く場合は QR を読み取ってください。App プレビューは Cloudflare Access のサインインを求められます。
+          EOF
 
       # push のたびにコメントが増えないよう、同じコメントを上書きしていく。
       - name: Create PR comment
         run: |
-          gh pr comment "${{ github.event.number }}" \
-            --body-file comment.md --edit-last --create-if-none
+          # GitHub API が一時的に 503 を返すことがあるため数回まで再試行する。
+          for attempt in 1 2 3; do
+            if gh pr comment "${{ github.event.number }}" \
+              --body-file comment.md --edit-last --create-if-none; then
+              exit 0
+            fi
+            sleep $((attempt * 10))
+          done
+          echo "Failed to post the preview comment after 3 attempts."
+          exit 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # comment ジョブは checkout しないため .git が無い。gh がリポジトリを
