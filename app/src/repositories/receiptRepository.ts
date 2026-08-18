@@ -1,5 +1,6 @@
 import { newId } from "../domain/id";
 import type {
+    ReceiptBaseDimension,
     ReceiptCursor,
     ReceiptExpiryConfidence,
     ReceiptExpirySource,
@@ -42,6 +43,10 @@ export interface ReceiptLineRow {
     expiryConfidence: ReceiptExpiryConfidence | null;
     // 列名は expiry_reason。domain の expiryEstimateReason と対応する
     expiryReason: string | null;
+    stockRelevant: boolean;
+    suggestedCategoryId: string | null;
+    suggestedBaseUnit: string | null;
+    suggestedBaseDimension: ReceiptBaseDimension | null;
     matchedItemId: string | null;
     // create_item の反映で使う品目 ID の先行予約。品目作成より先に書く
     pendingItemId: string | null;
@@ -63,6 +68,10 @@ export interface ReceiptLineWrite {
     expirySource: ReceiptExpirySource;
     expiryConfidence: ReceiptExpiryConfidence | null;
     expiryReason: string | null;
+    stockRelevant: boolean;
+    suggestedCategoryId: string | null;
+    suggestedBaseUnit: string | null;
+    suggestedBaseDimension: ReceiptBaseDimension | null;
 }
 
 export interface ReceiptLineMatchWrite {
@@ -137,6 +146,10 @@ const receiptLineColumns = `id,
     expiry_source AS expirySource,
     expiry_confidence AS expiryConfidence,
     expiry_reason AS expiryReason,
+    stock_relevant AS stockRelevant,
+    suggested_category_id AS suggestedCategoryId,
+    suggested_base_unit AS suggestedBaseUnit,
+    suggested_base_dimension AS suggestedBaseDimension,
     matched_item_id AS matchedItemId,
     pending_item_id AS pendingItemId,
     match_method AS matchMethod,
@@ -281,8 +294,10 @@ export const saveReceiptParseResult = async (
                     `INSERT INTO receipt_lines
                         (id, receipt_id, line_no, raw_name, completed_name, normalized_name, quantity, price,
                          printed_expiry_date, estimated_expiry_date, expiry_source,
-                         expiry_confidence, expiry_reason, created_at, updated_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14)`,
+                         expiry_confidence, expiry_reason, stock_relevant,
+                         suggested_category_id, suggested_base_unit, suggested_base_dimension,
+                         created_at, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?18)`,
                 )
                 .bind(
                     newId(),
@@ -298,6 +313,10 @@ export const saveReceiptParseResult = async (
                     line.expirySource,
                     line.expiryConfidence,
                     line.expiryReason,
+                    line.stockRelevant ? 1 : 0,
+                    line.suggestedCategoryId,
+                    line.suggestedBaseUnit,
+                    line.suggestedBaseDimension,
                     now,
                 ),
         ),

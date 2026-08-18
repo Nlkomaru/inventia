@@ -118,7 +118,7 @@ export const Route = createFileRoute("/_app/_inventory/receipts/new/")({
 });
 
 const pageClassName =
-    "mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
+    "mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
 
 const emptyIssueIndex: ReadonlyMap<
     string,

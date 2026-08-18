@@ -325,11 +325,13 @@ export const receiptExpiryDateToLotExpiry = (
     return new Date(parsed - utcOffsetMinutes * 60_000).toISOString();
 };
 
+// 末尾のタイムゾーン指定は任意で受ける。レシートの印字に時差の情報は無く、
+// モデルが Z や +09:00 を足して返すことがあるため、付いていても捨てて現地時刻として読む
 const localDateTimePattern =
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/u;
+    /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)(?:Z|[+-]\d{2}:?\d{2})?$/u;
 
 /**
- * レシート記載のタイムゾーンなし日時を UTC へ変換する。
+ * レシート記載の日時を UTC へ変換する。
  * レシートは購入地の現地時刻で印字されるため、この在庫システムの運用地である
  * Asia/Tokyo (+09:00) として解釈する。解釈できない値は null を返す。
  */
@@ -337,7 +339,12 @@ export const receiptLocalDateTimeToUtc = (
     value: string | null,
     utcOffsetMinutes = receiptLocalUtcOffsetMinutes,
 ): string | null => {
-    if (value === null || !localDateTimePattern.test(value)) {
+    const matched = value === null ? null : localDateTimePattern.exec(value);
+    if (matched === null) {
+        return null;
+    }
+    value = matched[1] ?? null;
+    if (value === null) {
         return null;
     }
     const parsed = Date.parse(`${value}Z`);

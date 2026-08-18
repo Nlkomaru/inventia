@@ -73,33 +73,45 @@ export const actionLabels: Record<ReceiptReviewAction, string> = {
     skip: "この行は取り込まない",
 };
 
-const emptyNewItem = (rawName: string): ReceiptReviewNewItemForm => ({
-    name: rawName.trim().slice(0, reviewItemNameMax),
-    categoryId: "",
+// 解析が返した提案を初期値にする。保管場所はレシートから決まらないため空のまま
+const suggestedNewItem = (line: ReceiptLineDto): ReceiptReviewNewItemForm => ({
+    name: (line.completedName ?? line.rawName)
+        .trim()
+        .slice(0, reviewItemNameMax),
+    categoryId: line.suggestedCategoryId ?? "",
     locationId: "",
-    baseUnit: "",
-    baseDimension: "",
+    baseUnit: line.suggestedBaseUnit ?? "",
+    baseDimension: line.suggestedBaseDimension ?? "",
     memo: "",
 });
 
 /**
+ * 既定の反映方法。照合済みなら既存品目へ加算、未照合でも在庫に置く品物なら
+ * 新規作成を既定にする。レジ袋や送料のように在庫へ置かない行はスキップにする。
+ */
+const resolveInitialAction = (line: ReceiptLineDto): ReceiptReviewAction => {
+    if (line.matchedItemId !== null) {
+        return "add_to_item";
+    }
+    return line.stockRelevant ? "create_item" : "skip";
+};
+
+/**
  * 明細 1 行分の初期フォーム状態。
- * 類似度だけで自動確定しないため、照合が確定していない行は既定でスキップにする
- * （承認せずに送信しても在庫が動かない状態を既定にする）。
+ * 類似度だけで自動確定しないため、照合が確定していない行は既存品目へ加算しない。
  */
 export const createReviewRow = (line: ReceiptLineDto): ReceiptReviewRow => ({
     lineId: line.id,
     lineNo: line.lineNo,
     rawName: line.rawName,
-    action: line.matchedItemId === null ? "skip" : "add_to_item",
+    action: resolveInitialAction(line),
     itemId: line.matchedItemId ?? "",
     quantity: String(line.quantity),
     price: line.price === null ? "" : String(line.price),
     expiryMode: line.suggestedExpiryDate === null ? "none" : "date",
     expiryDate: line.suggestedExpiryDate ?? "",
     registerAlias: true,
-    // 印字が途切れていた行は補完名を初期値にする。表記辞書の見出しは rawName のまま
-    newItem: emptyNewItem(line.completedName ?? line.rawName),
+    newItem: suggestedNewItem(line),
 });
 
 export const createReviewRows = (

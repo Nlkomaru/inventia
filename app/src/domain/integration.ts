@@ -33,18 +33,16 @@ export const openRouterIntegrationUpdateSchema = z
         apiKey: openRouterApiKeySchema.optional(),
         chatModel: openRouterChatModelSchema.optional(),
         receiptPrompt: receiptParsePromptSchema.nullable().optional(),
-        receiptToolsEnabled: z.boolean().optional(),
     })
     .strict()
     .refine(
         (value) =>
             value.apiKey !== undefined ||
             value.chatModel !== undefined ||
-            value.receiptPrompt !== undefined ||
-            value.receiptToolsEnabled !== undefined,
+            value.receiptPrompt !== undefined,
         {
             message:
-                "apiKey、chatModel、receiptPrompt、receiptToolsEnabled のいずれかを指定してください。API key を入力しなくても他の設定だけ保存できます。",
+                "apiKey、chatModel、receiptPrompt のいずれかを指定してください。API key を入力しなくても他の設定だけ保存できます。",
         },
     );
 
@@ -59,7 +57,6 @@ export const openRouterIntegrationStatusSchema = z
         // 解析へ実際に渡る指示。未設定なら既定の内容がそのまま入る
         receiptPrompt: z.string().min(1),
         receiptPromptConfigured: z.boolean(),
-        receiptToolsEnabled: z.boolean(),
         updatedAt: z.string().datetime().nullable(),
     })
     .strict();
