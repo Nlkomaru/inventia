@@ -4,9 +4,7 @@
         "packages": [
             {
                 "name": "type-fest",
-                "versions": [
-                    "5.8.0"
-                ],
+                "versions": ["5.8.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/type-fest#readme"
             }
@@ -17,9 +15,7 @@
         "packages": [
             {
                 "name": "tslib",
-                "versions": [
-                    "2.8.1"
-                ],
+                "versions": ["2.8.1"],
                 "author": "Microsoft Corp.",
                 "homepage": "https://www.typescriptlang.org/"
             }
@@ -30,49 +26,36 @@
         "packages": [
             {
                 "name": "baseline-browser-mapping",
-                "versions": [
-                    "2.11.12"
-                ],
+                "versions": ["2.11.12"],
                 "homepage": "https://github.com/web-platform-dx/baseline-browser-mapping#readme"
             },
             {
                 "name": "class-variance-authority",
-                "versions": [
-                    "0.7.1"
-                ],
+                "versions": ["0.7.1"],
                 "author": "Joe Bell",
                 "homepage": "https://github.com/joe-bell/cva#readme"
             },
             {
                 "name": "detect-libc",
-                "versions": [
-                    "2.1.2"
-                ],
+                "versions": ["2.1.2"],
                 "author": "Lovell Fuller",
                 "homepage": "https://github.com/lovell/detect-libc#readme"
             },
             {
                 "name": "drizzle-orm",
-                "versions": [
-                    "0.45.2"
-                ],
+                "versions": ["0.45.2"],
                 "author": "Drizzle Team",
                 "homepage": "https://orm.drizzle.team/"
             },
             {
                 "name": "human-signals",
-                "versions": [
-                    "2.1.0",
-                    "8.0.1"
-                ],
+                "versions": ["2.1.0", "8.0.1"],
                 "author": "ehmicky",
                 "homepage": "https://www.github.com/ehmicky/human-signals"
             },
             {
                 "name": "typescript",
-                "versions": [
-                    "6.0.3"
-                ],
+                "versions": ["6.0.3"],
                 "author": "Microsoft Corp.",
                 "homepage": "https://www.typescriptlang.org/"
             }
@@ -83,17 +66,13 @@
         "packages": [
             {
                 "name": "isexe",
-                "versions": [
-                    "3.1.5"
-                ],
+                "versions": ["3.1.5"],
                 "author": "Isaac Z. Schlueter",
                 "homepage": "https://github.com/isaacs/isexe#readme"
             },
             {
                 "name": "minimatch",
-                "versions": [
-                    "10.2.6"
-                ],
+                "versions": ["10.2.6"],
                 "author": "Isaac Z. Schlueter",
                 "homepage": "https://github.com/isaacs/minimatch#readme"
             }
@@ -104,33 +83,24 @@
         "packages": [
             {
                 "name": "dotenv",
-                "versions": [
-                    "17.4.2"
-                ],
+                "versions": ["17.4.2"],
                 "homepage": "https://github.com/motdotla/dotenv#readme"
             },
             {
                 "name": "esprima",
-                "versions": [
-                    "4.0.1"
-                ],
+                "versions": ["4.0.1"],
                 "author": "Ariya Hidayat",
                 "homepage": "http://esprima.org/"
             },
             {
                 "name": "json-schema-typed",
-                "versions": [
-                    "7.0.3",
-                    "8.0.2"
-                ],
+                "versions": ["7.0.3", "8.0.2"],
                 "author": "Remy Rylan",
                 "homepage": "https://github.com/RemyRylan/json-schema-typed/tree/main/dist/node"
             },
             {
                 "name": "stringify-object",
-                "versions": [
-                    "5.0.0"
-                ],
+                "versions": ["5.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/yeoman/stringify-object#readme"
             }
@@ -141,56 +111,41 @@
         "packages": [
             {
                 "name": "@dotenvx/dotenvx",
-                "versions": [
-                    "1.75.1"
-                ],
+                "versions": ["1.75.1"],
                 "author": "@motdotla",
                 "homepage": "https://github.com/dotenvx/dotenvx"
             },
             {
                 "name": "@dotenvx/primitives",
-                "versions": [
-                    "0.8.0"
-                ],
+                "versions": ["0.8.0"],
                 "author": "@motdotla",
                 "homepage": "https://github.com/dotenvx/dotenvx"
             },
             {
                 "name": "diff",
-                "versions": [
-                    "8.0.4"
-                ],
+                "versions": ["8.0.4"],
                 "homepage": "https://github.com/kpdecker/jsdiff#readme"
             },
             {
                 "name": "fast-uri",
-                "versions": [
-                    "3.1.5"
-                ],
+                "versions": ["3.1.5"],
                 "author": "Vincent Le Goff",
                 "homepage": "https://github.com/fastify/fast-uri"
             },
             {
                 "name": "qs",
-                "versions": [
-                    "6.15.3"
-                ],
+                "versions": ["6.15.3"],
                 "homepage": "https://github.com/ljharb/qs"
             },
             {
                 "name": "source-map",
-                "versions": [
-                    "0.6.1",
-                    "0.7.6"
-                ],
+                "versions": ["0.6.1", "0.7.6"],
                 "author": "Nick Fitzgerald",
                 "homepage": "https://github.com/mozilla/source-map"
             },
             {
                 "name": "source-map-js",
-                "versions": [
-                    "1.2.1"
-                ],
+                "versions": ["1.2.1"],
                 "author": "Valentin 7rulnik Semirulnik",
                 "homepage": "https://github.com/7rulnik/source-map-js"
             }
@@ -201,9 +156,7 @@
         "packages": [
             {
                 "name": "caniuse-lite",
-                "versions": [
-                    "1.0.30001806"
-                ],
+                "versions": ["1.0.30001806"],
                 "author": "Ben Briggs",
                 "homepage": "https://github.com/browserslist/caniuse-lite#readme"
             }
@@ -214,162 +167,119 @@
         "packages": [
             {
                 "name": "ansis",
-                "versions": [
-                    "4.3.1"
-                ],
+                "versions": ["4.3.1"],
                 "author": "webdiscus",
                 "homepage": "https://github.com/webdiscus/ansis#readme"
             },
             {
                 "name": "electron-to-chromium",
-                "versions": [
-                    "1.5.402"
-                ],
+                "versions": ["1.5.402"],
                 "author": "Kilian Valkhof",
                 "homepage": "https://github.com/Kilian/electron-to-chromium#readme"
             },
             {
                 "name": "fastq",
-                "versions": [
-                    "1.20.1"
-                ],
+                "versions": ["1.20.1"],
                 "author": "Matteo Collina",
                 "homepage": "https://github.com/mcollina/fastq#readme"
             },
             {
                 "name": "glob-parent",
-                "versions": [
-                    "5.1.2"
-                ],
+                "versions": ["5.1.2"],
                 "author": "Gulp Team",
                 "homepage": "https://github.com/gulpjs/glob-parent#readme"
             },
             {
                 "name": "graceful-fs",
-                "versions": [
-                    "4.2.11"
-                ],
+                "versions": ["4.2.11"],
                 "homepage": "https://github.com/isaacs/node-graceful-fs#readme"
             },
             {
                 "name": "inherits",
-                "versions": [
-                    "2.0.4"
-                ],
+                "versions": ["2.0.4"],
                 "homepage": "https://github.com/isaacs/inherits#readme"
             },
             {
                 "name": "isexe",
-                "versions": [
-                    "2.0.0"
-                ],
+                "versions": ["2.0.0"],
                 "author": "Isaac Z. Schlueter",
                 "homepage": "https://github.com/isaacs/isexe#readme"
             },
             {
                 "name": "lru-cache",
-                "versions": [
-                    "5.1.1"
-                ],
+                "versions": ["5.1.1"],
                 "author": "Isaac Z. Schlueter",
                 "homepage": "https://github.com/isaacs/node-lru-cache#readme"
             },
             {
                 "name": "lucide-react",
-                "versions": [
-                    "1.31.0"
-                ],
+                "versions": ["1.31.0"],
                 "author": "Eric Fennis",
                 "homepage": "https://lucide.dev/"
             },
             {
                 "name": "once",
-                "versions": [
-                    "1.4.0"
-                ],
+                "versions": ["1.4.0"],
                 "author": "Isaac Z. Schlueter",
                 "homepage": "https://github.com/isaacs/once#readme"
             },
             {
                 "name": "picocolors",
-                "versions": [
-                    "1.1.1"
-                ],
+                "versions": ["1.1.1"],
                 "author": "Alexey Raspopov",
                 "homepage": "https://github.com/alexeyraspopov/picocolors#readme"
             },
             {
                 "name": "semver",
-                "versions": [
-                    "6.3.1",
-                    "7.8.5"
-                ],
+                "versions": ["6.3.1", "7.8.5"],
                 "author": "GitHub Inc.",
                 "homepage": "https://github.com/npm/node-semver#readme"
             },
             {
                 "name": "setprototypeof",
-                "versions": [
-                    "1.2.0"
-                ],
+                "versions": ["1.2.0"],
                 "author": "Wes Todd",
                 "homepage": "https://github.com/wesleytodd/setprototypeof"
             },
             {
                 "name": "signal-exit",
-                "versions": [
-                    "3.0.7",
-                    "4.1.0"
-                ],
+                "versions": ["3.0.7", "4.1.0"],
                 "author": "Ben Coe",
                 "homepage": "https://github.com/tapjs/signal-exit#readme"
             },
             {
                 "name": "validate-npm-package-name",
-                "versions": [
-                    "7.0.2"
-                ],
+                "versions": ["7.0.2"],
                 "author": "GitHub Inc.",
                 "homepage": "https://github.com/npm/validate-npm-package-name"
             },
             {
                 "name": "which",
-                "versions": [
-                    "2.0.2",
-                    "4.0.0"
-                ],
+                "versions": ["2.0.2", "4.0.0"],
                 "author": "GitHub Inc.",
                 "homepage": "https://github.com/npm/node-which#readme"
             },
             {
                 "name": "wrappy",
-                "versions": [
-                    "1.0.2"
-                ],
+                "versions": ["1.0.2"],
                 "author": "Isaac Z. Schlueter",
                 "homepage": "https://github.com/npm/wrappy"
             },
             {
                 "name": "yallist",
-                "versions": [
-                    "3.1.1"
-                ],
+                "versions": ["3.1.1"],
                 "author": "Isaac Z. Schlueter",
                 "homepage": "https://github.com/isaacs/yallist#readme"
             },
             {
                 "name": "yaml",
-                "versions": [
-                    "2.9.0"
-                ],
+                "versions": ["2.9.0"],
                 "author": "Eemeli Aro",
                 "homepage": "https://eemeli.org/yaml/"
             },
             {
                 "name": "zod-to-json-schema",
-                "versions": [
-                    "3.25.2"
-                ],
+                "versions": ["3.25.2"],
                 "author": "Stefan Terdell",
                 "homepage": "https://github.com/StefanTerdell/zod-to-json-schema#readme"
             }
@@ -380,2857 +290,2129 @@
         "packages": [
             {
                 "name": "@asteasolutions/zod-to-openapi",
-                "versions": [
-                    "8.5.0"
-                ],
+                "versions": ["8.5.0"],
                 "author": "Astea Solutions",
                 "homepage": "https://github.com/asteasolutions/zod-to-openapi"
             },
             {
                 "name": "@babel/code-frame",
-                "versions": [
-                    "7.27.1",
-                    "7.29.7"
-                ],
+                "versions": ["7.27.1", "7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-code-frame"
             },
             {
                 "name": "@babel/compat-data",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://github.com/babel/babel#readme"
             },
             {
                 "name": "@babel/core",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-core"
             },
             {
                 "name": "@babel/generator",
-                "versions": [
-                    "7.29.8"
-                ],
+                "versions": ["7.29.8"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-generator"
             },
             {
                 "name": "@babel/helper-annotate-as-pure",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-helper-annotate-as-pure"
             },
             {
                 "name": "@babel/helper-compilation-targets",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://github.com/babel/babel#readme"
             },
             {
                 "name": "@babel/helper-create-class-features-plugin",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://github.com/babel/babel#readme"
             },
             {
                 "name": "@babel/helper-globals",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://github.com/babel/babel#readme"
             },
             {
                 "name": "@babel/helper-member-expression-to-functions",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-helper-member-expression-to-functions"
             },
             {
                 "name": "@babel/helper-module-imports",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-helper-module-imports"
             },
             {
                 "name": "@babel/helper-module-transforms",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-helper-module-transforms"
             },
             {
                 "name": "@babel/helper-optimise-call-expression",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-helper-optimise-call-expression"
             },
             {
                 "name": "@babel/helper-plugin-utils",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-helper-plugin-utils"
             },
             {
                 "name": "@babel/helper-replace-supers",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-helper-replace-supers"
             },
             {
                 "name": "@babel/helper-skip-transparent-expression-wrappers",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://github.com/babel/babel#readme"
             },
             {
                 "name": "@babel/helper-string-parser",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-helper-string-parser"
             },
             {
                 "name": "@babel/helper-validator-identifier",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://github.com/babel/babel#readme"
             },
             {
                 "name": "@babel/helper-validator-option",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://github.com/babel/babel#readme"
             },
             {
                 "name": "@babel/helpers",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-helpers"
             },
             {
                 "name": "@babel/parser",
-                "versions": [
-                    "7.29.8"
-                ],
+                "versions": ["7.29.8"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-parser"
             },
             {
                 "name": "@babel/plugin-syntax-jsx",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-plugin-syntax-jsx"
             },
             {
                 "name": "@babel/plugin-syntax-typescript",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-plugin-syntax-typescript"
             },
             {
                 "name": "@babel/plugin-transform-modules-commonjs",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-plugin-transform-modules-commonjs"
             },
             {
                 "name": "@babel/plugin-transform-typescript",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-plugin-transform-typescript"
             },
             {
                 "name": "@babel/preset-typescript",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-preset-typescript"
             },
             {
                 "name": "@babel/runtime",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-runtime"
             },
             {
                 "name": "@babel/template",
-                "versions": [
-                    "7.29.7"
-                ],
+                "versions": ["7.29.7"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-template"
             },
             {
                 "name": "@babel/traverse",
-                "versions": [
-                    "7.29.8"
-                ],
+                "versions": ["7.29.8"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-traverse"
             },
             {
                 "name": "@babel/types",
-                "versions": [
-                    "7.29.8"
-                ],
+                "versions": ["7.29.8"],
                 "author": "The Babel Team",
                 "homepage": "https://babel.dev/docs/en/next/babel-types"
             },
             {
                 "name": "@base-ui/react",
-                "versions": [
-                    "1.7.0"
-                ],
+                "versions": ["1.7.0"],
                 "author": "MUI Team",
                 "homepage": "https://base-ui.com/"
             },
             {
                 "name": "@base-ui/utils",
-                "versions": [
-                    "0.3.2"
-                ],
+                "versions": ["0.3.2"],
                 "author": "MUI Team",
                 "homepage": "https://github.com/mui/base-ui#readme"
             },
             {
                 "name": "@esbuild/linux-x64",
-                "versions": [
-                    "0.28.1"
-                ],
+                "versions": ["0.28.1"],
                 "homepage": "https://github.com/evanw/esbuild#readme"
             },
             {
                 "name": "@floating-ui/core",
-                "versions": [
-                    "1.8.0"
-                ],
+                "versions": ["1.8.0"],
                 "author": "atomiks",
                 "homepage": "https://floating-ui.com/"
             },
             {
                 "name": "@floating-ui/dom",
-                "versions": [
-                    "1.8.0"
-                ],
+                "versions": ["1.8.0"],
                 "author": "atomiks",
                 "homepage": "https://floating-ui.com/"
             },
             {
                 "name": "@floating-ui/react-dom",
-                "versions": [
-                    "2.1.9"
-                ],
+                "versions": ["2.1.9"],
                 "author": "atomiks",
                 "homepage": "https://floating-ui.com/docs/react-dom"
             },
             {
                 "name": "@floating-ui/utils",
-                "versions": [
-                    "0.2.12"
-                ],
+                "versions": ["0.2.12"],
                 "author": "atomiks",
                 "homepage": "https://floating-ui.com/"
             },
             {
                 "name": "@hono/mcp",
-                "versions": [
-                    "0.3.1"
-                ],
+                "versions": ["0.3.1"],
                 "homepage": "https://honohub.dev/docs/hono-mcp"
             },
             {
                 "name": "@hono/node-server",
-                "versions": [
-                    "2.1.0"
-                ],
+                "versions": ["2.1.0"],
                 "author": "Yusuke Wada",
                 "homepage": "https://github.com/honojs/node-server"
             },
             {
                 "name": "@hono/zod-openapi",
-                "versions": [
-                    "1.5.1"
-                ],
+                "versions": ["1.5.1"],
                 "homepage": "https://github.com/honojs/middleware"
             },
             {
                 "name": "@hono/zod-validator",
-                "versions": [
-                    "0.9.0"
-                ],
+                "versions": ["0.9.0"],
                 "homepage": "https://github.com/honojs/middleware"
             },
             {
                 "name": "@jridgewell/gen-mapping",
-                "versions": [
-                    "0.3.13"
-                ],
+                "versions": ["0.3.13"],
                 "author": "Justin Ridgewell",
                 "homepage": "https://github.com/jridgewell/sourcemaps/tree/main/packages/gen-mapping"
             },
             {
                 "name": "@jridgewell/remapping",
-                "versions": [
-                    "2.3.5"
-                ],
+                "versions": ["2.3.5"],
                 "author": "Justin Ridgewell",
                 "homepage": "https://github.com/jridgewell/sourcemaps/tree/main/packages/remapping"
             },
             {
                 "name": "@jridgewell/resolve-uri",
-                "versions": [
-                    "3.1.2"
-                ],
+                "versions": ["3.1.2"],
                 "author": "Justin Ridgewell",
                 "homepage": "https://github.com/jridgewell/resolve-uri#readme"
             },
             {
                 "name": "@jridgewell/sourcemap-codec",
-                "versions": [
-                    "1.5.5"
-                ],
+                "versions": ["1.5.5"],
                 "author": "Justin Ridgewell",
                 "homepage": "https://github.com/jridgewell/sourcemaps/tree/main/packages/sourcemap-codec"
             },
             {
                 "name": "@jridgewell/trace-mapping",
-                "versions": [
-                    "0.3.31"
-                ],
+                "versions": ["0.3.31"],
                 "author": "Justin Ridgewell",
                 "homepage": "https://github.com/jridgewell/sourcemaps/tree/main/packages/trace-mapping"
             },
             {
                 "name": "@modelcontextprotocol/sdk",
-                "versions": [
-                    "1.30.0"
-                ],
+                "versions": ["1.30.0"],
                 "author": "Anthropic, PBC",
                 "homepage": "https://modelcontextprotocol.io/"
             },
             {
                 "name": "@neodrag/core",
-                "versions": [
-                    "3.0.0-next.11"
-                ],
+                "versions": ["3.0.0-next.11"],
                 "author": "Puru Vijay",
                 "homepage": "https://github.com/PuruVJ/neodrag#readme"
             },
             {
                 "name": "@neodrag/solid",
-                "versions": [
-                    "3.0.0-next.11"
-                ],
+                "versions": ["3.0.0-next.11"],
                 "author": "Puru Vijay",
                 "homepage": "https://github.com/PuruVJ/neodrag/tree/main/packages/solid#readme"
             },
             {
                 "name": "@nodelib/fs.scandir",
-                "versions": [
-                    "2.1.5"
-                ],
+                "versions": ["2.1.5"],
                 "homepage": "https://github.com/nodelib/nodelib/tree/master#readme"
             },
             {
                 "name": "@nodelib/fs.stat",
-                "versions": [
-                    "2.0.5"
-                ],
+                "versions": ["2.0.5"],
                 "homepage": "https://github.com/nodelib/nodelib/tree/master#readme"
             },
             {
                 "name": "@nodelib/fs.walk",
-                "versions": [
-                    "1.2.8"
-                ],
+                "versions": ["1.2.8"],
                 "homepage": "https://github.com/nodelib/nodelib/tree/master#readme"
             },
             {
                 "name": "@oozcitak/dom",
-                "versions": [
-                    "2.0.2"
-                ],
+                "versions": ["2.0.2"],
                 "author": "Ozgur Ozcitak",
                 "homepage": "http://github.com/oozcitak/dom"
             },
             {
                 "name": "@oozcitak/infra",
-                "versions": [
-                    "2.0.2"
-                ],
+                "versions": ["2.0.2"],
                 "author": "Ozgur Ozcitak",
                 "homepage": "http://github.com/oozcitak/infra"
             },
             {
                 "name": "@oozcitak/url",
-                "versions": [
-                    "3.0.0"
-                ],
+                "versions": ["3.0.0"],
                 "author": "Ozgur Ozcitak",
                 "homepage": "http://github.com/oozcitak/url"
             },
             {
                 "name": "@oozcitak/util",
-                "versions": [
-                    "10.0.0"
-                ],
+                "versions": ["10.0.0"],
                 "author": "Ozgur Ozcitak",
                 "homepage": "http://github.com/oozcitak/util"
             },
             {
                 "name": "@oxc-project/types",
-                "versions": [
-                    "0.143.0"
-                ],
+                "versions": ["0.143.0"],
                 "author": "Boshen and oxc contributors",
                 "homepage": "https://oxc.rs/"
             },
             {
                 "name": "@rolldown/binding-linux-x64-gnu",
-                "versions": [
-                    "1.2.3"
-                ],
+                "versions": ["1.2.3"],
                 "homepage": "https://rolldown.rs/"
             },
             {
                 "name": "@rolldown/pluginutils",
-                "versions": [
-                    "1.0.1"
-                ],
+                "versions": ["1.0.1"],
                 "homepage": "https://github.com/rolldown/plugins/tree/main/packages/pluginutils#readme"
             },
             {
                 "name": "@scalar/client-side-rendering",
-                "versions": [
-                    "0.3.5"
-                ],
+                "versions": ["0.3.5"],
                 "author": "Scalar",
                 "homepage": "https://github.com/scalar/scalar"
             },
             {
                 "name": "@scalar/helpers",
-                "versions": [
-                    "0.9.2"
-                ],
+                "versions": ["0.9.2"],
                 "author": "Scalar",
                 "homepage": "https://github.com/scalar/scalar"
             },
             {
                 "name": "@scalar/hono-api-reference",
-                "versions": [
-                    "0.11.12"
-                ],
+                "versions": ["0.11.12"],
                 "author": "Scalar",
                 "homepage": "https://github.com/scalar/scalar"
             },
             {
                 "name": "@scalar/schemas",
-                "versions": [
-                    "0.8.0"
-                ],
+                "versions": ["0.8.0"],
                 "author": "Scalar",
                 "homepage": "https://github.com/scalar/scalar"
             },
             {
                 "name": "@scalar/types",
-                "versions": [
-                    "0.17.0"
-                ],
+                "versions": ["0.17.0"],
                 "author": "Scalar",
                 "homepage": "https://github.com/scalar/scalar"
             },
             {
                 "name": "@scalar/validation",
-                "versions": [
-                    "0.6.2"
-                ],
+                "versions": ["0.6.2"],
                 "author": "Scalar",
                 "homepage": "https://github.com/scalar/scalar"
             },
             {
                 "name": "@sec-ant/readable-stream",
-                "versions": [
-                    "0.4.1"
-                ],
+                "versions": ["0.4.1"],
                 "author": "Ze-Zheng Wu",
                 "homepage": "https://github.com/Sec-ant/readable-stream"
             },
             {
                 "name": "@sindresorhus/merge-streams",
-                "versions": [
-                    "4.0.0"
-                ],
+                "versions": ["4.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/merge-streams#readme"
             },
             {
                 "name": "@solid-primitives/event-listener",
-                "versions": [
-                    "2.4.6"
-                ],
+                "versions": ["2.4.6"],
                 "author": "David Di Biase",
                 "homepage": "https://primitives.solidjs.community/package/event-listener"
             },
             {
                 "name": "@solid-primitives/keyboard",
-                "versions": [
-                    "1.3.7"
-                ],
+                "versions": ["1.3.7"],
                 "author": "Damian Tarnwski",
                 "homepage": "https://primitives.solidjs.community/package/keyboard"
             },
             {
                 "name": "@solid-primitives/resize-observer",
-                "versions": [
-                    "2.2.0"
-                ],
+                "versions": ["2.2.0"],
                 "author": "Moshe Udimar",
                 "homepage": "https://primitives.solidjs.community/package/resize-observer"
             },
             {
                 "name": "@solid-primitives/rootless",
-                "versions": [
-                    "1.5.4"
-                ],
+                "versions": ["1.5.4"],
                 "author": "Damian Tarnawski @thetarnav",
                 "homepage": "https://primitives.solidjs.community/package/rootless"
             },
             {
                 "name": "@solid-primitives/static-store",
-                "versions": [
-                    "0.1.4"
-                ],
+                "versions": ["0.1.4"],
                 "author": "Damian Tarnawski",
                 "homepage": "https://primitives.solidjs.community/package/static-store"
             },
             {
                 "name": "@solid-primitives/utils",
-                "versions": [
-                    "6.4.1"
-                ],
+                "versions": ["6.4.1"],
                 "author": "Damian Tarnawski @thetarnav",
                 "homepage": "https://github.com/solidjs-community/solid-primitives/tree/main/packages/utils#readme"
             },
             {
                 "name": "@tailwindcss/node",
-                "versions": [
-                    "4.3.3"
-                ],
+                "versions": ["4.3.3"],
                 "homepage": "https://tailwindcss.com/"
             },
             {
                 "name": "@tailwindcss/oxide",
-                "versions": [
-                    "4.3.3"
-                ],
+                "versions": ["4.3.3"],
                 "homepage": "https://github.com/tailwindlabs/tailwindcss#readme"
             },
             {
                 "name": "@tailwindcss/oxide-linux-x64-gnu",
-                "versions": [
-                    "4.3.3"
-                ],
+                "versions": ["4.3.3"],
                 "homepage": "https://github.com/tailwindlabs/tailwindcss#readme"
             },
             {
                 "name": "@tailwindcss/vite",
-                "versions": [
-                    "4.3.3"
-                ],
+                "versions": ["4.3.3"],
                 "homepage": "https://tailwindcss.com/"
             },
             {
                 "name": "@tanstack/devtools",
-                "versions": [
-                    "0.14.0"
-                ],
+                "versions": ["0.14.0"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/devtools"
             },
             {
                 "name": "@tanstack/devtools-client",
-                "versions": [
-                    "0.0.8"
-                ],
+                "versions": ["0.0.8"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/devtools"
             },
             {
                 "name": "@tanstack/devtools-event-bus",
-                "versions": [
-                    "0.4.2"
-                ],
+                "versions": ["0.4.2"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/devtools"
             },
             {
                 "name": "@tanstack/devtools-event-client",
-                "versions": [
-                    "0.5.0"
-                ],
+                "versions": ["0.5.0"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/devtools"
             },
             {
                 "name": "@tanstack/devtools-ui",
-                "versions": [
-                    "0.7.0"
-                ],
+                "versions": ["0.7.0"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/devtools"
             },
             {
                 "name": "@tanstack/history",
-                "versions": [
-                    "1.162.0",
-                    "1.162.1"
-                ],
+                "versions": ["1.162.0", "1.162.1"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/router"
             },
             {
+                "name": "@tanstack/query-core",
+                "versions": ["5.101.4"],
+                "author": "tannerlinsley",
+                "homepage": "https://tanstack.com/query"
+            },
+            {
                 "name": "@tanstack/react-devtools",
-                "versions": [
-                    "0.10.10"
-                ],
+                "versions": ["0.10.10"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/devtools"
             },
             {
+                "name": "@tanstack/react-query",
+                "versions": ["5.101.4"],
+                "author": "tannerlinsley",
+                "homepage": "https://tanstack.com/query"
+            },
+            {
                 "name": "@tanstack/react-router",
-                "versions": [
-                    "1.170.25"
-                ],
+                "versions": ["1.170.29"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/router"
             },
             {
                 "name": "@tanstack/react-router-devtools",
-                "versions": [
-                    "1.167.1"
-                ],
+                "versions": ["1.167.1"],
+                "author": "Tanner Linsley",
+                "homepage": "https://tanstack.com/router"
+            },
+            {
+                "name": "@tanstack/react-router-ssr-query",
+                "versions": ["1.167.1"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/router"
             },
             {
                 "name": "@tanstack/react-start",
-                "versions": [
-                    "1.168.42"
-                ],
+                "versions": ["1.168.46"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/start"
             },
             {
                 "name": "@tanstack/react-start-client",
-                "versions": [
-                    "1.168.23"
-                ],
+                "versions": ["1.168.27"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/start"
             },
             {
                 "name": "@tanstack/react-start-rsc",
-                "versions": [
-                    "0.1.41"
-                ],
+                "versions": ["0.1.45"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/start"
             },
             {
                 "name": "@tanstack/react-start-server",
-                "versions": [
-                    "1.167.30"
-                ],
+                "versions": ["1.167.34"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/start"
             },
             {
                 "name": "@tanstack/react-store",
-                "versions": [
-                    "0.9.3",
-                    "0.11.1"
-                ],
+                "versions": ["0.9.3", "0.11.1"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/store"
             },
             {
                 "name": "@tanstack/react-table",
-                "versions": [
-                    "9.1.2"
-                ],
+                "versions": ["9.1.2"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/table"
             },
             {
                 "name": "@tanstack/router-core",
-                "versions": [
-                    "1.171.17",
-                    "1.171.21"
-                ],
+                "versions": ["1.171.17", "1.171.24"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/router"
             },
             {
                 "name": "@tanstack/router-devtools-core",
-                "versions": [
-                    "1.168.1"
-                ],
+                "versions": ["1.168.1"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/router"
             },
             {
                 "name": "@tanstack/router-generator",
-                "versions": [
-                    "1.167.27"
-                ],
+                "versions": ["1.167.30"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/router"
             },
             {
                 "name": "@tanstack/router-plugin",
-                "versions": [
-                    "1.168.29"
-                ],
+                "versions": ["1.168.32"],
+                "author": "Tanner Linsley",
+                "homepage": "https://tanstack.com/router"
+            },
+            {
+                "name": "@tanstack/router-ssr-query-core",
+                "versions": ["1.169.1"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/router"
             },
             {
                 "name": "@tanstack/router-utils",
-                "versions": [
-                    "1.162.2"
-                ],
+                "versions": ["1.162.2"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/router"
             },
             {
                 "name": "@tanstack/start-client-core",
-                "versions": [
-                    "1.170.21"
-                ],
+                "versions": ["1.170.24"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/start"
             },
             {
                 "name": "@tanstack/start-fn-stubs",
-                "versions": [
-                    "1.162.0"
-                ],
+                "versions": ["1.162.0"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/start"
             },
             {
                 "name": "@tanstack/start-plugin-core",
-                "versions": [
-                    "1.171.33"
-                ],
+                "versions": ["1.171.36"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/start"
             },
             {
                 "name": "@tanstack/start-server-core",
-                "versions": [
-                    "1.169.25"
-                ],
+                "versions": ["1.169.28"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/start"
             },
             {
                 "name": "@tanstack/start-storage-context",
-                "versions": [
-                    "1.167.23"
-                ],
+                "versions": ["1.167.26"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/start"
             },
             {
                 "name": "@tanstack/store",
-                "versions": [
-                    "0.9.3",
-                    "0.11.1"
-                ],
+                "versions": ["0.9.3", "0.11.1"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/store"
             },
             {
                 "name": "@tanstack/table-core",
-                "versions": [
-                    "9.1.2"
-                ],
+                "versions": ["9.1.2"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/table"
             },
             {
                 "name": "@tanstack/virtual-file-routes",
-                "versions": [
-                    "1.162.0"
-                ],
+                "versions": ["1.162.0"],
                 "author": "Tanner Linsley",
                 "homepage": "https://tanstack.com/router"
             },
             {
                 "name": "@ts-morph/common",
-                "versions": [
-                    "0.27.0"
-                ],
+                "versions": ["0.27.0"],
                 "author": "David Sherret",
                 "homepage": "https://github.com/dsherret/ts-morph#readme"
             },
             {
                 "name": "@types/node",
-                "versions": [
-                    "22.20.1"
-                ],
+                "versions": ["22.20.1"],
                 "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node"
             },
             {
                 "name": "@types/react",
-                "versions": [
-                    "19.2.18"
-                ],
+                "versions": ["19.2.18"],
                 "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react"
             },
             {
                 "name": "@types/react-dom",
-                "versions": [
-                    "19.2.4"
-                ],
+                "versions": ["19.2.4"],
                 "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react-dom"
             },
             {
                 "name": "@types/validate-npm-package-name",
-                "versions": [
-                    "4.0.2"
-                ],
+                "versions": ["4.0.2"],
                 "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/validate-npm-package-name"
             },
             {
                 "name": "accepts",
-                "versions": [
-                    "2.0.0"
-                ],
+                "versions": ["2.0.0"],
                 "homepage": "https://github.com/jshttp/accepts#readme"
             },
             {
                 "name": "ajv",
-                "versions": [
-                    "8.20.0"
-                ],
+                "versions": ["8.20.0"],
                 "author": "Evgeny Poberezkin",
                 "homepage": "https://ajv.js.org/"
             },
             {
                 "name": "ajv-formats",
-                "versions": [
-                    "2.1.1",
-                    "3.0.1"
-                ],
+                "versions": ["2.1.1", "3.0.1"],
                 "author": "Evgeny Poberezkin",
                 "homepage": "https://github.com/ajv-validator/ajv-formats#readme"
             },
             {
                 "name": "ansi-colors",
-                "versions": [
-                    "4.1.3"
-                ],
+                "versions": ["4.1.3"],
                 "author": "Brian Woodward",
                 "homepage": "https://github.com/doowb/ansi-colors"
             },
             {
                 "name": "ansi-regex",
-                "versions": [
-                    "5.0.1",
-                    "6.2.2"
-                ],
+                "versions": ["5.0.1", "6.2.2"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/chalk/ansi-regex#readme"
             },
             {
                 "name": "ast-types",
-                "versions": [
-                    "0.16.1"
-                ],
+                "versions": ["0.16.1"],
                 "author": "Ben Newman",
                 "homepage": "http://github.com/benjamn/ast-types"
             },
             {
                 "name": "atomically",
-                "versions": [
-                    "1.7.0"
-                ],
+                "versions": ["1.7.0"],
                 "author": "Fabio Spampinato",
                 "homepage": "https://github.com/fabiospampinato/atomically#readme"
             },
             {
                 "name": "babel-dead-code-elimination",
-                "versions": [
-                    "1.0.12"
-                ],
+                "versions": ["1.0.12"],
                 "author": "pcattori",
                 "homepage": "https://github.com/pcattori/babel-dead-code-elimination#readme"
             },
             {
                 "name": "balanced-match",
-                "versions": [
-                    "4.0.4"
-                ],
+                "versions": ["4.0.4"],
                 "homepage": "https://github.com/juliangruber/balanced-match#readme"
             },
             {
                 "name": "body-parser",
-                "versions": [
-                    "2.3.0"
-                ],
+                "versions": ["2.3.0"],
                 "homepage": "https://github.com/expressjs/body-parser#readme"
             },
             {
                 "name": "brace-expansion",
-                "versions": [
-                    "5.0.9"
-                ],
+                "versions": ["5.0.9"],
                 "homepage": "https://github.com/juliangruber/brace-expansion#readme"
             },
             {
                 "name": "braces",
-                "versions": [
-                    "3.0.3"
-                ],
+                "versions": ["3.0.3"],
                 "author": "Jon Schlinkert",
                 "homepage": "https://github.com/micromatch/braces"
             },
             {
                 "name": "browserslist",
-                "versions": [
-                    "4.28.7"
-                ],
+                "versions": ["4.28.7"],
                 "author": "Andrey Sitnik",
                 "homepage": "https://github.com/browserslist/browserslist#readme"
             },
             {
                 "name": "bundle-name",
-                "versions": [
-                    "4.1.0"
-                ],
+                "versions": ["4.1.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/bundle-name#readme"
             },
             {
                 "name": "bytes",
-                "versions": [
-                    "3.1.2"
-                ],
+                "versions": ["3.1.2"],
                 "author": "TJ Holowaychuk",
                 "homepage": "https://github.com/visionmedia/bytes.js#readme"
             },
             {
                 "name": "call-bind-apply-helpers",
-                "versions": [
-                    "1.0.2"
-                ],
+                "versions": ["1.0.2"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/ljharb/call-bind-apply-helpers#readme"
             },
             {
                 "name": "call-bound",
-                "versions": [
-                    "1.0.4"
-                ],
+                "versions": ["1.0.4"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/ljharb/call-bound#readme"
             },
             {
                 "name": "callsites",
-                "versions": [
-                    "3.1.0"
-                ],
+                "versions": ["3.1.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/callsites#readme"
             },
             {
                 "name": "chalk",
-                "versions": [
-                    "5.6.2"
-                ],
+                "versions": ["5.6.2"],
                 "homepage": "https://github.com/chalk/chalk#readme"
             },
             {
                 "name": "chokidar",
-                "versions": [
-                    "5.0.0"
-                ],
+                "versions": ["5.0.0"],
                 "author": "Paul Miller",
                 "homepage": "https://github.com/paulmillr/chokidar"
             },
             {
                 "name": "cli-cursor",
-                "versions": [
-                    "5.0.0"
-                ],
+                "versions": ["5.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/cli-cursor#readme"
             },
             {
                 "name": "cli-spinners",
-                "versions": [
-                    "2.9.2"
-                ],
+                "versions": ["2.9.2"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/cli-spinners#readme"
             },
             {
                 "name": "clsx",
-                "versions": [
-                    "2.1.1"
-                ],
+                "versions": ["2.1.1"],
                 "author": "Luke Edwards",
                 "homepage": "https://github.com/lukeed/clsx#readme"
             },
             {
                 "name": "code-block-writer",
-                "versions": [
-                    "13.0.3"
-                ],
+                "versions": ["13.0.3"],
                 "author": "David Sherret",
                 "homepage": "https://github.com/dsherret/code-block-writer#readme"
             },
             {
                 "name": "commander",
-                "versions": [
-                    "11.1.0",
-                    "14.0.3"
-                ],
+                "versions": ["11.1.0", "14.0.3"],
                 "author": "TJ Holowaychuk",
                 "homepage": "https://github.com/tj/commander.js#readme"
             },
             {
                 "name": "conf",
-                "versions": [
-                    "10.2.0"
-                ],
+                "versions": ["10.2.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/conf#readme"
             },
             {
                 "name": "content-disposition",
-                "versions": [
-                    "1.1.0"
-                ],
+                "versions": ["1.1.0"],
                 "author": "Douglas Christopher Wilson",
                 "homepage": "https://github.com/jshttp/content-disposition#readme"
             },
             {
                 "name": "content-type",
-                "versions": [
-                    "1.0.5",
-                    "2.0.0"
-                ],
+                "versions": ["1.0.5", "2.0.0"],
                 "author": "Douglas Christopher Wilson",
                 "homepage": "https://github.com/jshttp/content-type#readme"
             },
             {
                 "name": "convert-source-map",
-                "versions": [
-                    "2.0.0"
-                ],
+                "versions": ["2.0.0"],
                 "author": "Thorsten Lorenz",
                 "homepage": "https://github.com/thlorenz/convert-source-map"
             },
             {
                 "name": "cookie",
-                "versions": [
-                    "0.7.2"
-                ],
+                "versions": ["0.7.2"],
                 "author": "Roman Shtylman",
                 "homepage": "https://github.com/jshttp/cookie#readme"
             },
             {
                 "name": "cookie-es",
-                "versions": [
-                    "3.1.1"
-                ],
+                "versions": ["3.1.1"],
                 "homepage": "https://github.com/unjs/cookie-es#readme"
             },
             {
                 "name": "cookie-signature",
-                "versions": [
-                    "1.2.2"
-                ],
+                "versions": ["1.2.2"],
                 "author": "TJ Holowaychuk",
                 "homepage": "https://github.com/visionmedia/node-cookie-signature#readme"
             },
             {
                 "name": "cors",
-                "versions": [
-                    "2.8.6"
-                ],
+                "versions": ["2.8.6"],
                 "author": "Troy Goode",
                 "homepage": "https://github.com/expressjs/cors#readme"
             },
             {
                 "name": "cosmiconfig",
-                "versions": [
-                    "9.0.2"
-                ],
+                "versions": ["9.0.2"],
                 "author": "Daniel Fischer",
                 "homepage": "https://github.com/cosmiconfig/cosmiconfig#readme"
             },
             {
                 "name": "cross-spawn",
-                "versions": [
-                    "7.0.6"
-                ],
+                "versions": ["7.0.6"],
                 "author": "André Cruz",
                 "homepage": "https://github.com/moxystudio/node-cross-spawn"
             },
             {
                 "name": "cssesc",
-                "versions": [
-                    "3.0.0"
-                ],
+                "versions": ["3.0.0"],
                 "author": "Mathias Bynens",
                 "homepage": "https://mths.be/cssesc"
             },
             {
                 "name": "csstype",
-                "versions": [
-                    "3.2.3"
-                ],
+                "versions": ["3.2.3"],
                 "author": "Fredrik Nicol",
                 "homepage": "https://github.com/frenic/csstype#readme"
             },
             {
                 "name": "dayjs",
-                "versions": [
-                    "1.11.21"
-                ],
+                "versions": ["1.11.21"],
                 "author": "iamkun",
                 "homepage": "https://day.js.org/"
             },
             {
                 "name": "debounce-fn",
-                "versions": [
-                    "4.0.0"
-                ],
+                "versions": ["4.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/debounce-fn#readme"
             },
             {
                 "name": "debug",
-                "versions": [
-                    "4.4.3"
-                ],
+                "versions": ["4.4.3"],
                 "author": "Josh Junon",
                 "homepage": "https://github.com/debug-js/debug#readme"
             },
             {
                 "name": "dedent",
-                "versions": [
-                    "1.7.2"
-                ],
+                "versions": ["1.7.2"],
                 "author": "Desmond Brand",
                 "homepage": "https://github.com/dmnd/dedent"
             },
             {
                 "name": "deepmerge",
-                "versions": [
-                    "4.3.1"
-                ],
+                "versions": ["4.3.1"],
                 "homepage": "https://github.com/TehShrike/deepmerge"
             },
             {
                 "name": "default-browser",
-                "versions": [
-                    "5.5.0"
-                ],
+                "versions": ["5.5.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/default-browser#readme"
             },
             {
                 "name": "default-browser-id",
-                "versions": [
-                    "5.0.1"
-                ],
+                "versions": ["5.0.1"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/default-browser-id#readme"
             },
             {
                 "name": "define-lazy-prop",
-                "versions": [
-                    "2.0.0",
-                    "3.0.0"
-                ],
+                "versions": ["2.0.0", "3.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/define-lazy-prop#readme"
             },
             {
                 "name": "depd",
-                "versions": [
-                    "2.0.0"
-                ],
+                "versions": ["2.0.0"],
                 "author": "Douglas Christopher Wilson",
                 "homepage": "https://github.com/dougwilson/nodejs-depd#readme"
             },
             {
                 "name": "dot-prop",
-                "versions": [
-                    "6.0.1"
-                ],
+                "versions": ["6.0.1"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/dot-prop#readme"
             },
             {
                 "name": "dunder-proto",
-                "versions": [
-                    "1.0.1"
-                ],
+                "versions": ["1.0.1"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/es-shims/dunder-proto#readme"
             },
             {
                 "name": "ee-first",
-                "versions": [
-                    "1.1.1"
-                ],
+                "versions": ["1.1.1"],
                 "author": "Jonathan Ong",
                 "homepage": "https://github.com/jonathanong/ee-first#readme"
             },
             {
                 "name": "emoji-regex",
-                "versions": [
-                    "10.6.0"
-                ],
+                "versions": ["10.6.0"],
                 "author": "Mathias Bynens",
                 "homepage": "https://mths.be/emoji-regex"
             },
             {
                 "name": "encodeurl",
-                "versions": [
-                    "2.0.0"
-                ],
+                "versions": ["2.0.0"],
                 "homepage": "https://github.com/pillarjs/encodeurl#readme"
             },
             {
                 "name": "enhanced-resolve",
-                "versions": [
-                    "5.24.5"
-                ],
+                "versions": ["5.24.5"],
                 "author": "Tobias Koppers @sokra",
                 "homepage": "https://github.com/webpack/enhanced-resolve#readme"
             },
             {
                 "name": "enquirer",
-                "versions": [
-                    "2.4.1"
-                ],
+                "versions": ["2.4.1"],
                 "author": "Jon Schlinkert",
                 "homepage": "https://github.com/enquirer/enquirer"
             },
             {
                 "name": "env-paths",
-                "versions": [
-                    "2.2.1"
-                ],
+                "versions": ["2.2.1"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/env-paths#readme"
             },
             {
                 "name": "error-ex",
-                "versions": [
-                    "1.3.4"
-                ],
+                "versions": ["1.3.4"],
                 "homepage": "https://github.com/qix-/node-error-ex#readme"
             },
             {
                 "name": "es-define-property",
-                "versions": [
-                    "1.0.1"
-                ],
+                "versions": ["1.0.1"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/ljharb/es-define-property#readme"
             },
             {
                 "name": "es-errors",
-                "versions": [
-                    "1.3.0"
-                ],
+                "versions": ["1.3.0"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/ljharb/es-errors#readme"
             },
             {
                 "name": "es-object-atoms",
-                "versions": [
-                    "1.1.2"
-                ],
+                "versions": ["1.1.2"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/ljharb/es-object-atoms#readme"
             },
             {
                 "name": "esbuild",
-                "versions": [
-                    "0.28.1"
-                ],
+                "versions": ["0.28.1"],
                 "homepage": "https://github.com/evanw/esbuild#readme"
             },
             {
                 "name": "escalade",
-                "versions": [
-                    "3.2.0"
-                ],
+                "versions": ["3.2.0"],
                 "author": "Luke Edwards",
                 "homepage": "https://github.com/lukeed/escalade#readme"
             },
             {
                 "name": "escape-html",
-                "versions": [
-                    "1.0.3"
-                ],
+                "versions": ["1.0.3"],
                 "homepage": "https://github.com/component/escape-html#readme"
             },
             {
                 "name": "etag",
-                "versions": [
-                    "1.8.1"
-                ],
+                "versions": ["1.8.1"],
                 "homepage": "https://github.com/jshttp/etag#readme"
             },
             {
                 "name": "eventsource",
-                "versions": [
-                    "3.0.7"
-                ],
+                "versions": ["3.0.7"],
                 "author": "Espen Hovlandsdal",
                 "homepage": "https://github.com/EventSource/eventsource#readme"
             },
             {
                 "name": "eventsource-parser",
-                "versions": [
-                    "3.1.0"
-                ],
+                "versions": ["3.1.0"],
                 "author": "Espen Hovlandsdal",
                 "homepage": "https://github.com/rexxars/eventsource-parser#readme"
             },
             {
                 "name": "execa",
-                "versions": [
-                    "5.1.1",
-                    "9.6.1"
-                ],
+                "versions": ["5.1.1", "9.6.1"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/execa#readme"
             },
             {
                 "name": "express",
-                "versions": [
-                    "5.2.1"
-                ],
+                "versions": ["5.2.1"],
                 "author": "TJ Holowaychuk",
                 "homepage": "https://expressjs.com/"
             },
             {
                 "name": "express-rate-limit",
-                "versions": [
-                    "8.6.2"
-                ],
+                "versions": ["8.6.2"],
                 "author": "Nathan Friedly",
                 "homepage": "https://github.com/express-rate-limit/express-rate-limit"
             },
             {
                 "name": "exsolve",
-                "versions": [
-                    "1.1.1"
-                ],
+                "versions": ["1.1.1"],
                 "homepage": "https://github.com/unjs/exsolve#readme"
             },
             {
                 "name": "fast-deep-equal",
-                "versions": [
-                    "3.1.3"
-                ],
+                "versions": ["3.1.3"],
                 "author": "Evgeny Poberezkin",
                 "homepage": "https://github.com/epoberezkin/fast-deep-equal#readme"
             },
             {
                 "name": "fast-glob",
-                "versions": [
-                    "3.3.3"
-                ],
+                "versions": ["3.3.3"],
                 "author": "Denis Malinochkin",
                 "homepage": "https://github.com/mrmlnc/fast-glob#readme"
             },
             {
                 "name": "fdir",
-                "versions": [
-                    "6.5.0"
-                ],
+                "versions": ["6.5.0"],
                 "author": "thecodrr",
                 "homepage": "https://github.com/thecodrr/fdir#readme"
             },
             {
                 "name": "fetchdts",
-                "versions": [
-                    "0.1.7"
-                ],
+                "versions": ["0.1.7"],
                 "author": "Daniel Roe",
                 "homepage": "https://github.com/unjs/fetchdts#readme"
             },
             {
                 "name": "figures",
-                "versions": [
-                    "6.1.0"
-                ],
+                "versions": ["6.1.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/figures#readme"
             },
             {
                 "name": "fill-range",
-                "versions": [
-                    "7.1.1"
-                ],
+                "versions": ["7.1.1"],
                 "author": "Jon Schlinkert",
                 "homepage": "https://github.com/jonschlinkert/fill-range"
             },
             {
                 "name": "finalhandler",
-                "versions": [
-                    "2.1.1"
-                ],
+                "versions": ["2.1.1"],
                 "author": "Douglas Christopher Wilson",
                 "homepage": "https://github.com/pillarjs/finalhandler#readme"
             },
             {
                 "name": "find-up",
-                "versions": [
-                    "3.0.0"
-                ],
+                "versions": ["3.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/find-up#readme"
             },
             {
                 "name": "forwarded",
-                "versions": [
-                    "0.2.0"
-                ],
+                "versions": ["0.2.0"],
                 "homepage": "https://github.com/jshttp/forwarded#readme"
             },
             {
                 "name": "fresh",
-                "versions": [
-                    "2.0.0"
-                ],
+                "versions": ["2.0.0"],
                 "author": "TJ Holowaychuk",
                 "homepage": "https://github.com/jshttp/fresh#readme"
             },
             {
                 "name": "fs-extra",
-                "versions": [
-                    "11.4.0"
-                ],
+                "versions": ["11.4.0"],
                 "author": "JP Richardson",
                 "homepage": "https://github.com/jprichardson/node-fs-extra"
             },
             {
                 "name": "function-bind",
-                "versions": [
-                    "1.1.2"
-                ],
+                "versions": ["1.1.2"],
                 "author": "Raynos",
                 "homepage": "https://github.com/Raynos/function-bind"
             },
             {
                 "name": "fuzzysort",
-                "versions": [
-                    "3.1.0"
-                ],
+                "versions": ["3.1.0"],
                 "author": "farzher",
                 "homepage": "https://github.com/farzher/fuzzysort#readme"
             },
             {
                 "name": "gensync",
-                "versions": [
-                    "1.0.0-beta.2"
-                ],
+                "versions": ["1.0.0-beta.2"],
                 "author": "Logan Smyth",
                 "homepage": "https://github.com/loganfsmyth/gensync"
             },
             {
                 "name": "get-east-asian-width",
-                "versions": [
-                    "1.6.0"
-                ],
+                "versions": ["1.6.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/get-east-asian-width#readme"
             },
             {
                 "name": "get-intrinsic",
-                "versions": [
-                    "1.3.0"
-                ],
+                "versions": ["1.3.0"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/ljharb/get-intrinsic#readme"
             },
             {
                 "name": "get-own-enumerable-keys",
-                "versions": [
-                    "1.0.0"
-                ],
+                "versions": ["1.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/get-own-enumerable-keys#readme"
             },
             {
                 "name": "get-proto",
-                "versions": [
-                    "1.0.1"
-                ],
+                "versions": ["1.0.1"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/ljharb/get-proto#readme"
             },
             {
                 "name": "get-stream",
-                "versions": [
-                    "6.0.1",
-                    "9.0.1"
-                ],
+                "versions": ["6.0.1", "9.0.1"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/get-stream#readme"
             },
             {
                 "name": "goober",
-                "versions": [
-                    "2.1.19"
-                ],
+                "versions": ["2.1.19"],
                 "author": "Cristian",
                 "homepage": "https://github.com/cristianbote/goober#readme"
             },
             {
                 "name": "gopd",
-                "versions": [
-                    "1.2.0"
-                ],
+                "versions": ["1.2.0"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/ljharb/gopd#readme"
             },
             {
                 "name": "h3",
-                "versions": [
-                    "2.0.1-rc.20"
-                ],
+                "versions": ["2.0.1-rc.20"],
                 "homepage": "https://h3.dev/"
             },
             {
                 "name": "has-symbols",
-                "versions": [
-                    "1.1.0"
-                ],
+                "versions": ["1.1.0"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/ljharb/has-symbols#readme"
             },
             {
                 "name": "hasown",
-                "versions": [
-                    "2.0.4"
-                ],
+                "versions": ["2.0.4"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/inspect-js/hasOwn#readme"
             },
             {
                 "name": "hono",
-                "versions": [
-                    "4.13.0"
-                ],
+                "versions": ["4.13.0"],
                 "author": "Yusuke Wada",
                 "homepage": "https://hono.dev/"
             },
             {
                 "name": "hono-rate-limiter",
-                "versions": [
-                    "0.5.3"
-                ],
+                "versions": ["0.5.3"],
                 "homepage": "https://honohub.dev/docs/rate-limiter"
             },
             {
                 "name": "http-errors",
-                "versions": [
-                    "2.0.1"
-                ],
+                "versions": ["2.0.1"],
                 "author": "Jonathan Ong",
                 "homepage": "https://github.com/jshttp/http-errors#readme"
             },
             {
                 "name": "iconv-lite",
-                "versions": [
-                    "0.7.3"
-                ],
+                "versions": ["0.7.3"],
                 "author": "Alexander Shtuchkin",
                 "homepage": "https://github.com/pillarjs/iconv-lite"
             },
             {
                 "name": "ignore",
-                "versions": [
-                    "5.3.2"
-                ],
+                "versions": ["5.3.2"],
                 "author": "kael",
                 "homepage": "https://github.com/kaelzhang/node-ignore#readme"
             },
             {
                 "name": "import-fresh",
-                "versions": [
-                    "3.3.1"
-                ],
+                "versions": ["3.3.1"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/import-fresh#readme"
             },
             {
                 "name": "ip-address",
-                "versions": [
-                    "10.4.0"
-                ],
+                "versions": ["10.4.0"],
                 "author": "Beau Gunderson",
                 "homepage": "https://github.com/beaugunderson/ip-address#readme"
             },
             {
                 "name": "ipaddr.js",
-                "versions": [
-                    "1.9.1"
-                ],
+                "versions": ["1.9.1"],
                 "author": "whitequark",
                 "homepage": "https://github.com/whitequark/ipaddr.js#readme"
             },
             {
                 "name": "is-arrayish",
-                "versions": [
-                    "0.2.1"
-                ],
+                "versions": ["0.2.1"],
                 "author": "Qix",
                 "homepage": "https://github.com/qix-/node-is-arrayish#readme"
             },
             {
                 "name": "is-docker",
-                "versions": [
-                    "2.2.1",
-                    "3.0.0"
-                ],
+                "versions": ["2.2.1", "3.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/is-docker#readme"
             },
             {
                 "name": "is-extglob",
-                "versions": [
-                    "2.1.1"
-                ],
+                "versions": ["2.1.1"],
                 "author": "Jon Schlinkert",
                 "homepage": "https://github.com/jonschlinkert/is-extglob"
             },
             {
                 "name": "is-glob",
-                "versions": [
-                    "4.0.3"
-                ],
+                "versions": ["4.0.3"],
                 "author": "Jon Schlinkert",
                 "homepage": "https://github.com/micromatch/is-glob"
             },
             {
                 "name": "is-in-ssh",
-                "versions": [
-                    "1.0.0"
-                ],
+                "versions": ["1.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/is-in-ssh#readme"
             },
             {
                 "name": "is-inside-container",
-                "versions": [
-                    "1.0.0"
-                ],
+                "versions": ["1.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/is-inside-container#readme"
             },
             {
                 "name": "is-interactive",
-                "versions": [
-                    "2.0.0"
-                ],
+                "versions": ["2.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/is-interactive#readme"
             },
             {
                 "name": "is-number",
-                "versions": [
-                    "7.0.0"
-                ],
+                "versions": ["7.0.0"],
                 "author": "Jon Schlinkert",
                 "homepage": "https://github.com/jonschlinkert/is-number"
             },
             {
                 "name": "is-obj",
-                "versions": [
-                    "2.0.0",
-                    "3.0.0"
-                ],
+                "versions": ["2.0.0", "3.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/is-obj#readme"
             },
             {
                 "name": "is-plain-obj",
-                "versions": [
-                    "4.1.0"
-                ],
+                "versions": ["4.1.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/is-plain-obj#readme"
             },
             {
                 "name": "is-promise",
-                "versions": [
-                    "4.0.0"
-                ],
+                "versions": ["4.0.0"],
                 "author": "ForbesLindesay",
                 "homepage": "https://github.com/then/is-promise#readme"
             },
             {
                 "name": "is-regexp",
-                "versions": [
-                    "3.1.0"
-                ],
+                "versions": ["3.1.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/is-regexp#readme"
             },
             {
                 "name": "is-stream",
-                "versions": [
-                    "2.0.1",
-                    "4.0.1"
-                ],
+                "versions": ["2.0.1", "4.0.1"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/is-stream#readme"
             },
             {
                 "name": "is-unicode-supported",
-                "versions": [
-                    "1.3.0",
-                    "2.1.0"
-                ],
+                "versions": ["1.3.0", "2.1.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/is-unicode-supported#readme"
             },
             {
                 "name": "is-wsl",
-                "versions": [
-                    "2.2.0",
-                    "3.1.1"
-                ],
+                "versions": ["2.2.0", "3.1.1"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/is-wsl#readme"
             },
             {
                 "name": "jiti",
-                "versions": [
-                    "2.7.0"
-                ],
+                "versions": ["2.7.0"],
                 "homepage": "https://github.com/unjs/jiti#readme"
             },
             {
                 "name": "jose",
-                "versions": [
-                    "6.2.8"
-                ],
+                "versions": ["6.2.8"],
                 "author": "Filip Skokan",
                 "homepage": "https://github.com/panva/jose"
             },
             {
                 "name": "jotai",
-                "versions": [
-                    "2.20.2"
-                ],
+                "versions": ["2.20.2"],
                 "author": "Daishi Kato",
                 "homepage": "https://github.com/pmndrs/jotai"
             },
             {
                 "name": "js-tokens",
-                "versions": [
-                    "4.0.0"
-                ],
+                "versions": ["4.0.0"],
                 "author": "Simon Lydell",
                 "homepage": "https://github.com/lydell/js-tokens#readme"
             },
             {
                 "name": "js-yaml",
-                "versions": [
-                    "4.3.1"
-                ],
+                "versions": ["4.3.1"],
                 "author": "Vladimir Zapparov",
                 "homepage": "https://github.com/nodeca/js-yaml#readme"
             },
             {
                 "name": "jsesc",
-                "versions": [
-                    "3.1.0"
-                ],
+                "versions": ["3.1.0"],
                 "author": "Mathias Bynens",
                 "homepage": "https://mths.be/jsesc"
             },
             {
                 "name": "json-parse-even-better-errors",
-                "versions": [
-                    "2.3.1"
-                ],
+                "versions": ["2.3.1"],
                 "author": "Kat Marchán",
                 "homepage": "https://github.com/npm/json-parse-even-better-errors#readme"
             },
             {
                 "name": "json-schema-traverse",
-                "versions": [
-                    "1.0.0"
-                ],
+                "versions": ["1.0.0"],
                 "author": "Evgeny Poberezkin",
                 "homepage": "https://github.com/epoberezkin/json-schema-traverse#readme"
             },
             {
                 "name": "json5",
-                "versions": [
-                    "2.2.3"
-                ],
+                "versions": ["2.2.3"],
                 "author": "Aseem Kishore",
                 "homepage": "http://json5.org/"
             },
             {
                 "name": "jsonfile",
-                "versions": [
-                    "6.2.1"
-                ],
+                "versions": ["6.2.1"],
                 "author": "JP Richardson",
                 "homepage": "https://github.com/jprichardson/node-jsonfile#readme"
             },
             {
                 "name": "kleur",
-                "versions": [
-                    "3.0.3",
-                    "4.1.5"
-                ],
+                "versions": ["3.0.3", "4.1.5"],
                 "author": "Luke Edwards",
                 "homepage": "https://github.com/lukeed/kleur#readme"
             },
             {
                 "name": "lines-and-columns",
-                "versions": [
-                    "1.2.4"
-                ],
+                "versions": ["1.2.4"],
                 "author": "Brian Donovan",
                 "homepage": "https://github.com/eventualbuddha/lines-and-columns#readme"
             },
             {
                 "name": "locate-path",
-                "versions": [
-                    "3.0.0"
-                ],
+                "versions": ["3.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/locate-path#readme"
             },
             {
                 "name": "log-symbols",
-                "versions": [
-                    "6.0.0"
-                ],
+                "versions": ["6.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/log-symbols#readme"
             },
             {
                 "name": "magic-string",
-                "versions": [
-                    "0.30.21"
-                ],
+                "versions": ["0.30.21"],
                 "author": "Rich Harris",
                 "homepage": "https://github.com/Rich-Harris/magic-string#readme"
             },
             {
                 "name": "math-intrinsics",
-                "versions": [
-                    "1.1.0"
-                ],
+                "versions": ["1.1.0"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/es-shims/math-intrinsics#readme"
             },
             {
                 "name": "media-typer",
-                "versions": [
-                    "1.1.1"
-                ],
+                "versions": ["1.1.1"],
                 "author": "Douglas Christopher Wilson",
                 "homepage": "https://github.com/jshttp/media-typer#readme"
             },
             {
                 "name": "merge-descriptors",
-                "versions": [
-                    "2.0.0"
-                ],
+                "versions": ["2.0.0"],
                 "homepage": "https://github.com/sindresorhus/merge-descriptors#readme"
             },
             {
                 "name": "merge-stream",
-                "versions": [
-                    "2.0.0"
-                ],
+                "versions": ["2.0.0"],
                 "author": "Stephen Sugden",
                 "homepage": "https://github.com/grncdr/merge-stream#readme"
             },
             {
                 "name": "merge2",
-                "versions": [
-                    "1.4.1"
-                ],
+                "versions": ["1.4.1"],
                 "homepage": "https://github.com/teambition/merge2"
             },
             {
                 "name": "micromatch",
-                "versions": [
-                    "4.0.8"
-                ],
+                "versions": ["4.0.8"],
                 "author": "Jon Schlinkert",
                 "homepage": "https://github.com/micromatch/micromatch"
             },
             {
                 "name": "mime-db",
-                "versions": [
-                    "1.54.0"
-                ],
+                "versions": ["1.54.0"],
                 "homepage": "https://github.com/jshttp/mime-db#readme"
             },
             {
                 "name": "mime-types",
-                "versions": [
-                    "3.0.2"
-                ],
+                "versions": ["3.0.2"],
                 "homepage": "https://github.com/jshttp/mime-types#readme"
             },
             {
                 "name": "mimic-fn",
-                "versions": [
-                    "2.1.0",
-                    "3.1.0"
-                ],
+                "versions": ["2.1.0", "3.1.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/mimic-fn#readme"
             },
             {
                 "name": "mimic-function",
-                "versions": [
-                    "5.0.1"
-                ],
+                "versions": ["5.0.1"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/mimic-function#readme"
             },
             {
                 "name": "minimist",
-                "versions": [
-                    "1.2.8"
-                ],
+                "versions": ["1.2.8"],
                 "author": "James Halliday",
                 "homepage": "https://github.com/minimistjs/minimist"
             },
             {
                 "name": "ms",
-                "versions": [
-                    "2.1.3"
-                ],
+                "versions": ["2.1.3"],
                 "homepage": "https://github.com/vercel/ms#readme"
             },
             {
                 "name": "nanoid",
-                "versions": [
-                    "3.3.17",
-                    "5.1.16"
-                ],
+                "versions": ["3.3.17", "5.1.16"],
                 "author": "Andrey Sitnik",
                 "homepage": "https://github.com/ai/nanoid#readme"
             },
             {
                 "name": "negotiator",
-                "versions": [
-                    "1.0.0"
-                ],
+                "versions": ["1.0.0"],
                 "homepage": "https://github.com/jshttp/negotiator#readme"
             },
             {
                 "name": "node-releases",
-                "versions": [
-                    "2.0.52"
-                ],
+                "versions": ["2.0.52"],
                 "author": "Sergey Rubanov",
                 "homepage": "https://github.com/chicoxyzzy/node-releases#readme"
             },
             {
                 "name": "npm-run-path",
-                "versions": [
-                    "4.0.1",
-                    "6.0.0"
-                ],
+                "versions": ["4.0.1", "6.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/npm-run-path#readme"
             },
             {
                 "name": "object-assign",
-                "versions": [
-                    "4.1.1"
-                ],
+                "versions": ["4.1.1"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/object-assign#readme"
             },
             {
                 "name": "object-inspect",
-                "versions": [
-                    "1.13.4"
-                ],
+                "versions": ["1.13.4"],
                 "author": "James Halliday",
                 "homepage": "https://github.com/inspect-js/object-inspect"
             },
             {
                 "name": "object-treeify",
-                "versions": [
-                    "1.1.33"
-                ],
+                "versions": ["1.1.33"],
                 "author": "Lukas Siemon",
                 "homepage": "https://github.com/blackflux/object-treeify#readme"
             },
             {
                 "name": "on-finished",
-                "versions": [
-                    "2.4.1"
-                ],
+                "versions": ["2.4.1"],
                 "homepage": "https://github.com/jshttp/on-finished#readme"
             },
             {
                 "name": "onetime",
-                "versions": [
-                    "5.1.2",
-                    "7.0.0"
-                ],
+                "versions": ["5.1.2", "7.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/onetime#readme"
             },
             {
                 "name": "open",
-                "versions": [
-                    "8.4.2",
-                    "11.0.0"
-                ],
+                "versions": ["8.4.2", "11.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/open#readme"
             },
             {
                 "name": "openapi3-ts",
-                "versions": [
-                    "4.6.1"
-                ],
+                "versions": ["4.6.1"],
                 "author": "Pedro J. Molina / Metadev",
                 "homepage": "https://github.com/metadevpro/openapi3-ts#readme"
             },
             {
                 "name": "ora",
-                "versions": [
-                    "8.2.0"
-                ],
+                "versions": ["8.2.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/ora#readme"
             },
             {
                 "name": "p-limit",
-                "versions": [
-                    "2.3.0"
-                ],
+                "versions": ["2.3.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/p-limit#readme"
             },
             {
                 "name": "p-locate",
-                "versions": [
-                    "3.0.0"
-                ],
+                "versions": ["3.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/p-locate#readme"
             },
             {
                 "name": "p-try",
-                "versions": [
-                    "2.2.0"
-                ],
+                "versions": ["2.2.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/p-try#readme"
             },
             {
                 "name": "parent-module",
-                "versions": [
-                    "1.0.1"
-                ],
+                "versions": ["1.0.1"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/parent-module#readme"
             },
             {
                 "name": "parse-json",
-                "versions": [
-                    "5.2.0"
-                ],
+                "versions": ["5.2.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/parse-json#readme"
             },
             {
                 "name": "parse-ms",
-                "versions": [
-                    "4.0.0"
-                ],
+                "versions": ["4.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/parse-ms#readme"
             },
             {
                 "name": "parseurl",
-                "versions": [
-                    "1.3.3"
-                ],
+                "versions": ["1.3.3"],
                 "homepage": "https://github.com/pillarjs/parseurl#readme"
             },
             {
                 "name": "path-browserify",
-                "versions": [
-                    "1.0.1"
-                ],
+                "versions": ["1.0.1"],
                 "author": "James Halliday",
                 "homepage": "https://github.com/browserify/path-browserify"
             },
             {
                 "name": "path-exists",
-                "versions": [
-                    "3.0.0"
-                ],
+                "versions": ["3.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/path-exists#readme"
             },
             {
                 "name": "path-key",
-                "versions": [
-                    "3.1.1",
-                    "4.0.0"
-                ],
+                "versions": ["3.1.1", "4.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/path-key#readme"
             },
             {
                 "name": "path-to-regexp",
-                "versions": [
-                    "8.4.2"
-                ],
+                "versions": ["8.4.2"],
                 "homepage": "https://github.com/pillarjs/path-to-regexp#readme"
             },
             {
                 "name": "pathe",
-                "versions": [
-                    "2.0.3"
-                ],
+                "versions": ["2.0.3"],
                 "homepage": "https://github.com/unjs/pathe#readme"
             },
             {
                 "name": "picomatch",
-                "versions": [
-                    "2.3.2",
-                    "4.0.5"
-                ],
+                "versions": ["2.3.2", "4.0.5"],
                 "author": "Jon Schlinkert",
                 "homepage": "https://github.com/micromatch/picomatch"
             },
             {
                 "name": "pkce-challenge",
-                "versions": [
-                    "5.0.1"
-                ],
+                "versions": ["5.0.1"],
                 "author": "crouchcd",
                 "homepage": "https://github.com/crouchcd/pkce-challenge#readme"
             },
             {
                 "name": "pkg-up",
-                "versions": [
-                    "3.1.0"
-                ],
+                "versions": ["3.1.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/pkg-up#readme"
             },
             {
                 "name": "postcss",
-                "versions": [
-                    "8.5.25"
-                ],
+                "versions": ["8.5.25"],
                 "author": "Andrey Sitnik",
                 "homepage": "https://postcss.org/"
             },
             {
                 "name": "postcss-selector-parser",
-                "versions": [
-                    "7.1.5"
-                ],
+                "versions": ["7.1.5"],
                 "homepage": "https://github.com/postcss/postcss-selector-parser"
             },
             {
                 "name": "powershell-utils",
-                "versions": [
-                    "0.1.0"
-                ],
+                "versions": ["0.1.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/powershell-utils#readme"
             },
             {
                 "name": "prettier",
-                "versions": [
-                    "3.9.6"
-                ],
+                "versions": ["3.9.6"],
                 "author": "James Long",
                 "homepage": "https://prettier.io/"
             },
             {
                 "name": "pretty-ms",
-                "versions": [
-                    "9.3.0"
-                ],
+                "versions": ["9.3.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/pretty-ms#readme"
             },
             {
                 "name": "prompts",
-                "versions": [
-                    "2.4.2"
-                ],
+                "versions": ["2.4.2"],
                 "author": "Terkel Gjervig",
                 "homepage": "https://github.com/terkelg/prompts#readme"
             },
             {
                 "name": "proxy-addr",
-                "versions": [
-                    "2.0.7"
-                ],
+                "versions": ["2.0.7"],
                 "author": "Douglas Christopher Wilson",
                 "homepage": "https://github.com/jshttp/proxy-addr#readme"
             },
             {
                 "name": "queue-microtask",
-                "versions": [
-                    "1.2.3"
-                ],
+                "versions": ["1.2.3"],
                 "author": "Feross Aboukhadijeh",
                 "homepage": "https://github.com/feross/queue-microtask"
             },
             {
                 "name": "range-parser",
-                "versions": [
-                    "1.3.0"
-                ],
+                "versions": ["1.3.0"],
                 "author": "TJ Holowaychuk",
                 "homepage": "https://github.com/jshttp/range-parser#readme"
             },
             {
                 "name": "raw-body",
-                "versions": [
-                    "3.0.2"
-                ],
+                "versions": ["3.0.2"],
                 "author": "Jonathan Ong",
                 "homepage": "https://github.com/stream-utils/raw-body#readme"
             },
             {
                 "name": "react",
-                "versions": [
-                    "19.2.8"
-                ],
+                "versions": ["19.2.8"],
                 "homepage": "https://react.dev/"
             },
             {
                 "name": "react-dom",
-                "versions": [
-                    "19.2.8"
-                ],
+                "versions": ["19.2.8"],
                 "homepage": "https://react.dev/"
             },
             {
                 "name": "readdirp",
-                "versions": [
-                    "5.0.0"
-                ],
+                "versions": ["5.0.0"],
                 "author": "Thorsten Lorenz",
                 "homepage": "https://github.com/paulmillr/readdirp"
             },
             {
                 "name": "recast",
-                "versions": [
-                    "0.23.19"
-                ],
+                "versions": ["0.23.19"],
                 "author": "Ben Newman",
                 "homepage": "http://github.com/benjamn/recast"
             },
             {
                 "name": "require-from-string",
-                "versions": [
-                    "2.0.2"
-                ],
+                "versions": ["2.0.2"],
                 "author": "Vsevolod Strukchinsky",
                 "homepage": "https://github.com/floatdrop/require-from-string#readme"
             },
             {
                 "name": "reselect",
-                "versions": [
-                    "5.2.0"
-                ],
+                "versions": ["5.2.0"],
                 "homepage": "https://github.com/reduxjs/reselect#readme"
             },
             {
                 "name": "resolve-from",
-                "versions": [
-                    "4.0.0"
-                ],
+                "versions": ["4.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/resolve-from#readme"
             },
             {
                 "name": "restore-cursor",
-                "versions": [
-                    "5.1.0"
-                ],
+                "versions": ["5.1.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/restore-cursor#readme"
             },
             {
                 "name": "reusify",
-                "versions": [
-                    "1.1.0"
-                ],
+                "versions": ["1.1.0"],
                 "author": "Matteo Collina",
                 "homepage": "https://github.com/mcollina/reusify#readme"
             },
             {
                 "name": "rolldown",
-                "versions": [
-                    "1.2.3"
-                ],
+                "versions": ["1.2.3"],
                 "homepage": "https://rolldown.rs/"
             },
             {
                 "name": "rou3",
-                "versions": [
-                    "0.8.1"
-                ],
+                "versions": ["0.8.1"],
                 "homepage": "https://github.com/h3js/rou3#readme"
             },
             {
                 "name": "router",
-                "versions": [
-                    "2.2.0"
-                ],
+                "versions": ["2.2.0"],
                 "author": "Douglas Christopher Wilson",
                 "homepage": "https://github.com/pillarjs/router#readme"
             },
             {
                 "name": "run-applescript",
-                "versions": [
-                    "7.1.0"
-                ],
+                "versions": ["7.1.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/run-applescript#readme"
             },
             {
                 "name": "run-parallel",
-                "versions": [
-                    "1.2.0"
-                ],
+                "versions": ["1.2.0"],
                 "author": "Feross Aboukhadijeh",
                 "homepage": "https://github.com/feross/run-parallel"
             },
             {
                 "name": "safer-buffer",
-                "versions": [
-                    "2.1.2"
-                ],
+                "versions": ["2.1.2"],
                 "author": "Nikita Skovoroda",
                 "homepage": "https://github.com/ChALkeR/safer-buffer#readme"
             },
             {
                 "name": "scheduler",
-                "versions": [
-                    "0.27.0"
-                ],
+                "versions": ["0.27.0"],
                 "homepage": "https://react.dev/"
             },
             {
                 "name": "send",
-                "versions": [
-                    "1.2.1"
-                ],
+                "versions": ["1.2.1"],
                 "author": "TJ Holowaychuk",
                 "homepage": "https://github.com/pillarjs/send#readme"
             },
             {
                 "name": "seroval",
-                "versions": [
-                    "1.5.6",
-                    "1.6.2"
-                ],
+                "versions": ["1.5.6", "1.6.2"],
                 "author": "Alexis Munsayac",
                 "homepage": "https://github.com/lxsmnsyc/seroval/tree/main/packages/seroval"
             },
             {
                 "name": "seroval-plugins",
-                "versions": [
-                    "1.5.6",
-                    "1.6.2"
-                ],
+                "versions": ["1.5.6", "1.6.2"],
                 "author": "Alexis Munsayac",
                 "homepage": "https://github.com/lxsmnsyc/seroval/tree/main/packages/plugins"
             },
             {
                 "name": "serve-static",
-                "versions": [
-                    "2.2.1"
-                ],
+                "versions": ["2.2.1"],
                 "author": "Douglas Christopher Wilson",
                 "homepage": "https://github.com/expressjs/serve-static#readme"
             },
             {
                 "name": "shadcn",
-                "versions": [
-                    "4.16.2"
-                ],
+                "versions": ["4.16.2"],
                 "author": "shadcn",
                 "homepage": "https://github.com/shadcn-ui/ui#readme"
             },
             {
                 "name": "shebang-command",
-                "versions": [
-                    "2.0.0"
-                ],
+                "versions": ["2.0.0"],
                 "author": "Kevin Mårtensson",
                 "homepage": "https://github.com/kevva/shebang-command#readme"
             },
             {
                 "name": "shebang-regex",
-                "versions": [
-                    "3.0.0"
-                ],
+                "versions": ["3.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/shebang-regex#readme"
             },
             {
                 "name": "side-channel",
-                "versions": [
-                    "1.1.1"
-                ],
+                "versions": ["1.1.1"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/ljharb/side-channel#readme"
             },
             {
                 "name": "side-channel-list",
-                "versions": [
-                    "1.0.1"
-                ],
+                "versions": ["1.0.1"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/ljharb/side-channel-list#readme"
             },
             {
                 "name": "side-channel-map",
-                "versions": [
-                    "1.0.1"
-                ],
+                "versions": ["1.0.1"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/ljharb/side-channel-map#readme"
             },
             {
                 "name": "side-channel-weakmap",
-                "versions": [
-                    "1.0.2"
-                ],
+                "versions": ["1.0.2"],
                 "author": "Jordan Harband",
                 "homepage": "https://github.com/ljharb/side-channel-weakmap#readme"
             },
             {
                 "name": "sisteransi",
-                "versions": [
-                    "1.0.5"
-                ],
+                "versions": ["1.0.5"],
                 "author": "Terkel Gjervig",
                 "homepage": "https://github.com/terkelg/sisteransi#readme"
             },
             {
                 "name": "solid-js",
-                "versions": [
-                    "1.9.14"
-                ],
+                "versions": ["1.9.14"],
                 "author": "Ryan Carniato",
                 "homepage": "https://solidjs.com/"
             },
             {
                 "name": "srvx",
-                "versions": [
-                    "0.11.22"
-                ],
+                "versions": ["0.11.22"],
                 "homepage": "https://srvx.h3.dev/"
             },
             {
                 "name": "statuses",
-                "versions": [
-                    "2.0.2"
-                ],
+                "versions": ["2.0.2"],
                 "homepage": "https://github.com/jshttp/statuses#readme"
             },
             {
                 "name": "stdin-discarder",
-                "versions": [
-                    "0.2.2"
-                ],
+                "versions": ["0.2.2"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/stdin-discarder#readme"
             },
             {
                 "name": "string-width",
-                "versions": [
-                    "7.2.0"
-                ],
+                "versions": ["7.2.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/string-width#readme"
             },
             {
                 "name": "strip-ansi",
-                "versions": [
-                    "6.0.1",
-                    "7.2.0"
-                ],
+                "versions": ["6.0.1", "7.2.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/chalk/strip-ansi#readme"
             },
             {
                 "name": "strip-bom",
-                "versions": [
-                    "3.0.0"
-                ],
+                "versions": ["3.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/strip-bom#readme"
             },
             {
                 "name": "strip-final-newline",
-                "versions": [
-                    "2.0.0",
-                    "4.0.0"
-                ],
+                "versions": ["2.0.0", "4.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/strip-final-newline#readme"
             },
             {
                 "name": "supports-color",
-                "versions": [
-                    "10.2.2"
-                ],
+                "versions": ["10.2.2"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/chalk/supports-color#readme"
             },
             {
                 "name": "systeminformation",
-                "versions": [
-                    "5.33.1"
-                ],
+                "versions": ["5.33.1"],
                 "author": "Sebastian Hildebrandt",
                 "homepage": "https://systeminformation.io/"
             },
             {
                 "name": "tagged-tag",
-                "versions": [
-                    "1.0.0"
-                ],
+                "versions": ["1.0.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/tagged-tag#readme"
             },
             {
                 "name": "tailwind-merge",
-                "versions": [
-                    "3.6.0"
-                ],
+                "versions": ["3.6.0"],
                 "author": "Dany Castillo",
                 "homepage": "https://github.com/dcastil/tailwind-merge"
             },
             {
                 "name": "tailwindcss",
-                "versions": [
-                    "4.3.3"
-                ],
+                "versions": ["4.3.3"],
                 "homepage": "https://tailwindcss.com/"
             },
             {
                 "name": "tapable",
-                "versions": [
-                    "2.3.3"
-                ],
+                "versions": ["2.3.3"],
                 "author": "Tobias Koppers @sokra",
                 "homepage": "https://github.com/webpack/tapable"
             },
             {
                 "name": "tiny-invariant",
-                "versions": [
-                    "1.3.3"
-                ],
+                "versions": ["1.3.3"],
                 "author": "Alex Reardon",
                 "homepage": "https://github.com/alexreardon/tiny-invariant#readme"
             },
             {
                 "name": "tinyglobby",
-                "versions": [
-                    "0.2.17"
-                ],
+                "versions": ["0.2.17"],
                 "author": "Superchupu",
                 "homepage": "https://superchupu.dev/tinyglobby"
             },
             {
                 "name": "to-regex-range",
-                "versions": [
-                    "5.0.1"
-                ],
+                "versions": ["5.0.1"],
                 "author": "Jon Schlinkert",
                 "homepage": "https://github.com/micromatch/to-regex-range"
             },
             {
                 "name": "toidentifier",
-                "versions": [
-                    "1.0.1"
-                ],
+                "versions": ["1.0.1"],
                 "author": "Douglas Christopher Wilson",
                 "homepage": "https://github.com/component/toidentifier#readme"
             },
             {
                 "name": "ts-morph",
-                "versions": [
-                    "26.0.0"
-                ],
+                "versions": ["26.0.0"],
                 "author": "David Sherret",
                 "homepage": "https://github.com/dsherret/ts-morph#readme"
             },
             {
                 "name": "tsconfig-paths",
-                "versions": [
-                    "4.2.0"
-                ],
+                "versions": ["4.2.0"],
                 "author": "Jonas Kello",
                 "homepage": "https://github.com/dividab/tsconfig-paths#readme"
             },
             {
                 "name": "tsx",
-                "versions": [
-                    "4.23.9"
-                ],
+                "versions": ["4.23.9"],
                 "author": "Hiroki Osame",
                 "homepage": "https://tsx.hirok.io/"
             },
             {
                 "name": "tw-animate-css",
-                "versions": [
-                    "1.4.0"
-                ],
+                "versions": ["1.4.0"],
                 "author": "Luca Bosin",
                 "homepage": "https://github.com/Wombosvideo/tw-animate-css#readme"
             },
             {
                 "name": "type-is",
-                "versions": [
-                    "2.1.0"
-                ],
+                "versions": ["2.1.0"],
                 "homepage": "https://github.com/jshttp/type-is#readme"
             },
             {
                 "name": "ufo",
-                "versions": [
-                    "1.6.4"
-                ],
+                "versions": ["1.6.4"],
                 "homepage": "https://github.com/unjs/ufo#readme"
             },
             {
                 "name": "undici",
-                "versions": [
-                    "7.28.0"
-                ],
+                "versions": ["7.28.0"],
                 "homepage": "https://undici.nodejs.org/"
             },
             {
                 "name": "undici-types",
-                "versions": [
-                    "6.21.0"
-                ],
+                "versions": ["6.21.0"],
                 "homepage": "https://undici.nodejs.org/"
             },
             {
                 "name": "unicorn-magic",
-                "versions": [
-                    "0.3.0"
-                ],
+                "versions": ["0.3.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/unicorn-magic#readme"
             },
             {
                 "name": "universalify",
-                "versions": [
-                    "2.0.1"
-                ],
+                "versions": ["2.0.1"],
                 "author": "Ryan Zimmerman",
                 "homepage": "https://github.com/RyanZim/universalify#readme"
             },
             {
                 "name": "unpipe",
-                "versions": [
-                    "1.0.0"
-                ],
+                "versions": ["1.0.0"],
                 "author": "Douglas Christopher Wilson",
                 "homepage": "https://github.com/stream-utils/unpipe#readme"
             },
             {
                 "name": "unplugin",
-                "versions": [
-                    "3.3.0"
-                ],
+                "versions": ["3.3.0"],
                 "homepage": "https://unplugin.unjs.io/"
             },
             {
                 "name": "update-browserslist-db",
-                "versions": [
-                    "1.2.3"
-                ],
+                "versions": ["1.2.3"],
                 "author": "Andrey Sitnik",
                 "homepage": "https://github.com/browserslist/update-db#readme"
             },
             {
                 "name": "use-sync-external-store",
-                "versions": [
-                    "1.6.0"
-                ],
+                "versions": ["1.6.0"],
                 "homepage": "https://github.com/facebook/react#readme"
             },
             {
                 "name": "util-deprecate",
-                "versions": [
-                    "1.0.2"
-                ],
+                "versions": ["1.0.2"],
                 "author": "Nathan Rajlich",
                 "homepage": "https://github.com/TooTallNate/util-deprecate"
             },
             {
                 "name": "uuid",
-                "versions": [
-                    "14.0.1"
-                ],
+                "versions": ["14.0.1"],
                 "homepage": "https://github.com/uuidjs/uuid#readme"
             },
             {
                 "name": "vary",
-                "versions": [
-                    "1.1.2"
-                ],
+                "versions": ["1.1.2"],
                 "author": "Douglas Christopher Wilson",
                 "homepage": "https://github.com/jshttp/vary#readme"
             },
             {
                 "name": "vite",
-                "versions": [
-                    "8.2.0"
-                ],
+                "versions": ["8.2.0"],
                 "author": "Evan You",
                 "homepage": "https://vite.dev/"
             },
             {
                 "name": "vitefu",
-                "versions": [
-                    "1.1.3"
-                ],
+                "versions": ["1.1.3"],
                 "homepage": "https://github.com/svitejs/vitefu#readme"
             },
             {
                 "name": "webpack-virtual-modules",
-                "versions": [
-                    "0.6.2"
-                ],
+                "versions": ["0.6.2"],
                 "author": "SysGears INC",
                 "homepage": "https://github.com/sysgears/webpack-virtual-modules#readme"
             },
             {
                 "name": "ws",
-                "versions": [
-                    "8.21.1"
-                ],
+                "versions": ["8.21.1"],
                 "author": "Einar Otto Stangvik",
                 "homepage": "https://github.com/websockets/ws"
             },
             {
                 "name": "wsl-utils",
-                "versions": [
-                    "0.3.1"
-                ],
+                "versions": ["0.3.1"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/wsl-utils#readme"
             },
             {
                 "name": "xmlbuilder2",
-                "versions": [
-                    "4.0.3"
-                ],
+                "versions": ["4.0.3"],
                 "author": "Ozgur Ozcitak",
                 "homepage": "https://github.com/oozcitak/xmlbuilder2"
             },
             {
                 "name": "yocto-spinner",
-                "versions": [
-                    "1.2.2"
-                ],
+                "versions": ["1.2.2"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/yocto-spinner#readme"
             },
             {
                 "name": "yoctocolors",
-                "versions": [
-                    "2.2.0"
-                ],
+                "versions": ["2.2.0"],
                 "author": "Sindre Sorhus",
                 "homepage": "https://github.com/sindresorhus/yoctocolors#readme"
             },
             {
                 "name": "zod",
-                "versions": [
-                    "3.25.76",
-                    "4.4.3"
-                ],
+                "versions": ["3.25.76", "4.4.3"],
                 "author": "Colin McDonnell",
                 "homepage": "https://zod.dev/"
             }
@@ -3241,18 +2423,12 @@
         "packages": [
             {
                 "name": "lightningcss",
-                "versions": [
-                    "1.32.0",
-                    "1.33.0"
-                ],
+                "versions": ["1.32.0", "1.33.0"],
                 "homepage": "https://github.com/parcel-bundler/lightningcss#readme"
             },
             {
                 "name": "lightningcss-linux-x64-gnu",
-                "versions": [
-                    "1.32.0",
-                    "1.33.0"
-                ],
+                "versions": ["1.32.0", "1.33.0"],
                 "homepage": "https://github.com/parcel-bundler/lightningcss#readme"
             }
         ]
@@ -3262,25 +2438,19 @@
         "packages": [
             {
                 "name": "@fontsource-variable/noto-sans-jp",
-                "versions": [
-                    "5.3.0"
-                ],
+                "versions": ["5.3.0"],
                 "author": "Google Inc.",
                 "homepage": "https://fontsource.org/fonts/noto-sans-jp"
             },
             {
                 "name": "@fontsource-variable/playfair-display",
-                "versions": [
-                    "5.3.0"
-                ],
+                "versions": ["5.3.0"],
                 "author": "Google Inc.",
                 "homepage": "https://fontsource.org/fonts/playfair-display"
             },
             {
                 "name": "@fontsource/poppins",
-                "versions": [
-                    "5.3.0"
-                ],
+                "versions": ["5.3.0"],
                 "author": "Google Inc.",
                 "homepage": "https://fontsource.org/fonts/poppins"
             }
@@ -3291,9 +2461,7 @@
         "packages": [
             {
                 "name": "argparse",
-                "versions": [
-                    "2.0.1"
-                ],
+                "versions": ["2.0.1"],
                 "homepage": "https://github.com/nodeca/argparse#readme"
             }
         ]
@@ -3303,9 +2471,7 @@
         "packages": [
             {
                 "name": "isbot",
-                "versions": [
-                    "5.2.1"
-                ],
+                "versions": ["5.2.1"],
                 "homepage": "https://isbot.js.org/"
             }
         ]

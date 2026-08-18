@@ -1,70 +1,55 @@
+import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { type ItemDto, itemDtoSchema } from "@/domain/item";
+import type { ItemDto } from "@/domain/item";
 import {
     type StockHistoryResult,
-    stockHistoryResultSchema,
+    stockMovementReasonSchema,
 } from "@/domain/stock";
-import {
-    type HistoryQuery,
-    toHistoryParams,
-} from "../-functions/history-query";
 
-const itemListOutputSchema = z.object({
-    items: z.array(itemDtoSchema),
-    nextCursor: z.string().nullable(),
+// 読み取りは server function から service を直接呼ぶ。SSR から自分の公開 URL を
+// fetch すると Cloudflare Access に阻まれるため、HTTP API 経由にしない。
+// `cloudflare:workers` と service はクライアントバンドルへ漏らさないよう動的 import する。
+export const listItems = createServerFn({ method: "GET" }).handler(
+    async (): Promise<ItemDto[]> => {
+        const [{ env }, { listItems: listItemPage }] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/itemService"),
+        ]);
+        const items: ItemDto[] = [];
+        let cursor: string | undefined;
+        do {
+            const page = await listItemPage(env.DB, {
+                limit: 100,
+                ...(cursor === undefined ? {} : { cursor }),
+            });
+            items.push(...page.items);
+            cursor = page.nextCursor ?? undefined;
+        } while (cursor);
+        return items;
+    },
+);
+
+/**
+ * 履歴取得の入力。未指定の絞り込みと cursor は「キーごと省略」で表す。
+ * service 側の schema は strict なため、null を渡さない。
+ */
+const stockHistoryInputSchema = z.object({
+    itemId: z.string().trim().min(1).optional(),
+    reason: stockMovementReasonSchema.optional(),
+    cursor: z.string().min(1).optional(),
+    limit: z.number().int().min(1).max(100),
 });
 
-const apiErrorSchema = z.object({
-    error: z
-        .object({
-            message: z.string().optional(),
-        })
-        .optional(),
-});
-
-const request = async <T>(
-    url: string,
-    schema: z.ZodType<T>,
-    fallbackMessage: string,
-    init?: RequestInit,
-): Promise<T> => {
-    const response = await fetch(url, init);
-    if (!response.ok) {
-        const body = apiErrorSchema.safeParse(
-            await response.json().catch(() => ({})),
-        );
-        throw new Error(
-            body.success && body.data.error?.message
-                ? body.data.error.message
-                : fallbackMessage,
-        );
-    }
-    return schema.parse(await response.json());
-};
-
-export const listItems = async (): Promise<ItemDto[]> => {
-    const items: ItemDto[] = [];
-    let cursor: string | undefined;
-    do {
-        const params = new URLSearchParams({ limit: "100" });
-        if (cursor) params.set("cursor", cursor);
-        const page = await request(
-            `/api/items?${params.toString()}`,
-            itemListOutputSchema,
-            "品目を読み込めませんでした",
-        );
-        items.push(...page.items);
-        cursor = page.nextCursor ?? undefined;
-    } while (cursor);
-    return items;
-};
+export type StockHistoryInput = z.infer<typeof stockHistoryInputSchema>;
 
 /** 履歴は cursor ページングで、1 ページごとにロット内訳を同梱して返る。 */
-export const listStockHistory = (
-    query: HistoryQuery,
-): Promise<StockHistoryResult> =>
-    request(
-        `/api/inventory/history?${toHistoryParams(query)}`,
-        stockHistoryResultSchema,
-        "在庫履歴を読み込めませんでした",
-    );
+export const listStockHistory = createServerFn({ method: "GET" })
+    .validator(stockHistoryInputSchema)
+    .handler(async ({ data }): Promise<StockHistoryResult> => {
+        const [{ env }, { listStockHistory: listHistoryPage }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/stockService"),
+            ]);
+        return listHistoryPage(env.DB, data);
+    });

@@ -1,5 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+    useSuspenseInfiniteQuery,
+    useSuspenseQuery,
+} from "@tanstack/react-query";
+import {
+    createFileRoute,
+    type ErrorComponentProps,
+    redirect,
+    useRouter,
+} from "@tanstack/react-router";
+import { useMemo } from "react";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -26,28 +36,55 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import type { ItemDto } from "@/domain/item";
 import {
-    type StockMovementDto,
     type StockMovementReason,
+    stockMovementReasonSchema,
     stockMovementReasons,
 } from "@/domain/stock";
-import { listItems, listStockHistory } from "./-api/stock-api";
+import { formatDisplayDateTime } from "@/lib/datetime";
+import {
+    itemListQueryOptions,
+    stockHistoryQueryOptions,
+} from "./-api/stock-queries";
 import { formatDelta } from "./-functions/history-query";
 
+// 絞り込みは URL に持たせる。不正値は既定（絞り込みなし）へ寄せる。
+const historySearchSchema = z.object({
+    itemId: z.string().min(1).optional().catch(undefined),
+    reason: stockMovementReasonSchema.optional().catch(undefined),
+});
+
 export const Route = createFileRoute("/_app/_inventory/inventory/history/")({
+    validateSearch: historySearchSchema,
+    loaderDeps: ({ search }) => search,
+    // 履歴取得は未知の itemId を「品目が見つからない」で失敗させるため、
+    // ブックマークや削除済み品目の URL でルート全体が落ちないよう、
+    // 先に品目一覧で存在を確かめ、無ければ絞り込みを外した URL へ寄せる。
+    loader: async ({ context, deps }) => {
+        const items = await context.queryClient.ensureQueryData(
+            itemListQueryOptions(),
+        );
+        if (
+            deps.itemId !== undefined &&
+            !items.some((item) => item.id === deps.itemId)
+        ) {
+            const { itemId: _unknownItemId, ...rest } = deps;
+            throw redirect({ to: "/inventory/history", search: rest });
+        }
+        await context.queryClient.ensureInfiniteQueryData(
+            stockHistoryQueryOptions(deps),
+        );
+    },
     staticData: {
         breadcrumbs: [{ label: "在庫履歴" }],
     },
     component: StockHistoryPage,
+    pendingComponent: StockHistoryPending,
+    errorComponent: StockHistoryError,
 });
 
-const dateFormatter = new Intl.DateTimeFormat("ja-JP", {
-    dateStyle: "medium",
-    timeStyle: "short",
-});
-
-const pageSize = 50;
+const pageClassName =
+    "mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
 
 const reasonLabels: Record<StockMovementReason, string> = {
     purchase: "購入",
@@ -59,73 +96,23 @@ const reasonLabels: Record<StockMovementReason, string> = {
 
 const allFilterValue = "all";
 
+const isReason = (value: string): value is StockMovementReason =>
+    stockMovementReasons.some((reason) => reason === value);
+
 function StockHistoryPage() {
-    const [items, setItems] = useState<ItemDto[]>([]);
-    const [movements, setMovements] = useState<StockMovementDto[]>([]);
-    const [nextCursor, setNextCursor] = useState<string | null>(null);
-    const [itemFilter, setItemFilter] = useState(allFilterValue);
-    const [reasonFilter, setReasonFilter] = useState(allFilterValue);
-    const [loading, setLoading] = useState(true);
-    const [loadingMore, setLoadingMore] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const loadItems = useCallback(async () => {
-        try {
-            setItems(await listItems());
-        } catch (cause) {
-            setError(errorMessage(cause, "品目を読み込めませんでした"));
-        }
-    }, []);
-
-    // 絞り込みを変えた場合は cursor を捨てて先頭から読み直す
-    const loadFirstPage = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const result = await listStockHistory({
-                itemId: itemFilter === allFilterValue ? null : itemFilter,
-                reason: reasonFilter === allFilterValue ? null : reasonFilter,
-                cursor: null,
-                limit: pageSize,
-            });
-            setMovements(result.movements);
-            setNextCursor(result.nextCursor);
-        } catch (cause) {
-            setMovements([]);
-            setNextCursor(null);
-            setError(errorMessage(cause, "在庫履歴を読み込めませんでした"));
-        } finally {
-            setLoading(false);
-        }
-    }, [itemFilter, reasonFilter]);
-
-    const loadNextPage = useCallback(async () => {
-        if (nextCursor === null) return;
-        setLoadingMore(true);
-        setError(null);
-        try {
-            const result = await listStockHistory({
-                itemId: itemFilter === allFilterValue ? null : itemFilter,
-                reason: reasonFilter === allFilterValue ? null : reasonFilter,
-                cursor: nextCursor,
-                limit: pageSize,
-            });
-            setMovements((current) => [...current, ...result.movements]);
-            setNextCursor(result.nextCursor);
-        } catch (cause) {
-            setError(errorMessage(cause, "在庫履歴を読み込めませんでした"));
-        } finally {
-            setLoadingMore(false);
-        }
-    }, [itemFilter, nextCursor, reasonFilter]);
-
-    useEffect(() => {
-        void loadItems();
-    }, [loadItems]);
-
-    useEffect(() => {
-        void loadFirstPage();
-    }, [loadFirstPage]);
+    const navigate = Route.useNavigate();
+    const search = Route.useSearch();
+    const { data: items } = useSuspenseQuery(itemListQueryOptions());
+    const historyQuery = useSuspenseInfiniteQuery(
+        stockHistoryQueryOptions(search),
+    );
+    const movements = useMemo(
+        () => historyQuery.data.pages.flatMap((page) => page.movements),
+        [historyQuery.data],
+    );
+    const error = historyQuery.error
+        ? errorMessage(historyQuery.error, "在庫履歴を読み込めませんでした")
+        : null;
 
     const itemNames = useMemo(
         () => new Map(items.map((item) => [item.id, item.name])),
@@ -135,6 +122,31 @@ function StockHistoryPage() {
         () => new Map(items.map((item) => [item.id, item.baseUnit])),
         [items],
     );
+
+    const itemFilter = search.itemId ?? allFilterValue;
+    const reasonFilter = search.reason ?? allFilterValue;
+    // 絞り込みは戻る操作の対象にしない（従来は state で保持していた）
+    const handleItemFilterChange = (value: string | null) => {
+        void navigate({
+            replace: true,
+            search: {
+                ...search,
+                itemId:
+                    value === null || value === allFilterValue
+                        ? undefined
+                        : value,
+            },
+        });
+    };
+    const handleReasonFilterChange = (value: string | null) => {
+        void navigate({
+            replace: true,
+            search: {
+                ...search,
+                reason: value !== null && isReason(value) ? value : undefined,
+            },
+        });
+    };
 
     const itemFilterOptions = [
         { label: "すべての品目", value: allFilterValue },
@@ -149,7 +161,7 @@ function StockHistoryPage() {
     ];
 
     return (
-        <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+        <main className={pageClassName}>
             <header>
                 <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
                     Inventory
@@ -172,11 +184,8 @@ function StockHistoryPage() {
                         <Field>
                             <FieldLabel htmlFor="history-item">品目</FieldLabel>
                             <Select
-                                disabled={loading && movements.length === 0}
                                 items={itemFilterOptions}
-                                onValueChange={(value) =>
-                                    setItemFilter(value ?? allFilterValue)
-                                }
+                                onValueChange={handleItemFilterChange}
                                 value={itemFilter}
                             >
                                 <SelectTrigger
@@ -205,9 +214,7 @@ function StockHistoryPage() {
                             </FieldLabel>
                             <Select
                                 items={reasonFilterOptions}
-                                onValueChange={(value) =>
-                                    setReasonFilter(value ?? allFilterValue)
-                                }
+                                onValueChange={handleReasonFilterChange}
                                 value={reasonFilter}
                             >
                                 <SelectTrigger
@@ -240,7 +247,7 @@ function StockHistoryPage() {
                         >
                             <span>{error}</span>
                             <Button
-                                onClick={() => void loadFirstPage()}
+                                onClick={() => void historyQuery.refetch()}
                                 size="sm"
                                 type="button"
                                 variant="outline"
@@ -250,14 +257,7 @@ function StockHistoryPage() {
                         </div>
                     ) : null}
 
-                    {loading ? (
-                        <p
-                            aria-live="polite"
-                            className="text-sm text-muted-foreground"
-                        >
-                            履歴を読み込み中…
-                        </p>
-                    ) : movements.length === 0 ? (
+                    {movements.length === 0 ? (
                         <p
                             aria-live="polite"
                             className="text-sm text-muted-foreground"
@@ -337,15 +337,20 @@ function StockHistoryPage() {
                 <CardFooter className="justify-between">
                     <p className="text-sm text-muted-foreground">
                         {movements.length} 件を表示中
-                        {nextCursor === null ? "（すべて表示）" : ""}
+                        {historyQuery.hasNextPage ? "" : "（すべて表示）"}
                     </p>
                     <Button
-                        disabled={nextCursor === null || loading || loadingMore}
-                        onClick={() => void loadNextPage()}
+                        disabled={
+                            !historyQuery.hasNextPage ||
+                            historyQuery.isFetchingNextPage
+                        }
+                        onClick={() => void historyQuery.fetchNextPage()}
                         type="button"
                         variant="outline"
                     >
-                        {loadingMore ? "読み込み中…" : "続きを読み込む"}
+                        {historyQuery.isFetchingNextPage
+                            ? "読み込み中…"
+                            : "続きを読み込む"}
                     </Button>
                 </CardFooter>
             </Card>
@@ -353,18 +358,49 @@ function StockHistoryPage() {
     );
 }
 
+function StockHistoryPending() {
+    return (
+        <main className={pageClassName}>
+            <p className="text-sm text-muted-foreground">
+                履歴を読み込んでいます…
+            </p>
+        </main>
+    );
+}
+
+function StockHistoryError({ error, reset }: ErrorComponentProps) {
+    const router = useRouter();
+    return (
+        <main className={pageClassName}>
+            <div
+                aria-live="assertive"
+                className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+                role="alert"
+            >
+                <span>
+                    {errorMessage(error, "在庫履歴を読み込めませんでした")}
+                </span>
+                <Button
+                    onClick={() => {
+                        reset();
+                        void router.invalidate();
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                >
+                    再読み込み
+                </Button>
+            </div>
+        </main>
+    );
+}
+
 const errorMessage = (cause: unknown, fallback: string): string =>
     cause instanceof Error ? cause.message : fallback;
 
-const formatDateTime = (value: string): string => {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
-};
+const formatDateTime = (value: string): string =>
+    formatDisplayDateTime(value) ?? value;
 
-const formatExpiry = (value: string | null): string => {
-    if (!value) return "期限なし";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime())
-        ? "期限なし"
-        : dateFormatter.format(date);
-};
+const formatExpiry = (value: string | null): string =>
+    (value === null ? null : formatDisplayDateTime(value)) ?? "期限なし";

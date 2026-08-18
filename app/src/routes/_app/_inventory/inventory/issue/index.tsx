@@ -1,5 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+    useMutation,
+    useQuery,
+    useQueryClient,
+    useSuspenseQuery,
+} from "@tanstack/react-query";
+import {
+    createFileRoute,
+    type ErrorComponentProps,
+    useRouter,
+} from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -33,14 +43,17 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import type { ItemDto } from "@/domain/item";
-import {
-    allocateFefo,
-    earliestExpiryDate,
-    type ItemLotDto,
-} from "@/domain/lot";
+import { allocateFefo, type ItemLotDto } from "@/domain/lot";
 import type { StockMovementReason } from "@/domain/stock";
-import { issueStock, listItemLots, listItems } from "./-api/stock-api";
+import { formatDisplayDateTime } from "@/lib/datetime";
+import { type IssueStockInput, issueStock } from "./-api/stock-api";
+import {
+    inventoryKeys,
+    itemKeys,
+    itemListQueryOptions,
+    itemLotsQueryOptions,
+    stockHistoryKeys,
+} from "./-api/stock-queries";
 import {
     type IssuePlan,
     parsePositiveInteger,
@@ -49,16 +62,18 @@ import {
 } from "./-functions/issue-plan";
 
 export const Route = createFileRoute("/_app/_inventory/inventory/issue/")({
+    loader: ({ context }) =>
+        context.queryClient.ensureQueryData(itemListQueryOptions()),
     staticData: {
         breadcrumbs: [{ label: "出庫" }],
     },
     component: IssueStockPage,
+    pendingComponent: IssuePending,
+    errorComponent: IssueError,
 });
 
-const dateFormatter = new Intl.DateTimeFormat("ja-JP", {
-    dateStyle: "medium",
-    timeStyle: "short",
-});
+const pageClassName =
+    "mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
 
 // 出庫の理由は減少側のものだけを出す（購入は入庫画面、棚卸しは棚卸画面で扱う）
 const reasonOptions: { label: string; value: StockMovementReason }[] = [
@@ -76,19 +91,22 @@ const modeOptions: { label: string; value: IssueMode }[] = [
 
 const emptyPlan: IssuePlan = { status: "ready", rows: [] };
 
+// 未取得時の既定値は参照を固定する。毎描画で新しい配列を作ると
+// ロットに依存する derive が無限に走る
+const noLots: ItemLotDto[] = [];
+
+type IssueSubmitInput = IssueStockInput & { itemId: string };
+
 function IssueStockPage() {
-    const [items, setItems] = useState<ItemDto[]>([]);
+    const queryClient = useQueryClient();
+    const { data: items } = useSuspenseQuery(itemListQueryOptions());
     const [selectedItemId, setSelectedItemId] = useState("");
-    const [lots, setLots] = useState<ItemLotDto[]>([]);
+    const lotsQuery = useQuery(itemLotsQueryOptions(selectedItemId));
+    const lots = lotsQuery.data ?? noLots;
     const [quantity, setQuantity] = useState("");
     const [mode, setMode] = useState<IssueMode>("fefo");
     const [selectedLotId, setSelectedLotId] = useState("");
     const [reason, setReason] = useState<StockMovementReason>("consume");
-    const [loading, setLoading] = useState(true);
-    const [lotsLoading, setLotsLoading] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [loadError, setLoadError] = useState<string | null>(null);
-    const [lotsError, setLotsError] = useState<string | null>(null);
     const [selectionError, setSelectionError] = useState<string | null>(null);
     const [quantityError, setQuantityError] = useState<string | null>(null);
     const [lotError, setLotError] = useState<string | null>(null);
@@ -100,43 +118,27 @@ function IssueStockPage() {
         null,
     );
 
-    const load = useCallback(async () => {
-        setLoading(true);
-        setLoadError(null);
-        try {
-            setItems(await listItems());
-        } catch (cause) {
-            setLoadError(errorMessage(cause, "品目を読み込めませんでした"));
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    const loadLots = useCallback(async (itemId: string) => {
-        setLotsLoading(true);
-        setLotsError(null);
-        try {
-            setLots(await listItemLots(itemId));
-        } catch (cause) {
-            setLots([]);
-            setLotsError(errorMessage(cause, "ロットを読み込めませんでした"));
-        } finally {
-            setLotsLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        void load();
-    }, [load]);
-
-    useEffect(() => {
-        if (!selectedItemId) {
-            setLots([]);
-            setLotsError(null);
-            return;
-        }
-        void loadLots(selectedItemId);
-    }, [loadLots, selectedItemId]);
+    // 出庫はロット構成・品目の在庫数・在庫履歴を同時に変えるため、関係する query をまとめて無効化する。
+    // onSuccess の Promise を返すと mutateAsync が再取得完了まで待つ。
+    const issueMutation = useMutation({
+        mutationFn: ({ itemId, ...input }: IssueSubmitInput) =>
+            issueStock(itemId, input),
+        onSuccess: () =>
+            Promise.all([
+                queryClient.invalidateQueries({ queryKey: itemKeys.all }),
+                queryClient.invalidateQueries({
+                    queryKey: stockHistoryKeys.all,
+                }),
+                queryClient.invalidateQueries({
+                    queryKey: inventoryKeys.all,
+                }),
+            ]),
+    });
+    const saving = issueMutation.isPending;
+    const lotsLoading = lotsQuery.isLoading;
+    const lotsError = lotsQuery.error
+        ? errorMessage(lotsQuery.error, "ロットを読み込めませんでした")
+        : null;
 
     // 出庫で消えたロットは選択肢から外れるため、選択を持ち越さない
     useEffect(() => {
@@ -243,29 +245,14 @@ function IssueStockPage() {
                 ? pendingKey.current.value
                 : crypto.randomUUID();
         pendingKey.current = { signature, value: idempotencyKey };
-        setSaving(true);
         try {
-            const result = await issueStock(selectedItem.id, {
+            const result = await issueMutation.mutateAsync({
+                itemId: selectedItem.id,
                 quantity: parsedQuantity,
                 lotId,
                 reason,
                 idempotencyKey,
             });
-            setLots(result.lots);
-            setItems((current) =>
-                current.map((item) =>
-                    item.id === result.itemId
-                        ? {
-                              ...item,
-                              currentQuantity: result.currentQuantity,
-                              earliestExpiryDate: earliestExpiryDate(
-                                  result.lots,
-                              ),
-                              lotCount: result.lots.length,
-                          }
-                        : item,
-                ),
-            );
             // プレビューは送信前の在庫に基づくため、記録された内訳はサーバーの応答で置き換える
             setRecorded(result.allocations);
             setQuantity("");
@@ -277,8 +264,6 @@ function IssueStockPage() {
             );
         } catch (cause) {
             setSubmitError(errorMessage(cause, "出庫を記録できませんでした"));
-        } finally {
-            setSaving(false);
         }
     };
 
@@ -294,7 +279,7 @@ function IssueStockPage() {
     const shortage = plan.status === "shortage" ? plan.shortage : 0;
 
     return (
-        <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+        <main className={pageClassName}>
             <header>
                 <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
                     Inventory
@@ -304,24 +289,6 @@ function IssueStockPage() {
                     消費・廃棄した数量を、期限が早いロットから順に減らします。
                 </p>
             </header>
-
-            {loadError ? (
-                <div
-                    aria-live="polite"
-                    className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
-                    role="alert"
-                >
-                    <span>{loadError}</span>
-                    <Button
-                        onClick={() => void load()}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                    >
-                        再読み込み
-                    </Button>
-                </div>
-            ) : null}
 
             <Card>
                 <CardHeader>
@@ -338,7 +305,7 @@ function IssueStockPage() {
                                     品目
                                 </FieldLabel>
                                 <Select
-                                    disabled={loading || items.length === 0}
+                                    disabled={items.length === 0}
                                     items={itemOptions}
                                     onValueChange={handleItemChange}
                                     value={selectedItemId || null}
@@ -355,11 +322,9 @@ function IssueStockPage() {
                                     >
                                         <SelectValue
                                             placeholder={
-                                                loading
-                                                    ? "品目を読み込み中…"
-                                                    : items.length === 0
-                                                      ? "品目がありません"
-                                                      : "品目を選択"
+                                                items.length === 0
+                                                    ? "品目がありません"
+                                                    : "品目を選択"
                                             }
                                         />
                                     </SelectTrigger>
@@ -547,7 +512,6 @@ function IssueStockPage() {
                         <Button
                             disabled={
                                 saving ||
-                                loading ||
                                 !selectedItem ||
                                 plan.status === "shortage"
                             }
@@ -579,11 +543,7 @@ function IssueStockPage() {
                         >
                             <span>{lotsError}</span>
                             <Button
-                                onClick={() =>
-                                    selectedItemId
-                                        ? void loadLots(selectedItemId)
-                                        : undefined
-                                }
+                                onClick={() => void lotsQuery.refetch()}
                                 size="sm"
                                 type="button"
                                 variant="outline"
@@ -685,16 +645,47 @@ function IssueStockPage() {
     );
 }
 
+function IssuePending() {
+    return (
+        <main className={pageClassName}>
+            <p className="text-sm text-muted-foreground">
+                品目を読み込んでいます…
+            </p>
+        </main>
+    );
+}
+
+function IssueError({ error, reset }: ErrorComponentProps) {
+    const router = useRouter();
+    return (
+        <main className={pageClassName}>
+            <div
+                aria-live="polite"
+                className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+                role="alert"
+            >
+                <span>{errorMessage(error, "品目を読み込めませんでした")}</span>
+                <Button
+                    onClick={() => {
+                        reset();
+                        void router.invalidate();
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                >
+                    再読み込み
+                </Button>
+            </div>
+        </main>
+    );
+}
+
 const errorMessage = (cause: unknown, fallback: string): string =>
     cause instanceof Error ? cause.message : fallback;
 
-const formatExpiry = (value: string | null): string => {
-    if (!value) return "期限なし";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime())
-        ? "期限なし"
-        : dateFormatter.format(date);
-};
+const formatExpiry = (value: string | null): string =>
+    (value === null ? null : formatDisplayDateTime(value)) ?? "期限なし";
 
 const remainingQuantity = (
     lots: readonly ItemLotDto[],

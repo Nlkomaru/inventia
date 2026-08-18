@@ -21,11 +21,14 @@ const config = defineConfig(({ command, mode }) => {
     const accessClientId = process.env.CLOUDFLARE_ACCESS_CLIENT_ID;
     const accessClientSecret = process.env.CLOUDFLARE_ACCESS_CLIENT_SECRET;
     const hasAccessServiceToken = Boolean(accessClientId && accessClientSecret);
-    // 既定は remote D1 binding。INVENTIA_API_PROXY=1 のときだけ /api をデプロイ済み Worker へ委譲する。
+    // 既定は remote D1 binding。INVENTIA_API_PROXY=1 のときはローカル D1 の Worker 設定を使う。
+    // Cloudflare plugin は build 時点の wrangler 設定を dist/server/wrangler.json へ焼き込むため、
+    // command で絞ると `vite preview` が常に remote D1 を指してしまう。
+    // Access service token は remote 接続先 (Access 配下) のためのもので、ローカル設定には不要。
+    const useLocalWorkerConfig = process.env.INVENTIA_API_PROXY === "1";
+    // /api をデプロイ済み Worker へ委譲する proxy は dev server だけの機能で、token が要る。
     const proxyAccessProtectedWorker =
-        command === "serve" &&
-        process.env.INVENTIA_API_PROXY === "1" &&
-        hasAccessServiceToken;
+        command === "serve" && useLocalWorkerConfig && hasAccessServiceToken;
 
     return {
         resolve: { tsconfigPaths: true },
@@ -46,7 +49,7 @@ const config = defineConfig(({ command, mode }) => {
         plugins: [
             devtools(),
             cloudflare({
-                configPath: proxyAccessProtectedWorker
+                configPath: useLocalWorkerConfig
                     ? "./wrangler.local.jsonc"
                     : undefined,
                 viteEnvironment: { name: "ssr" },

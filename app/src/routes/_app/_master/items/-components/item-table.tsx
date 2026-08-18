@@ -13,7 +13,6 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
     Table,
     TableBody,
@@ -25,28 +24,19 @@ import {
 import type { CategoryDto } from "@/domain/category";
 import type { ItemDto } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
+import { formatDisplayDateTime } from "@/lib/datetime";
 import { readingStatusLabels } from "../-functions/reading-state-form";
 import { getHierarchyLabels } from "./item-options";
 
 const features = tableFeatures({});
 const columnHelper = createColumnHelper<typeof features, ItemDto>();
-const dateFormatter = new Intl.DateTimeFormat("ja-JP", {
-    dateStyle: "medium",
-    timeStyle: "short",
-});
-const loadingRowKeys = ["loading-0", "loading-1", "loading-2", "loading-3"];
-
-const formatExpiry = (value: string | null): string => {
-    if (!value) return "—";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "—" : dateFormatter.format(date);
-};
+const formatExpiry = (value: string | null): string =>
+    (value === null ? null : formatDisplayDateTime(value)) ?? "—";
 
 type ItemTableProps = {
     items: ItemDto[];
     categories: CategoryDto[];
     locations: LocationDto[];
-    loading: boolean;
     deletingId: string | null;
     onEdit: (item: ItemDto) => void;
     onDelete: (item: ItemDto) => void;
@@ -56,7 +46,6 @@ export function ItemTable({
     items,
     categories,
     locations,
-    loading,
     deletingId,
     onEdit,
     onDelete,
@@ -175,16 +164,10 @@ export function ItemTable({
         <Card>
             <CardHeader>
                 <CardTitle>登録済み品目</CardTitle>
-                <CardDescription>
-                    {loading ? "品目を読み込み中…" : `${items.length} 件`}
-                </CardDescription>
+                <CardDescription>{`${items.length} 件`}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-                <Table
-                    aria-busy={loading}
-                    className="min-w-[980px]"
-                    aria-label="登録済み品目"
-                >
+                <Table className="min-w-[980px]" aria-label="登録済み品目">
                     <TableHeader className="bg-muted/50">
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
@@ -207,17 +190,7 @@ export function ItemTable({
                         ))}
                     </TableHeader>
                     <TableBody>
-                        {loading ? (
-                            loadingRowKeys.map((rowKey) => (
-                                <TableRow key={rowKey}>
-                                    {columns.map((column) => (
-                                        <TableCell key={column.id}>
-                                            <Skeleton className="h-4 w-24" />
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            ))
-                        ) : table.getRowModel().rows.length > 0 ? (
+                        {table.getRowModel().rows.length > 0 ? (
                             table.getRowModel().rows.map((row) => (
                                 <TableRow key={row.id}>
                                     {row.getAllCells().map((cell) => (

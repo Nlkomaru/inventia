@@ -1,6 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
+import {
+    useQuery,
+    useQueryClient,
+    useSuspenseQuery,
+} from "@tanstack/react-query";
+import {
+    createFileRoute,
+    type ErrorComponentProps,
+    useRouter,
+} from "@tanstack/react-router";
 import { RefreshCw, Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
 import {
     InventoryTable,
     readingStatusLabels,
@@ -17,24 +27,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import type { CategoryDto } from "@/domain/category";
-import type { ItemDto } from "@/domain/item";
-import type { LocationDto } from "@/domain/location";
-import type { ItemLotDto } from "@/domain/lot";
-import type { ReadingStatus } from "@/domain/reading";
+import { readingStatuses } from "@/domain/reading";
+import type { InventoryItemFilters } from "./-api/inventory-api";
 import {
-    listCategories,
-    listItems,
-    listLocations,
-    listLotsForItems,
-} from "./-api/inventory-api";
-
-export const Route = createFileRoute("/_app/_inventory/inventory/")({
-    staticData: {
-        breadcrumbs: [{ label: "在庫一覧" }],
-    },
-    component: InventoryPage,
-});
+    categoryKeys,
+    categoryTreeQueryOptions,
+    inventoryItemsQueryOptions,
+    inventoryKeys,
+    itemLotsQueryOptions,
+    locationKeys,
+    locationTreeQueryOptions,
+} from "./-api/inventory-queries";
 
 // 期限が近いと見なす日数。表の色分けと一覧の絞り込みで同じ値を使う
 const soonWithinDays = 7;
@@ -52,7 +55,7 @@ const isExpiryFilter = (value: string): value is ExpiryFilter =>
     expiryFilterItems.some((option) => option.value === value);
 
 // 読書状態は書籍カテゴリーの品目だけが持つ。`none` は書籍以外と未設定をまとめた選択肢
-type ReadingFilter = "all" | ReadingStatus | "none";
+type ReadingFilter = "all" | (typeof readingStatuses)[number] | "none";
 
 const readingFilterItems: { label: string; value: ReadingFilter }[] = [
     { label: "すべての読書状態", value: "all" },
@@ -65,8 +68,69 @@ const readingFilterItems: { label: string; value: ReadingFilter }[] = [
 const isReadingFilter = (value: string): value is ReadingFilter =>
     readingFilterItems.some((option) => option.value === value);
 
-const errorMessage = (cause: unknown, fallback: string): string =>
-    cause instanceof Error ? cause.message : fallback;
+// 絞り込みは URL の search params に持たせて共有・事前読み込みできるようにする。
+// 既定値は「絞り込みなし」を意味する未指定とし、不正値は catch で未指定へ寄せる
+const inventorySearchSchema = z.object({
+    q: z.string().max(200).optional().catch(undefined),
+    categoryId: z.string().min(1).optional().catch(undefined),
+    locationId: z.string().min(1).optional().catch(undefined),
+    lowStockOnly: z.boolean().optional().catch(undefined),
+    expiry: z
+        .enum(["attention", "expired", "none"])
+        .optional()
+        .catch(undefined),
+    reading: z
+        .enum([...readingStatuses, "none"])
+        .optional()
+        .catch(undefined),
+});
+
+type InventorySearch = z.infer<typeof inventorySearchSchema>;
+
+/**
+ * URL の絞り込みを service の一覧条件へ変換する。
+ * 期限「なしのみ」と読書状態「なし」は service の条件で表現できないため
+ * ここでは落とし、取得後の絞り込みで扱う。
+ */
+const toItemFilters = (search: InventorySearch): InventoryItemFilters => {
+    const q = search.q?.trim();
+    return {
+        q: q ? q : undefined,
+        categoryId: search.categoryId,
+        locationId: search.locationId,
+        lowStockOnly: search.lowStockOnly === true ? true : undefined,
+        // 最短期限が now + n 日以内であることは、期限切れ・期限間近と同じ条件になる
+        expiringWithinDays:
+            search.expiry === "attention"
+                ? soonWithinDays
+                : search.expiry === "expired"
+                  ? 0
+                  : undefined,
+        readingStatus:
+            search.reading && search.reading !== "none"
+                ? search.reading
+                : undefined,
+    };
+};
+
+export const Route = createFileRoute("/_app/_inventory/inventory/")({
+    validateSearch: inventorySearchSchema,
+    loaderDeps: ({ search }) => ({ filters: toItemFilters(search) }),
+    loader: ({ context, deps }) =>
+        Promise.all([
+            context.queryClient.ensureQueryData(
+                inventoryItemsQueryOptions(deps.filters),
+            ),
+            context.queryClient.ensureQueryData(categoryTreeQueryOptions()),
+            context.queryClient.ensureQueryData(locationTreeQueryOptions()),
+        ]),
+    staticData: {
+        breadcrumbs: [{ label: "在庫一覧" }],
+    },
+    component: InventoryPage,
+    pendingComponent: InventoryPending,
+    errorComponent: InventoryError,
+});
 
 // 保管場所とカテゴリは末端の名前だけを表示する。一覧は行数が多く、
 // 親を連ねた経路表示は品目名や期限の視認性を落とす
@@ -74,47 +138,61 @@ const toNameMap = (
     nodes: readonly { id: string; name: string }[],
 ): Map<string, string> => new Map(nodes.map((node) => [node.id, node.name]));
 
+// 入力のたびに URL 更新と再取得を起こさないための待ち時間
+const searchDebounceMs = 300;
+
 function InventoryPage() {
-    const [items, setItems] = useState<ItemDto[]>([]);
-    const [categories, setCategories] = useState<CategoryDto[]>([]);
-    const [locations, setLocations] = useState<LocationDto[]>([]);
-    const [lotsByItemId, setLotsByItemId] = useState<Map<string, ItemLotDto[]>>(
-        new Map(),
+    const search = Route.useSearch();
+    const navigate = Route.useNavigate();
+    const queryClient = useQueryClient();
+    const filters = useMemo(() => toItemFilters(search), [search]);
+    const itemsQuery = useSuspenseQuery(inventoryItemsQueryOptions(filters));
+    const { data: categories } = useSuspenseQuery(categoryTreeQueryOptions());
+    const { data: locations } = useSuspenseQuery(locationTreeQueryOptions());
+    const items = itemsQuery.data;
+
+    // 一覧 DTO は最短期限と件数だけを持つため、内訳が必要な品目だけ個別に取得する。
+    // 1 ロットの品目は合計と最短期限で内訳が尽きているので取得しない
+    const lotTargetIds = useMemo(
+        () => items.filter((item) => item.lotCount > 1).map((item) => item.id),
+        [items],
     );
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [query, setQuery] = useState("");
-    const [locationFilter, setLocationFilter] = useState("all");
-    const [expiryFilter, setExpiryFilter] = useState<ExpiryFilter>("all");
-    const [readingFilter, setReadingFilter] = useState<ReadingFilter>("all");
+    const lotsQuery = useQuery(itemLotsQueryOptions(lotTargetIds));
+    const lotsByItemId = useMemo(
+        () =>
+            new Map(
+                (lotsQuery.data ?? []).map((entry) => [
+                    entry.itemId,
+                    entry.lots,
+                ]),
+            ),
+        [lotsQuery.data],
+    );
 
-    const load = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const [nextItems, nextCategories, nextLocations] =
-                await Promise.all([
-                    listItems(),
-                    listCategories(),
-                    listLocations(),
-                ]);
-            setItems(nextItems);
-            setCategories(nextCategories);
-            setLocations(nextLocations);
-            setLotsByItemId(new Map());
-            setLoading(false);
-            // 内訳の取得は品目ごとの追加リクエストになるため、一覧の表示を待たせない
-            setLotsByItemId(await listLotsForItems(nextItems));
-        } catch (cause) {
-            setError(errorMessage(cause, "在庫を読み込めませんでした"));
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
+    const [queryText, setQueryText] = useState(search.q ?? "");
+    // 自分が押し込んだ値かを見分けて、入力中の文字を URL 側の値で上書きしない
+    const pushedQueryRef = useRef(search.q ?? "");
     useEffect(() => {
-        void load();
-    }, [load]);
+        const urlQuery = search.q ?? "";
+        if (urlQuery === pushedQueryRef.current) return;
+        pushedQueryRef.current = urlQuery;
+        setQueryText(urlQuery);
+    }, [search.q]);
+    useEffect(() => {
+        const nextQuery = queryText.trim();
+        if (nextQuery === (search.q ?? "")) return;
+        const timer = setTimeout(() => {
+            pushedQueryRef.current = nextQuery;
+            void navigate({
+                search: (prev) => ({
+                    ...prev,
+                    q: nextQuery === "" ? undefined : nextQuery,
+                }),
+                replace: true,
+            });
+        }, searchDebounceMs);
+        return () => clearTimeout(timer);
+    }, [navigate, queryText, search.q]);
 
     const categoryLabels = useMemo(() => toNameMap(categories), [categories]);
     const locationLabels = useMemo(() => toNameMap(locations), [locations]);
@@ -129,42 +207,30 @@ function InventoryPage() {
         [locations],
     );
 
+    // service の条件で表現できない絞り込みだけを取得後に適用する
     const visibleItems = useMemo(() => {
-        const normalizedQuery = query.trim().toLocaleLowerCase("ja");
+        if (search.expiry !== "none" && search.reading !== "none") return items;
         const now = Date.now();
         return items.filter((item) => {
-            if (
-                normalizedQuery &&
-                !item.name.toLocaleLowerCase("ja").includes(normalizedQuery)
-            ) {
+            if (search.reading === "none" && item.readingStatus !== null) {
                 return false;
             }
-            if (
-                locationFilter !== "all" &&
-                item.locationId !== locationFilter
-            ) {
-                return false;
-            }
-            if (readingFilter !== "all") {
-                const matches =
-                    readingFilter === "none"
-                        ? item.readingStatus === null
-                        : item.readingStatus === readingFilter;
-                if (!matches) return false;
-            }
-            if (expiryFilter === "all") return true;
+            if (search.expiry !== "none") return true;
             const { state } = resolveExpirySignal(
                 item.earliestExpiryDate,
                 now,
                 soonWithinDays,
             );
-            if (expiryFilter === "attention") {
-                return state === "expired" || state === "soon";
-            }
-            if (expiryFilter === "expired") return state === "expired";
             return state === "none";
         });
-    }, [expiryFilter, items, locationFilter, query, readingFilter]);
+    }, [items, search.expiry, search.reading]);
+
+    const reloading = itemsQuery.isFetching || lotsQuery.isFetching;
+    const reload = () => {
+        void queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
+        void queryClient.invalidateQueries({ queryKey: categoryKeys.all });
+        void queryClient.invalidateQueries({ queryKey: locationKeys.all });
+    };
 
     return (
         <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
@@ -179,8 +245,8 @@ function InventoryPage() {
                     </p>
                 </div>
                 <Button
-                    disabled={loading}
-                    onClick={() => void load()}
+                    disabled={reloading}
+                    onClick={reload}
                     type="button"
                     variant="outline"
                 >
@@ -188,25 +254,6 @@ function InventoryPage() {
                     再読み込み
                 </Button>
             </header>
-
-            {error ? (
-                <div
-                    aria-live="polite"
-                    className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
-                    role="alert"
-                >
-                    <span>{error}</span>
-                    <Button
-                        onClick={() => void load()}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                    >
-                        <RefreshCw data-icon="inline-start" />
-                        再読み込み
-                    </Button>
-                </div>
-            ) : null}
 
             <section
                 aria-label="在庫の検索と絞り込み"
@@ -223,9 +270,9 @@ function InventoryPage() {
                                 className="pl-9"
                                 id="inventory-search"
                                 placeholder="品目名で検索"
-                                value={query}
+                                value={queryText}
                                 onChange={(event) =>
-                                    setQuery(event.target.value)
+                                    setQueryText(event.target.value)
                                 }
                             />
                         </div>
@@ -236,9 +283,17 @@ function InventoryPage() {
                         </FieldLabel>
                         <Select
                             items={locationItems}
-                            value={locationFilter}
+                            value={search.locationId ?? "all"}
                             onValueChange={(value) =>
-                                setLocationFilter(value ?? "all")
+                                void navigate({
+                                    search: (prev) => ({
+                                        ...prev,
+                                        locationId:
+                                            value && value !== "all"
+                                                ? value
+                                                : undefined,
+                                    }),
+                                })
                             }
                         >
                             <SelectTrigger
@@ -267,14 +322,20 @@ function InventoryPage() {
                         </FieldLabel>
                         <Select
                             items={expiryFilterItems}
-                            value={expiryFilter}
-                            onValueChange={(value) =>
-                                setExpiryFilter(
+                            value={search.expiry ?? "all"}
+                            onValueChange={(value) => {
+                                const next =
                                     value && isExpiryFilter(value)
                                         ? value
-                                        : "all",
-                                )
-                            }
+                                        : "all";
+                                void navigate({
+                                    search: (prev) => ({
+                                        ...prev,
+                                        expiry:
+                                            next === "all" ? undefined : next,
+                                    }),
+                                });
+                            }}
                         >
                             <SelectTrigger
                                 className="w-full"
@@ -302,14 +363,20 @@ function InventoryPage() {
                         </FieldLabel>
                         <Select
                             items={readingFilterItems}
-                            value={readingFilter}
-                            onValueChange={(value) =>
-                                setReadingFilter(
+                            value={search.reading ?? "all"}
+                            onValueChange={(value) => {
+                                const next =
                                     value && isReadingFilter(value)
                                         ? value
-                                        : "all",
-                                )
-                            }
+                                        : "all";
+                                void navigate({
+                                    search: (prev) => ({
+                                        ...prev,
+                                        reading:
+                                            next === "all" ? undefined : next,
+                                    }),
+                                });
+                            }}
                         >
                             <SelectTrigger
                                 className="w-full"
@@ -337,11 +404,49 @@ function InventoryPage() {
             <InventoryTable
                 categoryLabels={categoryLabels}
                 items={visibleItems}
-                loading={loading}
+                loading={itemsQuery.isFetching}
                 locationLabels={locationLabels}
                 lotsByItemId={lotsByItemId}
                 soonWithinDays={soonWithinDays}
             />
+        </main>
+    );
+}
+
+function InventoryPending() {
+    return (
+        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+            <p className="text-sm text-muted-foreground">
+                在庫を読み込んでいます…
+            </p>
+        </main>
+    );
+}
+
+function InventoryError({ error }: ErrorComponentProps) {
+    const router = useRouter();
+    return (
+        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+            <div
+                aria-live="polite"
+                className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+                role="alert"
+            >
+                <span>
+                    {error instanceof Error
+                        ? error.message
+                        : "在庫を読み込めませんでした"}
+                </span>
+                <Button
+                    onClick={() => void router.invalidate()}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                >
+                    <RefreshCw data-icon="inline-start" />
+                    再読み込み
+                </Button>
+            </div>
         </main>
     );
 }
