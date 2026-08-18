@@ -7,12 +7,24 @@ import { useAtom, useSetAtom } from "jotai";
 import {
     ChevronDown,
     ChevronRight,
+    Copy,
+    Ellipsis,
     Pencil,
+    Plus,
     Search,
     Trash2,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuGroup,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
     Table,
@@ -32,8 +44,9 @@ import {
 } from "../-functions/effective-kind";
 import {
     categoryQueryAtom,
-    editingCategoryIdAtom,
     expandedCategoryIdsAtom,
+    startCategoryChildAtom,
+    startCategoryEditAtom,
 } from "./category-atoms";
 
 // 行ごとに変わる値・ハンドラはすべて行データへ持たせる。
@@ -47,7 +60,9 @@ type CategoryTableRow = {
     canDelete: boolean;
     effectiveKind: EffectiveCategoryKind;
     onToggle: () => void;
+    onCopyId: () => void;
     onEdit: () => void;
+    onAddChild: () => void;
     onDelete: () => void;
 };
 
@@ -66,17 +81,21 @@ const columns = columnHelper.columns([
                     className="flex items-center"
                     style={{ paddingLeft: depth * 24 }}
                 >
-                    <Button
-                        aria-expanded={canExpand ? isExpanded : undefined}
-                        aria-label={`${item.name}を展開`}
-                        disabled={!canExpand}
-                        onClick={onToggle}
-                        size="icon-sm"
-                        type="button"
-                        variant="ghost"
-                    >
-                        {isExpanded ? <ChevronDown /> : <ChevronRight />}
-                    </Button>
+                    {canExpand ? (
+                        <Button
+                            aria-expanded={isExpanded}
+                            aria-label={`${item.name}を展開`}
+                            onClick={onToggle}
+                            size="icon-sm"
+                            type="button"
+                            variant="ghost"
+                        >
+                            {isExpanded ? <ChevronDown /> : <ChevronRight />}
+                        </Button>
+                    ) : (
+                        // 子を持たない行も名前の開始位置を揃える
+                        <span aria-hidden className="size-7" />
+                    )}
                     <span>{item.name}</span>
                 </div>
             );
@@ -108,28 +127,55 @@ const columns = columnHelper.columns([
         id: "actions",
         header: "操作",
         cell: ({ row }) => {
-            const { canDelete, item, onDelete, onEdit } = row.original;
+            const { canDelete, item, onAddChild, onCopyId, onDelete, onEdit } =
+                row.original;
             return (
                 <div className="flex justify-end">
-                    <Button
-                        aria-label={`${item.name}を編集`}
-                        onClick={onEdit}
-                        size="icon-sm"
-                        type="button"
-                        variant="ghost"
-                    >
-                        <Pencil />
-                    </Button>
-                    <Button
-                        aria-label={`${item.name}を削除`}
-                        disabled={!canDelete}
-                        onClick={onDelete}
-                        size="icon-sm"
-                        type="button"
-                        variant="ghost"
-                    >
-                        <Trash2 />
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger
+                            render={
+                                <Button
+                                    aria-label={`${item.name}の操作`}
+                                    size="icon-sm"
+                                    type="button"
+                                    variant="ghost"
+                                >
+                                    <Ellipsis />
+                                </Button>
+                            }
+                        />
+                        <DropdownMenuContent
+                            align="end"
+                            // 既定では trigger 幅に揃うため項目名が折り返す
+                            className="w-auto"
+                        >
+                            {/* Base UI では GroupLabel を Group の中に置く */}
+                            <DropdownMenuGroup>
+                                <DropdownMenuLabel>操作</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={onCopyId}>
+                                    <Copy />
+                                    カテゴリIDをコピー
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={onEdit}>
+                                    <Pencil />
+                                    編集
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={onAddChild}>
+                                    <Plus />
+                                    子のカテゴリを追加
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    disabled={!canDelete}
+                                    onClick={onDelete}
+                                    variant="destructive"
+                                >
+                                    <Trash2 />
+                                    削除
+                                </DropdownMenuItem>
+                            </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             );
         },
@@ -145,7 +191,32 @@ export function CategoryTable({
 }) {
     const [query, setQuery] = useAtom(categoryQueryAtom);
     const [expanded, setExpanded] = useAtom(expandedCategoryIdsAtom);
-    const setEditingId = useSetAtom(editingCategoryIdAtom);
+    const startEdit = useSetAtom(startCategoryEditAtom);
+    const startChild = useSetAtom(startCategoryChildAtom);
+    // トーストを持たないので、コピー結果は読み上げ専用の領域だけで伝える。
+    // 同じ文言でも読み上げ直すよう、連番を key にして要素ごと差し替える
+    const [copyMessage, setCopyMessage] = useState({ seq: 0, text: "" });
+    const announce = useCallback(
+        (text: string) =>
+            setCopyMessage((current) => ({ seq: current.seq + 1, text })),
+        [],
+    );
+    const copyCategoryId = useCallback(
+        (category: CategoryDto) => {
+            // 安全なコンテキスト以外では navigator.clipboard 自体が存在しない
+            if (!navigator.clipboard) {
+                announce("カテゴリIDをコピーできませんでした");
+                return;
+            }
+            void navigator.clipboard
+                .writeText(category.id)
+                .then(() =>
+                    announce(`${category.name}のカテゴリIDをコピーしました`),
+                )
+                .catch(() => announce("カテゴリIDをコピーできませんでした"));
+        },
+        [announce],
+    );
     const data = useMemo<CategoryTableRow[]>(() => {
         const normalized = query.trim().toLocaleLowerCase("ja");
         const kindIndex = createCategoryKindIndex(categories);
@@ -176,7 +247,9 @@ export function CategoryTable({
                         }
                         return next;
                     }),
-                onEdit: () => setEditingId(item.id),
+                onCopyId: () => copyCategoryId(item),
+                onEdit: () => startEdit(item),
+                onAddChild: () => startChild(item),
                 onDelete: () => void onDelete(item.id),
             };
         };
@@ -199,7 +272,16 @@ export function CategoryTable({
         };
         visit(null, 0);
         return result;
-    }, [categories, expanded, onDelete, query, setEditingId, setExpanded]);
+    }, [
+        categories,
+        copyCategoryId,
+        expanded,
+        onDelete,
+        query,
+        setExpanded,
+        startChild,
+        startEdit,
+    ]);
     const table = useTable({ columns, data, features });
 
     return (
@@ -208,15 +290,15 @@ export function CategoryTable({
                 <div>
                     <h2 className="font-bold">登録済みカテゴリ</h2>
                     <p className="text-xs text-muted-foreground">
-                        {categories.length} 件 · D1に保存されたカテゴリ
+                        {categories.length} 件
                     </p>
                 </div>
                 <label className="relative" htmlFor="category-search">
-                    <Search className="absolute top-2.5 left-3 size-4" />
+                    <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                     <span className="sr-only">検索</span>
                     <Input
                         id="category-search"
-                        className="pl-9"
+                        className="pl-8"
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                     />
@@ -269,6 +351,9 @@ export function CategoryTable({
                     )}
                 </TableBody>
             </Table>
+            <div aria-live="polite" className="sr-only">
+                <span key={copyMessage.seq}>{copyMessage.text}</span>
+            </div>
         </section>
     );
 }
