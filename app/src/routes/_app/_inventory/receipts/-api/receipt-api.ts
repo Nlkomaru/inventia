@@ -179,3 +179,12 @@ export const applyReceipt = (
             body: JSON.stringify(receiptApplyInputSchema.parse(input)),
         },
     );
+
+/** 反映を開始したレシートは service 側で拒否される（在庫の根拠を残すため）。 */
+export const deleteReceipt = (receiptId: string): Promise<{ deleted: true }> =>
+    request(
+        `/api/receipts/${encodeURIComponent(receiptId)}`,
+        z.object({ deleted: z.literal(true) }),
+        "レシートを削除できませんでした",
+        { method: "DELETE" },
+    );

@@ -107,11 +107,14 @@ const columns = columnHelper.columns([
                     </span>
                     {/* 長い商品名でも折り返して崩さない */}
                     <span className="break-words text-sm font-medium">
-                        {review.rawName}
+                        {review.displayName}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                        レシート表記: {line.quantity} 点 /{" "}
-                        {formatYen(line.price)}
+                        レシート表記:{" "}
+                        {review.displayName === review.rawName
+                            ? null
+                            : `${review.rawName} / `}
+                        {line.quantity} 点 / {formatYen(line.price)}
                     </span>
                     {detailInvalid ? (
                         <span className="w-fit rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">

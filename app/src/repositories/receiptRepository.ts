@@ -45,6 +45,7 @@ export interface ReceiptLineRow {
     expiryReason: string | null;
     stockRelevant: boolean;
     suggestedCategoryId: string | null;
+    suggestedCategoryName: string | null;
     suggestedBaseUnit: string | null;
     suggestedBaseDimension: ReceiptBaseDimension | null;
     matchedItemId: string | null;
@@ -70,6 +71,7 @@ export interface ReceiptLineWrite {
     expiryReason: string | null;
     stockRelevant: boolean;
     suggestedCategoryId: string | null;
+    suggestedCategoryName: string | null;
     suggestedBaseUnit: string | null;
     suggestedBaseDimension: ReceiptBaseDimension | null;
 }
@@ -148,6 +150,7 @@ const receiptLineColumns = `id,
     expiry_reason AS expiryReason,
     stock_relevant AS stockRelevant,
     suggested_category_id AS suggestedCategoryId,
+    suggested_category_name AS suggestedCategoryName,
     suggested_base_unit AS suggestedBaseUnit,
     suggested_base_dimension AS suggestedBaseDimension,
     matched_item_id AS matchedItemId,
@@ -232,6 +235,16 @@ export const listReceipts = async (
     };
 };
 
+// SQLite に真偽値型が無く stock_relevant は 0 / 1 で返るため、行の型を跨ぐ前に変換する
+interface ReceiptLineSelectRow extends Omit<ReceiptLineRow, "stockRelevant"> {
+    stockRelevant: number;
+}
+
+const toReceiptLineRow = (row: ReceiptLineSelectRow): ReceiptLineRow => ({
+    ...row,
+    stockRelevant: row.stockRelevant !== 0,
+});
+
 export const listReceiptLines = async (
     db: D1Database,
     receiptId: string,
@@ -244,8 +257,8 @@ export const listReceiptLines = async (
              ORDER BY line_no ASC`,
         )
         .bind(receiptId)
-        .all<ReceiptLineRow>();
-    return result.results;
+        .all<ReceiptLineSelectRow>();
+    return result.results.map(toReceiptLineRow);
 };
 
 /**
@@ -295,9 +308,10 @@ export const saveReceiptParseResult = async (
                         (id, receipt_id, line_no, raw_name, completed_name, normalized_name, quantity, price,
                          printed_expiry_date, estimated_expiry_date, expiry_source,
                          expiry_confidence, expiry_reason, stock_relevant,
-                         suggested_category_id, suggested_base_unit, suggested_base_dimension,
+                         suggested_category_id, suggested_category_name,
+                         suggested_base_unit, suggested_base_dimension,
                          created_at, updated_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?18)`,
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?19)`,
                 )
                 .bind(
                     newId(),
@@ -315,6 +329,7 @@ export const saveReceiptParseResult = async (
                     line.expiryReason,
                     line.stockRelevant ? 1 : 0,
                     line.suggestedCategoryId,
+                    line.suggestedCategoryName,
                     line.suggestedBaseUnit,
                     line.suggestedBaseDimension,
                     now,
