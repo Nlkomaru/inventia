@@ -674,15 +674,15 @@ function ReceiptIntakePage() {
                         </p>
                     </div>
                     <Table>
-                        <TableHeader>
+                        <TableHeader className="bg-muted/50">
                             <TableRow>
-                                <TableHead>明細</TableHead>
-                                <TableHead>反映方法</TableHead>
-                                <TableHead className="text-right">
+                                <TableHead className="px-5">明細</TableHead>
+                                <TableHead className="px-5">反映方法</TableHead>
+                                <TableHead className="px-5 text-right">
                                     数量
                                 </TableHead>
-                                <TableHead>期限</TableHead>
-                                <TableHead>備考</TableHead>
+                                <TableHead className="px-5">期限</TableHead>
+                                <TableHead className="px-5">備考</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -693,18 +693,18 @@ function ReceiptIntakePage() {
                                 );
                                 return (
                                     <TableRow key={resultLine.lineId}>
-                                        <TableCell className="max-w-56 break-words align-top">
+                                        <TableCell className="max-w-56 break-words px-5 py-3 align-top">
                                             {line?.rawName ?? resultLine.lineId}
                                         </TableCell>
-                                        <TableCell className="align-top">
+                                        <TableCell className="px-5 py-3 align-top">
                                             {actionLabels[resultLine.action]}
                                         </TableCell>
-                                        <TableCell className="text-right align-top">
+                                        <TableCell className="px-5 py-3 text-right align-top">
                                             {resultLine.action === "skip"
                                                 ? "—"
                                                 : resultLine.quantity}
                                         </TableCell>
-                                        <TableCell className="align-top whitespace-nowrap">
+                                        <TableCell className="px-5 py-3 align-top whitespace-nowrap">
                                             {resultLine.action === "skip"
                                                 ? "—"
                                                 : resultLine.expiryDate === null
@@ -713,7 +713,7 @@ function ReceiptIntakePage() {
                                                         resultLine.expiryDate,
                                                     )}
                                         </TableCell>
-                                        <TableCell className="align-top">
+                                        <TableCell className="px-5 py-3 align-top">
                                             {resultNotes(resultLine)}
                                         </TableCell>
                                     </TableRow>
@@ -764,35 +764,37 @@ function ReceiptIntakePage() {
                         </p>
                     </div>
                     <Table>
-                        <TableHeader>
+                        <TableHeader className="bg-muted/50">
                             <TableRow>
-                                <TableHead>明細</TableHead>
-                                <TableHead className="text-right">
+                                <TableHead className="px-5">明細</TableHead>
+                                <TableHead className="px-5 text-right">
                                     数量
                                 </TableHead>
-                                <TableHead className="text-right">
+                                <TableHead className="px-5 text-right">
                                     金額
                                 </TableHead>
-                                <TableHead>反映先</TableHead>
-                                <TableHead>期限（読み取り値）</TableHead>
+                                <TableHead className="px-5">反映先</TableHead>
+                                <TableHead className="px-5">
+                                    期限（読み取り値）
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {lines.map((line) => (
                                 <TableRow key={line.id}>
-                                    <TableCell className="max-w-56 break-words align-top">
+                                    <TableCell className="max-w-56 break-words px-5 py-3 align-top">
                                         {line.rawName}
                                     </TableCell>
-                                    <TableCell className="text-right align-top">
+                                    <TableCell className="px-5 py-3 text-right align-top">
                                         {line.quantity}
                                     </TableCell>
-                                    <TableCell className="text-right align-top whitespace-nowrap">
+                                    <TableCell className="px-5 py-3 text-right align-top whitespace-nowrap">
                                         {formatYen(line.price)}
                                     </TableCell>
-                                    <TableCell className="align-top">
+                                    <TableCell className="px-5 py-3 align-top">
                                         {line.matchedItemName ?? "—"}
                                     </TableCell>
-                                    <TableCell className="align-top whitespace-nowrap">
+                                    <TableCell className="px-5 py-3 align-top whitespace-nowrap">
                                         {formatExpiryDate(
                                             line.suggestedExpiryDate,
                                         )}

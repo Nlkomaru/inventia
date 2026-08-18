@@ -9,12 +9,11 @@ import {
 } from "../-api/category-api";
 import { categoryKeys } from "../-api/category-queries";
 import {
-    categoryFormAtom,
     categoryFormSavingAtom,
     categoryQueryAtom,
     editingCategoryIdAtom,
     expandedCategoryIdsAtom,
-    initialCategoryFormState,
+    startCategoryEditAtom,
 } from "./category-atoms";
 import { CategoryForm } from "./category-form";
 import { CategoryTable } from "./category-table";
@@ -36,8 +35,7 @@ export function CategoryMasterPage({
 }) {
     const queryClient = useQueryClient();
     const editingId = useAtomValue(editingCategoryIdAtom);
-    const setEditingId = useSetAtom(editingCategoryIdAtom);
-    const setForm = useSetAtom(categoryFormAtom);
+    const resetEdit = useSetAtom(startCategoryEditAtom);
     const setSaving = useSetAtom(categoryFormSavingAtom);
     const setQuery = useSetAtom(categoryQueryAtom);
     const setExpanded = useSetAtom(expandedCategoryIdsAtom);
@@ -45,13 +43,12 @@ export function CategoryMasterPage({
     // atom はモジュールスコープに残るため、画面を離れるときに編集状態を破棄する
     useEffect(
         () => () => {
-            setEditingId(null);
-            setForm(initialCategoryFormState);
+            resetEdit(null);
             setSaving(false);
             setQuery("");
             setExpanded(new Set<string>());
         },
-        [setEditingId, setExpanded, setForm, setQuery, setSaving],
+        [resetEdit, setExpanded, setQuery, setSaving],
     );
     // onSuccess の Promise を返すと mutateAsync が再取得完了まで待つ。
     const invalidateCategories = () =>

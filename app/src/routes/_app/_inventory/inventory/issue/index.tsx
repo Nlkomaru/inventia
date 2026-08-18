@@ -513,8 +513,8 @@ function IssueStockPage() {
                 <div className="border-b p-5">
                     <h2 className="font-bold">引き当てプレビュー</h2>
                 </div>
-                <div className="flex flex-col gap-3 p-5">
-                    {lotsError ? (
+                {lotsError ? (
+                    <div className="p-5">
                         <div
                             aria-live="polite"
                             className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
@@ -530,67 +530,67 @@ function IssueStockPage() {
                                 再読み込み
                             </Button>
                         </div>
-                    ) : null}
-                    <output aria-live="polite" className="flex flex-col gap-3">
-                        {!selectedItem ? (
-                            <p className="text-sm text-muted-foreground">
-                                品目を選ぶと、引き当てられるロットを表示します。
-                            </p>
-                        ) : lotsLoading ? (
-                            <p className="text-sm text-muted-foreground">
-                                ロットを読み込み中…
-                            </p>
-                        ) : lots.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                在庫のあるロットがありません。先に入庫を記録してください。
-                            </p>
-                        ) : plan.rows.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                数量を入力すると、引き当てるロットを表示します。
-                            </p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>期限</TableHead>
-                                        <TableHead className="text-right">
-                                            引き当て
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            出庫後の残り
-                                        </TableHead>
+                    </div>
+                ) : null}
+                <output aria-live="polite" className="block">
+                    {!selectedItem ? (
+                        <p className="p-5 text-sm text-muted-foreground">
+                            品目を選ぶと、引き当てられるロットを表示します。
+                        </p>
+                    ) : lotsLoading ? (
+                        <p className="p-5 text-sm text-muted-foreground">
+                            ロットを読み込み中…
+                        </p>
+                    ) : lots.length === 0 ? (
+                        <p className="p-5 text-sm text-muted-foreground">
+                            在庫のあるロットがありません。先に入庫を記録してください。
+                        </p>
+                    ) : plan.rows.length === 0 ? (
+                        <p className="p-5 text-sm text-muted-foreground">
+                            数量を入力すると、引き当てるロットを表示します。
+                        </p>
+                    ) : (
+                        <Table>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                    <TableHead className="px-5">期限</TableHead>
+                                    <TableHead className="px-5 text-right">
+                                        引き当て
+                                    </TableHead>
+                                    <TableHead className="px-5 text-right">
+                                        出庫後の残り
+                                    </TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {plan.rows.map((row) => (
+                                    <TableRow key={row.lotId}>
+                                        <TableCell className="px-5 py-3">
+                                            {formatExpiry(row.expiryDate)}
+                                        </TableCell>
+                                        <TableCell className="px-5 py-3 text-right">
+                                            {row.delta} {baseUnit}
+                                        </TableCell>
+                                        <TableCell className="px-5 py-3 text-right">
+                                            {remainingQuantity(
+                                                lots,
+                                                row.lotId,
+                                                row.delta,
+                                            )}{" "}
+                                            {baseUnit}
+                                        </TableCell>
                                     </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {plan.rows.map((row) => (
-                                        <TableRow key={row.lotId}>
-                                            <TableCell>
-                                                {formatExpiry(row.expiryDate)}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {row.delta} {baseUnit}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {remainingQuantity(
-                                                    lots,
-                                                    row.lotId,
-                                                    row.delta,
-                                                )}{" "}
-                                                {baseUnit}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                        {shortage > 0 ? (
-                            <p className="text-sm font-medium text-destructive">
-                                在庫が {shortage} {baseUnit}{" "}
-                                不足しています。数量またはロットを見直してください。
-                            </p>
-                        ) : null}
-                    </output>
-                </div>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                    {shortage > 0 ? (
+                        <p className="px-5 pb-5 text-sm font-medium text-destructive">
+                            在庫が {shortage} {baseUnit}{" "}
+                            不足しています。数量またはロットを見直してください。
+                        </p>
+                    ) : null}
+                </output>
             </section>
 
             {submitError ? (

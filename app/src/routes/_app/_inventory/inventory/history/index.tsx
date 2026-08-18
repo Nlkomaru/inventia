@@ -238,84 +238,84 @@ function StockHistoryPage() {
                             </Button>
                         </div>
                     ) : null}
-
-                    {movements.length === 0 ? (
-                        <p
-                            aria-live="polite"
-                            className="text-sm text-muted-foreground"
-                        >
-                            履歴がありません。
-                        </p>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>日時</TableHead>
-                                    <TableHead>品目</TableHead>
-                                    <TableHead>理由</TableHead>
-                                    <TableHead className="text-right">
-                                        差分
-                                    </TableHead>
-                                    <TableHead>ロット内訳</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {movements.map((movement) => {
-                                    const unit =
-                                        itemUnits.get(movement.itemId) ?? "";
-                                    return (
-                                        <TableRow key={movement.id}>
-                                            <TableCell className="align-top whitespace-nowrap">
-                                                {formatDateTime(
-                                                    movement.occurredAt,
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="align-top">
-                                                {itemNames.get(
-                                                    movement.itemId,
-                                                ) ?? movement.itemId}
-                                            </TableCell>
-                                            <TableCell className="align-top">
-                                                {reasonLabels[movement.reason]}
-                                            </TableCell>
-                                            <TableCell className="text-right align-top whitespace-nowrap">
-                                                {formatDelta(movement.delta)}{" "}
-                                                {unit}
-                                            </TableCell>
-                                            <TableCell className="align-top">
-                                                {movement.allocations.length ===
-                                                0 ? (
-                                                    "—"
-                                                ) : (
-                                                    <ul className="flex flex-col gap-1">
-                                                        {movement.allocations.map(
-                                                            (allocation) => (
-                                                                <li
-                                                                    key={
-                                                                        allocation.lotId
-                                                                    }
-                                                                >
-                                                                    {formatExpiry(
-                                                                        allocation.expiryDate,
-                                                                    )}
-                                                                    :{" "}
-                                                                    {formatDelta(
-                                                                        allocation.delta,
-                                                                    )}{" "}
-                                                                    {unit}
-                                                                </li>
-                                                            ),
-                                                        )}
-                                                    </ul>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    )}
                 </div>
+
+                {movements.length === 0 ? (
+                    <p
+                        aria-live="polite"
+                        className="p-5 text-sm text-muted-foreground"
+                    >
+                        履歴がありません。
+                    </p>
+                ) : (
+                    <Table>
+                        <TableHeader className="bg-muted/50">
+                            <TableRow>
+                                <TableHead className="px-5">日時</TableHead>
+                                <TableHead className="px-5">品目</TableHead>
+                                <TableHead className="px-5">理由</TableHead>
+                                <TableHead className="px-5 text-right">
+                                    差分
+                                </TableHead>
+                                <TableHead className="px-5">
+                                    ロット内訳
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {movements.map((movement) => {
+                                const unit =
+                                    itemUnits.get(movement.itemId) ?? "";
+                                return (
+                                    <TableRow key={movement.id}>
+                                        <TableCell className="px-5 py-3 align-top whitespace-nowrap">
+                                            {formatDateTime(
+                                                movement.occurredAt,
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="px-5 py-3 align-top">
+                                            {itemNames.get(movement.itemId) ??
+                                                movement.itemId}
+                                        </TableCell>
+                                        <TableCell className="px-5 py-3 align-top">
+                                            {reasonLabels[movement.reason]}
+                                        </TableCell>
+                                        <TableCell className="px-5 py-3 text-right align-top whitespace-nowrap">
+                                            {formatDelta(movement.delta)} {unit}
+                                        </TableCell>
+                                        <TableCell className="px-5 py-3 align-top">
+                                            {movement.allocations.length ===
+                                            0 ? (
+                                                "—"
+                                            ) : (
+                                                <ul className="flex flex-col gap-1">
+                                                    {movement.allocations.map(
+                                                        (allocation) => (
+                                                            <li
+                                                                key={
+                                                                    allocation.lotId
+                                                                }
+                                                            >
+                                                                {formatExpiry(
+                                                                    allocation.expiryDate,
+                                                                )}
+                                                                :{" "}
+                                                                {formatDelta(
+                                                                    allocation.delta,
+                                                                )}{" "}
+                                                                {unit}
+                                                            </li>
+                                                        ),
+                                                    )}
+                                                </ul>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                )}
                 <div className="flex items-center justify-between border-t p-5">
                     <p className="text-sm text-muted-foreground">
                         {movements.length} 件を表示中

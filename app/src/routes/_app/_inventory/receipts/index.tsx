@@ -188,118 +188,106 @@ function ReceiptListPage() {
                     </div>
                 ) : null}
 
-                <div className="overflow-x-auto">
-                    <Table>
-                        <TableHeader>
+                <Table>
+                    <TableHeader className="bg-muted/50">
+                        <TableRow>
+                            <TableHead className="px-5">取込日時</TableHead>
+                            <TableHead className="px-5">状態</TableHead>
+                            <TableHead className="px-5">店舗</TableHead>
+                            <TableHead className="px-5">購入日時</TableHead>
+                            <TableHead className="px-5 text-right">
+                                合計
+                            </TableHead>
+                            <TableHead className="px-5 text-right">
+                                明細
+                            </TableHead>
+                            <TableHead className="px-5 text-right">
+                                操作
+                            </TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {receipts.length === 0 ? (
                             <TableRow>
-                                <TableHead>取込日時</TableHead>
-                                <TableHead>状態</TableHead>
-                                <TableHead>店舗</TableHead>
-                                <TableHead>購入日時</TableHead>
-                                <TableHead className="text-right">
-                                    合計
-                                </TableHead>
-                                <TableHead className="text-right">
-                                    明細
-                                </TableHead>
-                                <TableHead className="text-right">
-                                    操作
-                                </TableHead>
+                                <TableCell
+                                    aria-live="polite"
+                                    className="h-24 text-center text-muted-foreground"
+                                    colSpan={7}
+                                >
+                                    取込履歴がありません。
+                                </TableCell>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {receipts.length === 0 ? (
-                                <TableRow>
-                                    <TableCell
-                                        aria-live="polite"
-                                        className="h-24 text-center text-muted-foreground"
-                                        colSpan={7}
+                        ) : null}
+                        {receipts.map((receipt) => (
+                            <TableRow key={receipt.id}>
+                                <TableCell className="px-5 py-3 align-top whitespace-nowrap">
+                                    {formatDateTimeOrDash(receipt.createdAt)}
+                                </TableCell>
+                                <TableCell className="px-5 py-3 align-top">
+                                    <span
+                                        className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${receiptStatusClassNames[receipt.status]}`}
                                     >
-                                        取込履歴がありません。
-                                    </TableCell>
-                                </TableRow>
-                            ) : null}
-                            {receipts.map((receipt) => (
-                                <TableRow key={receipt.id}>
-                                    <TableCell className="align-top whitespace-nowrap">
-                                        {formatDateTimeOrDash(
-                                            receipt.createdAt,
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="align-top">
-                                        <span
-                                            className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${receiptStatusClassNames[receipt.status]}`}
-                                        >
-                                            {
-                                                receiptStatusLabels[
-                                                    receipt.status
-                                                ]
-                                            }
-                                        </span>
-                                        {receipt.status === "failed" &&
-                                        receipt.errorMessage !== null ? (
-                                            <p className="mt-1 max-w-56 break-words text-xs text-destructive">
-                                                {receipt.errorMessage}
-                                            </p>
-                                        ) : null}
-                                    </TableCell>
-                                    <TableCell className="max-w-48 break-words align-top">
-                                        {receipt.storeName ?? "—"}
-                                    </TableCell>
-                                    <TableCell className="align-top whitespace-nowrap">
-                                        {formatDateTimeOrDash(
-                                            receipt.purchasedAt,
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="text-right align-top whitespace-nowrap">
-                                        {formatYen(receipt.totalPrice)}
-                                    </TableCell>
-                                    <TableCell className="text-right align-top">
-                                        {receipt.lineCount}
-                                    </TableCell>
-                                    <TableCell className="text-right align-top">
-                                        <Button
-                                            nativeButton={false}
-                                            render={
-                                                // biome-ignore lint/a11y/useAnchorContent: Base UI forwards Button children to this anchor.
-                                                <a
-                                                    aria-label={`${receipt.storeName ?? "レシート"}の取込を開く`}
-                                                    href={resumeHref(
-                                                        receipt.id,
-                                                    )}
-                                                />
-                                            }
-                                            size="sm"
-                                            variant="outline"
-                                        >
-                                            {receipt.status === "applied"
-                                                ? "内容を見る"
-                                                : "続きから確認"}
-                                        </Button>
-                                        {/* 反映を開始したレシートは在庫の根拠として残す */}
-                                        <Button
-                                            aria-label={`${receipt.storeName ?? "レシート"}の取込を削除`}
-                                            className="ml-2"
-                                            disabled={
-                                                deleting ||
-                                                receipt.status === "applied" ||
-                                                receipt.purchaseId !== null
-                                            }
-                                            onClick={() =>
-                                                void removeReceipt(receipt.id)
-                                            }
-                                            size="icon-sm"
-                                            type="button"
-                                            variant="ghost"
-                                        >
-                                            <Trash2Icon />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
+                                        {receiptStatusLabels[receipt.status]}
+                                    </span>
+                                    {receipt.status === "failed" &&
+                                    receipt.errorMessage !== null ? (
+                                        <p className="mt-1 max-w-56 break-words text-xs text-destructive">
+                                            {receipt.errorMessage}
+                                        </p>
+                                    ) : null}
+                                </TableCell>
+                                <TableCell className="max-w-48 break-words px-5 py-3 align-top">
+                                    {receipt.storeName ?? "—"}
+                                </TableCell>
+                                <TableCell className="px-5 py-3 align-top whitespace-nowrap">
+                                    {formatDateTimeOrDash(receipt.purchasedAt)}
+                                </TableCell>
+                                <TableCell className="px-5 py-3 text-right align-top whitespace-nowrap">
+                                    {formatYen(receipt.totalPrice)}
+                                </TableCell>
+                                <TableCell className="px-5 py-3 text-right align-top">
+                                    {receipt.lineCount}
+                                </TableCell>
+                                <TableCell className="px-5 py-3 text-right align-top">
+                                    <Button
+                                        nativeButton={false}
+                                        render={
+                                            // biome-ignore lint/a11y/useAnchorContent: Base UI forwards Button children to this anchor.
+                                            <a
+                                                aria-label={`${receipt.storeName ?? "レシート"}の取込を開く`}
+                                                href={resumeHref(receipt.id)}
+                                            />
+                                        }
+                                        size="sm"
+                                        variant="outline"
+                                    >
+                                        {receipt.status === "applied"
+                                            ? "内容を見る"
+                                            : "続きから確認"}
+                                    </Button>
+                                    {/* 反映を開始したレシートは在庫の根拠として残す */}
+                                    <Button
+                                        aria-label={`${receipt.storeName ?? "レシート"}の取込を削除`}
+                                        className="ml-2"
+                                        disabled={
+                                            deleting ||
+                                            receipt.status === "applied" ||
+                                            receipt.purchaseId !== null
+                                        }
+                                        onClick={() =>
+                                            void removeReceipt(receipt.id)
+                                        }
+                                        size="icon-sm"
+                                        type="button"
+                                        variant="ghost"
+                                    >
+                                        <Trash2Icon />
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
                 <div className="flex flex-col items-stretch gap-3 border-t p-5">
                     <div aria-live="assertive">
                         {deleteError ? (

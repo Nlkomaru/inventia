@@ -512,13 +512,13 @@ function ReceiveStockPage() {
                         </p>
                     ) : (
                         <Table>
-                            <TableHeader>
+                            <TableHeader className="bg-muted/50">
                                 <TableRow>
-                                    <TableHead>期限</TableHead>
-                                    <TableHead className="text-right">
+                                    <TableHead className="px-5">期限</TableHead>
+                                    <TableHead className="px-5 text-right">
                                         数量
                                     </TableHead>
-                                    <TableHead className="text-right">
+                                    <TableHead className="px-5 text-right">
                                         操作
                                     </TableHead>
                                 </TableRow>
@@ -526,13 +526,13 @@ function ReceiveStockPage() {
                             <TableBody>
                                 {lots.map((lot) => (
                                     <TableRow key={lot.id}>
-                                        <TableCell>
+                                        <TableCell className="px-5 py-3">
                                             {formatExpiry(lot.expiryDate)}
                                         </TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="px-5 py-3 text-right">
                                             {lot.quantity} {baseUnit}
                                         </TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="px-5 py-3 text-right">
                                             <Button
                                                 onClick={() =>
                                                     applyExistingLot(lot)

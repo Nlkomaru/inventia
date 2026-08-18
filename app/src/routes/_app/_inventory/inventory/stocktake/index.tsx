@@ -535,13 +535,15 @@ function StocktakePage() {
                             </p>
                         ) : (
                             <Table>
-                                <TableHeader>
+                                <TableHeader className="bg-muted/50">
                                     <TableRow>
-                                        <TableHead>期限</TableHead>
-                                        <TableHead className="text-right">
+                                        <TableHead className="px-5">
+                                            期限
+                                        </TableHead>
+                                        <TableHead className="px-5 text-right">
                                             確定後
                                         </TableHead>
-                                        <TableHead className="text-right">
+                                        <TableHead className="px-5 text-right">
                                             差分
                                         </TableHead>
                                     </TableRow>
@@ -551,13 +553,13 @@ function StocktakePage() {
                                         <TableRow
                                             key={entry.expiryDate ?? "none"}
                                         >
-                                            <TableCell>
+                                            <TableCell className="px-5 py-3">
                                                 {formatExpiry(entry.expiryDate)}
                                             </TableCell>
-                                            <TableCell className="text-right">
+                                            <TableCell className="px-5 py-3 text-right">
                                                 {entry.quantity} {baseUnit}
                                             </TableCell>
-                                            <TableCell className="text-right">
+                                            <TableCell className="px-5 py-3 text-right">
                                                 {formatDelta(entry.delta)}{" "}
                                                 {baseUnit}
                                             </TableCell>

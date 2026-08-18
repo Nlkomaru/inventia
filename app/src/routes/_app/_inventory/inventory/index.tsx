@@ -234,10 +234,8 @@ function InventoryPage() {
 
     return (
         <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
-            <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <h1 className="mt-1 text-2xl font-bold">在庫一覧</h1>
-                </div>
+            <header className="flex items-center justify-between gap-4">
+                <h1 className="mt-1 text-2xl font-bold">在庫一覧</h1>
                 <Button
                     disabled={reloading}
                     onClick={reload}
