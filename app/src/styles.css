@@ -27,12 +27,14 @@ body {
 	-webkit-font-smoothing: antialiased;
 }
 
-button,
-input,
-select,
-option {
-	font: inherit;
-	font-family: var(--font-sans);
+@layer base {
+	button,
+	input,
+	select,
+	option {
+		font: inherit;
+		font-family: var(--font-sans);
+	}
 }
 
 @theme inline {
