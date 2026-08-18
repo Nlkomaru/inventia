@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerCategoryTools } from "./tools/categories";
 import { registerHealthTool } from "./tools/health";
 import { registerInventoryTools } from "./tools/inventory";
 import { registerInventoryWriteTools } from "./tools/inventory-write";
@@ -13,6 +14,7 @@ export const createMcpServer = (db: D1Database): McpServer => {
     registerHealthTool(server);
     registerInventoryTools(server, db);
     registerLocationTools(server, db);
+    registerCategoryTools(server, db);
     registerInventoryWriteTools(server, db);
 
     return server;
