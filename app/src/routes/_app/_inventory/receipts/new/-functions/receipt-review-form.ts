@@ -33,7 +33,10 @@ export interface ReceiptReviewNewItemForm {
 export interface ReceiptReviewRow {
     lineId: string;
     lineNo: number;
+    /** レシートの印字そのまま。紙との突き合わせと表記辞書の見出しに使う。 */
     rawName: string;
+    /** ※ などを除いて整えた表示名。印字のままで良い行は rawName と同じ。 */
+    displayName: string;
     /** 反映方法。既定は照合済みなら既存品目へ加算、未照合ならスキップ。 */
     action: ReceiptReviewAction;
     /** action = add_to_item のときの反映先品目 ID。 */
@@ -104,6 +107,7 @@ export const createReviewRow = (line: ReceiptLineDto): ReceiptReviewRow => ({
     lineId: line.id,
     lineNo: line.lineNo,
     rawName: line.rawName,
+    displayName: line.completedName ?? line.rawName,
     action: resolveInitialAction(line),
     itemId: line.matchedItemId ?? "",
     quantity: String(line.quantity),

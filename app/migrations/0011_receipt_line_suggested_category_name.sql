@@ -1,0 +1,1 @@
+ALTER TABLE `receipt_lines` ADD `suggested_category_name` text;

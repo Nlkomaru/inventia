@@ -1,10 +1,15 @@
-import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
+import {
+    useMutation,
+    useQueryClient,
+    useSuspenseInfiniteQuery,
+} from "@tanstack/react-query";
 import {
     createFileRoute,
     type ErrorComponentProps,
     useRouter,
 } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { Trash2Icon } from "lucide-react";
+import { useMemo, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,7 +42,8 @@ import {
     receiptStatuses,
     receiptStatusSchema,
 } from "@/domain/receipt";
-import { receiptListQueryOptions } from "./-api/receipt-queries";
+import { deleteReceipt } from "./-api/receipt-api";
+import { receiptKeys, receiptListQueryOptions } from "./-api/receipt-queries";
 import {
     formatDateTimeOrDash,
     formatYen,
@@ -81,6 +87,24 @@ function ReceiptListPage() {
         () => listQuery.data.pages.flatMap((page) => page.receipts),
         [listQuery.data],
     );
+    const queryClient = useQueryClient();
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+    const deleteMutation = useMutation({
+        mutationFn: (receiptId: string) => deleteReceipt(receiptId),
+        onSuccess: () =>
+            queryClient.invalidateQueries({ queryKey: receiptKeys.all }),
+    });
+    const deleting = deleteMutation.isPending;
+    const removeReceipt = async (receiptId: string) => {
+        setDeleteError(null);
+        try {
+            await deleteMutation.mutateAsync(receiptId);
+        } catch (cause) {
+            setDeleteError(
+                errorMessage(cause, "レシートを削除できませんでした"),
+            );
+        }
+    };
     const error = listQuery.error
         ? errorMessage(listQuery.error, "取込履歴を読み込めませんでした")
         : null;
@@ -268,6 +292,28 @@ function ReceiptListPage() {
                                                         ? "内容を見る"
                                                         : "続きから確認"}
                                                 </Button>
+                                                {/* 反映を開始したレシートは在庫の根拠として残す */}
+                                                <Button
+                                                    aria-label={`${receipt.storeName ?? "レシート"}の取込を削除`}
+                                                    className="ml-2"
+                                                    disabled={
+                                                        deleting ||
+                                                        receipt.status ===
+                                                            "applied" ||
+                                                        receipt.purchaseId !==
+                                                            null
+                                                    }
+                                                    onClick={() =>
+                                                        void removeReceipt(
+                                                            receipt.id,
+                                                        )
+                                                    }
+                                                    size="icon-sm"
+                                                    type="button"
+                                                    variant="ghost"
+                                                >
+                                                    <Trash2Icon />
+                                                </Button>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -276,24 +322,36 @@ function ReceiptListPage() {
                         </div>
                     )}
                 </CardContent>
-                <CardFooter className="justify-between">
-                    <p className="text-sm text-muted-foreground">
-                        {receipts.length} 件を表示中
-                        {listQuery.hasNextPage ? "" : "（すべて表示）"}
-                    </p>
-                    <Button
-                        disabled={
-                            !listQuery.hasNextPage ||
-                            listQuery.isFetchingNextPage
-                        }
-                        onClick={() => void listQuery.fetchNextPage()}
-                        type="button"
-                        variant="outline"
-                    >
-                        {listQuery.isFetchingNextPage
-                            ? "読み込み中…"
-                            : "続きを読み込む"}
-                    </Button>
+                <CardFooter className="flex-col items-stretch gap-3">
+                    <div aria-live="assertive">
+                        {deleteError ? (
+                            <p
+                                className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+                                role="alert"
+                            >
+                                {deleteError}
+                            </p>
+                        ) : null}
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm text-muted-foreground">
+                            {receipts.length} 件を表示中
+                            {listQuery.hasNextPage ? "" : "（すべて表示）"}
+                        </p>
+                        <Button
+                            disabled={
+                                !listQuery.hasNextPage ||
+                                listQuery.isFetchingNextPage
+                            }
+                            onClick={() => void listQuery.fetchNextPage()}
+                            type="button"
+                            variant="outline"
+                        >
+                            {listQuery.isFetchingNextPage
+                                ? "読み込み中…"
+                                : "続きを読み込む"}
+                        </Button>
+                    </div>
                 </CardFooter>
             </Card>
         </main>

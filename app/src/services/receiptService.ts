@@ -22,6 +22,7 @@ import {
     receiptListQuerySchema,
     receiptMaxByteSize,
     receiptOcrResultSchema,
+    receiptTaxIncludedPrice,
 } from "../domain/receipt";
 import {
     buildReceiptMatchIndex,
@@ -227,6 +228,7 @@ const toLineDto = (
     completedName: row.completedName,
     stockRelevant: row.stockRelevant,
     suggestedCategoryId: row.suggestedCategoryId,
+    suggestedCategoryName: row.suggestedCategoryName,
     suggestedBaseUnit: row.suggestedBaseUnit,
     suggestedBaseDimension: row.suggestedBaseDimension,
     normalizedName: row.normalizedName,
@@ -449,12 +451,14 @@ const toLineWrites = (
         expirySource: "printed" | "estimated" | "unknown";
         expiryConfidence: "high" | "medium" | "low" | null;
         expiryEstimateReason: string | null;
+        taxRate: 8 | 10 | null;
         stockRelevant: boolean;
         suggestedCategoryName: string | null;
         suggestedBaseUnit: string | null;
         suggestedBaseDimension: ReceiptBaseDimension | null;
     }[],
     categoryIndex: ReadonlyMap<string, string>,
+    pricesIncludeTax: boolean,
 ): ReceiptLineWrite[] => {
     const writes: ReceiptLineWrite[] = [];
     for (const line of lines) {
@@ -486,13 +490,19 @@ const toLineWrites = (
             // 解決できた ID だけを保存する。名前が一致しなければ確認画面で選ばせる
             suggestedCategoryId:
                 categoryIndex.get(suggestedCategoryName) ?? null,
+            suggestedCategoryName: line.suggestedCategoryName?.trim() || null,
             suggestedBaseUnit: unitPaired ? baseUnit : null,
             suggestedBaseDimension: unitPaired
                 ? line.suggestedBaseDimension
                 : null,
             normalizedName: normalizeReceiptName(rawName),
             quantity: line.quantity,
-            price: line.price,
+            // 保存する金額は常に税込へ揃える
+            price: receiptTaxIncludedPrice(
+                line.price,
+                line.taxRate,
+                pricesIncludeTax,
+            ),
             printedExpiryDate: expiry.printedExpiryDate,
             estimatedExpiryDate: expiry.estimatedExpiryDate,
             expirySource: expiry.expirySource,
@@ -620,6 +630,7 @@ export const parseReceipt = async (
             const lines = toLineWrites(
                 parsed.data.lines,
                 categoryIdByName(categories.items),
+                parsed.data.pricesIncludeTax,
             );
             if (lines.length === 0) {
                 throw new ReceiptParseFailure(parseFailureMessages.malformed);

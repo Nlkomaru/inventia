@@ -628,6 +628,8 @@ export const receiptLines = sqliteTable(
         // 解析時に既存カテゴリへ解決できた場合の ID。カテゴリ削除を妨げないよう
         // 外部キーは張らず、参照が切れた場合は確認画面で選び直す
         suggestedCategoryId: text("suggested_category_id"),
+        // 解決できなかったとき何を返したか追えるよう、AI の回答も残す
+        suggestedCategoryName: text("suggested_category_name"),
         suggestedBaseUnit: text("suggested_base_unit"),
         suggestedBaseDimension: text("suggested_base_dimension", {
             enum: unitDimensions,

@@ -78,6 +78,13 @@
       "when": 1787030058782,
       "tag": "0010_receipt_line_suggestions",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1787036352933,
+      "tag": "0011_receipt_line_suggested_category_name",
+      "breakpoints": true
     }
   ]
 }
