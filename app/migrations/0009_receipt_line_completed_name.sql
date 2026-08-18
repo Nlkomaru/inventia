@@ -1,0 +1,1 @@
+ALTER TABLE `receipt_lines` ADD `completed_name` text;

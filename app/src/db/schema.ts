@@ -597,6 +597,9 @@ export const receiptLines = sqliteTable(
         lineNo: integer("line_no").notNull(),
         // レシートに印字された表記そのまま
         rawName: text("raw_name").notNull(),
+        // 印字が途切れていた場合の補完名。表記辞書の見出しは raw_name のままにするため、
+        // 新規品目名の初期値としてだけ使う。補完が不要・不確かなら null
+        completedName: text("completed_name"),
         // domain の normalizeReceiptName を通した照合キー
         normalizedName: text("normalized_name").notNull(),
         quantity: integer("quantity").notNull(),
