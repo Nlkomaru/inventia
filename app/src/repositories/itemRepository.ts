@@ -285,11 +285,17 @@ export const locationExists = async (
             .first<{ id: string }>(),
     );
 
+/**
+ * 品目を作る。`options.id` を渡すと採番済みの ID で作る。
+ * 呼び出し側が作成前に ID を確定させておきたい場合（再実行で同じ品目へ収束させる
+ * 場合など）にだけ使い、通常はここで採番する。
+ */
 export const createItem = async (
     db: D1Database,
     input: ResolvedItemCreateInput,
+    options: { id?: string } = {},
 ): Promise<ItemRow> => {
-    const id = newId();
+    const id = options.id ?? newId();
     const now = new Date().toISOString();
     const expiryDate = input.expiryDate ?? null;
     const itemStatement = db

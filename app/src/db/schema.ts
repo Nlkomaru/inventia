@@ -31,6 +31,31 @@ export const stockOperationKinds = ["adjustment", "stocktake"] as const;
 
 export const readingStatuses = ["unread", "reading", "finished"] as const;
 
+export const receiptStatuses = [
+    "uploaded",
+    "parsing",
+    "parsed",
+    "applied",
+    "failed",
+] as const;
+
+export const receiptExpirySources = [
+    "printed",
+    "estimated",
+    "unknown",
+] as const;
+
+export const receiptExpiryConfidences = ["high", "medium", "low"] as const;
+
+export const receiptMatchMethods = [
+    "exact",
+    "alias",
+    "similarity",
+    "manual",
+] as const;
+
+export const itemAliasSources = ["receipt", "manual"] as const;
+
 export const storageLocations = sqliteTable(
     "storage_locations",
     {
@@ -218,10 +243,9 @@ export const itemReadingStates = sqliteTable(
 );
 
 // 購入イベント。stock_movements（在庫増）と price_records（価格明細）を 1 つの
-// 購入行為として束ね、コメントと（フェーズ 2 の）レシートの結び付け先になる。
-// 合計金額は明細から導出するため持たない。レシート由来の場合はフェーズ 2 で
-// receipt_id を追加する（SQLite の ALTER ADD COLUMN は UNIQUE を付けられないため
-// 1:1 制約は別途 unique index で張る）
+// 購入行為として束ね、コメントとレシートの結び付け先になる。
+// 合計金額は明細から導出するため持たない。レシートとの結び付けは receipts.purchase_id
+// が持つため、この表にレシートへの参照列は持たない
 export const purchases = sqliteTable(
     "purchases",
     {
@@ -504,6 +528,169 @@ export const integrationSettings = sqliteTable(
         check(
             "ck_integration_settings_chat_model_not_empty",
             sql`length(${t.chatModel}) > 0`,
+        ),
+    ],
+);
+
+// 取り込んだレシート画像 1 枚の状態。画像そのものは R2（RECEIPTS binding）に置き、
+// この表は object_key だけを持つ。承認前に在庫へ反映しないため、在庫・価格への
+// 反映結果は purchase_id と applied_at にだけ現れる
+export const receipts = sqliteTable(
+    "receipts",
+    {
+        id: text("id").primaryKey(),
+        // R2 のオブジェクトキー。1 レシート 1 オブジェクトのため unique
+        objectKey: text("object_key").notNull(),
+        contentType: text("content_type").notNull(),
+        byteSize: integer("byte_size").notNull(),
+        status: text("status", { enum: receiptStatuses }).notNull(),
+        storeName: text("store_name"),
+        // ISO 8601 UTC。レシート表記から読み取れない場合は null
+        purchasedAt: text("purchased_at"),
+        // レシート記載の合計金額（円、整数）。明細合計との突き合わせに使う
+        totalPrice: integer("total_price"),
+        // 解析に使った LLM のモデル ID
+        model: text("model"),
+        // 利用者が対処できる失敗理由だけを入れる。上流の例外文字列や API 応答を格納しない
+        errorMessage: text("error_message"),
+        // 適用後に設定する。購入履歴を孤児にしないため restrict
+        purchaseId: text("purchase_id").references(() => purchases.id, {
+            onDelete: "restrict",
+        }),
+        appliedAt: text("applied_at"),
+        createdAt: text("created_at").notNull(),
+        updatedAt: text("updated_at").notNull(),
+    },
+    (t) => [
+        uniqueIndex("uq_receipts_object_key").on(t.objectKey),
+        // 取込履歴一覧の cursor paging 用。(created_at, id) で順序を一意に安定させる
+        index("idx_receipts_created_at").on(t.createdAt, t.id),
+        index("idx_receipts_status").on(t.status),
+        check("ck_receipts_byte_size_positive", sql`${t.byteSize} > 0`),
+        check(
+            "ck_receipts_status",
+            sql`${t.status} in ('uploaded', 'parsing', 'parsed', 'applied', 'failed')`,
+        ),
+        check(
+            "ck_receipts_total_price_non_negative",
+            sql`${t.totalPrice} is null or ${t.totalPrice} >= 0`,
+        ),
+    ],
+);
+
+// AI が抽出したレシート明細 1 行と、その照合結果。承認前の下書きであり、
+// この表の存在だけでは在庫は動かない。レシートを消せば行も消えるため cascade
+export const receiptLines = sqliteTable(
+    "receipt_lines",
+    {
+        id: text("id").primaryKey(),
+        receiptId: text("receipt_id")
+            .notNull()
+            .references(() => receipts.id, { onDelete: "cascade" }),
+        lineNo: integer("line_no").notNull(),
+        // レシートに印字された表記そのまま
+        rawName: text("raw_name").notNull(),
+        // domain の normalizeReceiptName を通した照合キー
+        normalizedName: text("normalized_name").notNull(),
+        quantity: integer("quantity").notNull(),
+        // その行の金額（円、整数、数量分の小計）
+        price: integer("price"),
+        printedExpiryDate: text("printed_expiry_date"),
+        estimatedExpiryDate: text("estimated_expiry_date"),
+        expirySource: text("expiry_source", {
+            enum: receiptExpirySources,
+        }).notNull(),
+        expiryConfidence: text("expiry_confidence", {
+            enum: receiptExpiryConfidences,
+        }),
+        expiryReason: text("expiry_reason"),
+        // 照合先の品目。参照されている品目の削除は restrict で禁止する
+        matchedItemId: text("matched_item_id").references(() => items.id, {
+            onDelete: "restrict",
+        }),
+        // create_item の反映で使う品目 ID の先行予約。品目を作る前に書くため
+        // FK を持てない（存在しない行を参照する）。再実行時はこの ID の品目を
+        // 探して再利用し、同名の孤児品目が増えないようにする
+        pendingItemId: text("pending_item_id"),
+        matchMethod: text("match_method", { enum: receiptMatchMethods }),
+        // 類似度は 0-100 の整数。浮動小数を保存しない
+        matchScore: integer("match_score"),
+        createdAt: text("created_at").notNull(),
+        updatedAt: text("updated_at").notNull(),
+    },
+    (t) => [
+        // 同一レシート内の行番号重複を禁止しつつ、明細取得の索引も兼ねる
+        uniqueIndex("uq_receipt_lines_receipt_line_no").on(
+            t.receiptId,
+            t.lineNo,
+        ),
+        check("ck_receipt_lines_line_no_positive", sql`${t.lineNo} >= 1`),
+        check("ck_receipt_lines_quantity_positive", sql`${t.quantity} >= 1`),
+        check(
+            "ck_receipt_lines_price_non_negative",
+            sql`${t.price} is null or ${t.price} >= 0`,
+        ),
+        check(
+            "ck_receipt_lines_expiry_source",
+            sql`${t.expirySource} in ('printed', 'estimated', 'unknown')`,
+        ),
+        check(
+            "ck_receipt_lines_expiry_confidence",
+            sql`${t.expiryConfidence} is null or ${t.expiryConfidence} in ('high', 'medium', 'low')`,
+        ),
+        // 期限の由来と値を食い違わせない。printed なのに印字が無い、unknown
+        // なのに日付がある、といった行は「レシートの印字」と表示できないため
+        // 保存も許さない（表示ラベルの根拠を DB 制約で保証する）
+        check(
+            "ck_receipt_lines_expiry_consistent",
+            sql`(${t.expirySource} = 'printed'
+                    and ${t.printedExpiryDate} is not null
+                    and ${t.estimatedExpiryDate} is null
+                    and ${t.expiryConfidence} is null
+                    and ${t.expiryReason} is null)
+                or (${t.expirySource} = 'estimated'
+                    and ${t.printedExpiryDate} is null
+                    and ${t.estimatedExpiryDate} is not null)
+                or (${t.expirySource} = 'unknown'
+                    and ${t.printedExpiryDate} is null
+                    and ${t.estimatedExpiryDate} is null
+                    and ${t.expiryConfidence} is null
+                    and ${t.expiryReason} is null)`,
+        ),
+        check(
+            "ck_receipt_lines_match_method",
+            sql`${t.matchMethod} is null or ${t.matchMethod} in ('exact', 'alias', 'similarity', 'manual')`,
+        ),
+        check(
+            "ck_receipt_lines_match_score_range",
+            sql`${t.matchScore} is null or (${t.matchScore} >= 0 and ${t.matchScore} <= 100)`,
+        ),
+    ],
+);
+
+// レシート表記から品目への辞書。1 つの正規化表記は 1 品目にしか結び付かないため
+// normalized_name は全体で unique とする。品目を消す前にエイリアスを消す運用にするため
+// FK は restrict とする
+export const itemAliases = sqliteTable(
+    "item_aliases",
+    {
+        id: text("id").primaryKey(),
+        itemId: text("item_id")
+            .notNull()
+            .references(() => items.id, { onDelete: "restrict" }),
+        normalizedName: text("normalized_name").notNull(),
+        // レシート上の元表記。利用者が辞書を読めるように残す
+        displayName: text("display_name").notNull(),
+        source: text("source", { enum: itemAliasSources }).notNull(),
+        // 辞書は追加・削除のみで更新しないため updated_at を持たない
+        createdAt: text("created_at").notNull(),
+    },
+    (t) => [
+        uniqueIndex("uq_item_aliases_normalized_name").on(t.normalizedName),
+        index("idx_item_aliases_item").on(t.itemId),
+        check(
+            "ck_item_aliases_source",
+            sql`${t.source} in ('receipt', 'manual')`,
         ),
     ],
 );

@@ -56,6 +56,27 @@ pnpm check
 pnpm build
 ```
 
+### Running against a local database and bucket
+
+`app/wrangler.jsonc` binds the deployed D1 database and R2 bucket, so the
+default `dev`, `build` and `preview` commands read and write production data.
+`app/wrangler.local.jsonc` binds a local D1 database and a locally emulated R2
+bucket instead, and `INVENTIA_API_PROXY=1` selects it.
+
+The Cloudflare Vite plugin bakes the chosen Worker configuration into
+`app/dist/server/wrangler.json` at **build** time, so the variable must be set
+for the build as well, not only for `vite preview`:
+
+```bash
+cd app
+pnpm exec wrangler d1 migrations apply inventia-local --config wrangler.local.jsonc --local
+pnpm run preview:local
+```
+
+`app/dist/server/wrangler.json` then points at `wrangler.local.jsonc` and no
+binding carries `"remote": true`. Running `pnpm run preview` instead serves the
+build against the deployed database and bucket.
+
 ## Cloudflare deployment
 
 Authenticate and deploy the app package with the workspace-local Wrangler:

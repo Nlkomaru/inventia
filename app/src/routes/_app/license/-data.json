@@ -1,5 +1,16 @@
 [
     {
+        "license": "(AFL-2.1 OR BSD-3-Clause)",
+        "packages": [
+            {
+                "name": "json-schema",
+                "versions": ["0.4.0"],
+                "author": "Kris Zyp",
+                "homepage": "https://github.com/kriszyp/json-schema#readme"
+            }
+        ]
+    },
+    {
         "license": "(MIT OR CC0-1.0)",
         "packages": [
             {
@@ -24,6 +35,41 @@
     {
         "license": "Apache-2.0",
         "packages": [
+            {
+                "name": "@ai-sdk/gateway",
+                "versions": ["4.0.52"],
+                "homepage": "https://ai-sdk.dev/docs"
+            },
+            {
+                "name": "@ai-sdk/provider",
+                "versions": ["4.0.7"],
+                "homepage": "https://ai-sdk.dev/docs"
+            },
+            {
+                "name": "@ai-sdk/provider-utils",
+                "versions": ["5.0.27"],
+                "homepage": "https://ai-sdk.dev/docs"
+            },
+            {
+                "name": "@openrouter/ai-sdk-provider",
+                "versions": ["3.0.0"],
+                "homepage": "https://github.com/OpenRouterTeam/ai-sdk-provider"
+            },
+            {
+                "name": "@vercel/oidc",
+                "versions": ["3.2.0"],
+                "homepage": "https://vercel.com/"
+            },
+            {
+                "name": "@workflow/serde",
+                "versions": ["4.1.0"],
+                "homepage": "https://github.com/vercel/workflow#readme"
+            },
+            {
+                "name": "ai",
+                "versions": ["7.0.66"],
+                "homepage": "https://ai-sdk.dev/docs"
+            },
             {
                 "name": "baseline-browser-mapping",
                 "versions": ["2.11.12"],
@@ -716,6 +762,12 @@
                 "versions": ["6.4.1"],
                 "author": "Damian Tarnawski @thetarnav",
                 "homepage": "https://github.com/solidjs-community/solid-primitives/tree/main/packages/utils#readme"
+            },
+            {
+                "name": "@standard-schema/spec",
+                "versions": ["1.1.0"],
+                "author": "Colin McDonnell",
+                "homepage": "https://standardschema.dev/"
             },
             {
                 "name": "@tailwindcss/node",

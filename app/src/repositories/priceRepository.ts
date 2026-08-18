@@ -196,22 +196,27 @@ export const listPriceRecordsByUnitPrice = async (
     };
 };
 
+/**
+ * 価格履歴を 1 件追加する。`purchaseId` を渡すと購入明細として購入イベントへ紐付く
+ * （レシート適用など）。渡さない場合は価格観測のみの行になる。
+ */
 export const insertPriceRecord = async (
     db: D1Database,
-    input: NormalizedPriceRecordCreateInput,
+    input: NormalizedPriceRecordCreateInput & { purchaseId?: string | null },
 ): Promise<PriceRecordRow> => {
     const id = newId();
     const createdAt = new Date().toISOString();
     await db
         .prepare(
             `INSERT INTO price_records
-                (id, item_id, content_amount, set_count, packaging, price,
+                (id, item_id, purchase_id, content_amount, set_count, packaging, price,
                  source, url, recorded_at, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`,
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)`,
         )
         .bind(
             id,
             input.itemId,
+            input.purchaseId ?? null,
             input.contentAmount,
             input.setCount,
             input.packaging ?? null,

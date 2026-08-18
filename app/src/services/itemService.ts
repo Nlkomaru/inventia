@@ -172,9 +172,15 @@ export const getItem = async (
     return toDetailDto(row, lots, reading);
 };
 
+/**
+ * 品目を作る。`options.id` は再実行で同じ品目へ収束させたい呼び出し元
+ * （レシート反映など）が採番済みの ID を渡すためだけにあり、
+ * 公開入力スキーマ（`itemCreateSchema`）には含めない。
+ */
 export const createItem = async (
     db: D1Database,
     input: unknown,
+    options: { id?: string } = {},
 ): Promise<ItemDto> => {
     const parsed = parseOrThrow(itemCreateSchema.safeParse(input));
     if (!(await categoryExists(db, parsed.categoryId))) {
@@ -204,12 +210,16 @@ export const createItem = async (
         );
     }
     const currentQuantity = parsed.currentQuantity ?? (isDocument ? 1 : 0);
-    const row = await createItemRecord(db, {
-        ...parsed,
-        baseUnit,
-        baseDimension,
-        currentQuantity,
-    });
+    const row = await createItemRecord(
+        db,
+        {
+            ...parsed,
+            baseUnit,
+            baseDimension,
+            currentQuantity,
+        },
+        options,
+    );
     // 作成直後の品目は読書状態を持たない
     return toItemDto(row, null);
 };
