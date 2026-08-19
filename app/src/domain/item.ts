@@ -139,6 +139,62 @@ export const itemSemanticSearchResultSchema = z.object({
     items: z.array(itemDtoSchema),
 });
 
+// 名前の一括照合。1 行ずつ検索させると呼び出し回数が行数に比例するため、
+// レシートの明細のような複数の表記をまとめて受ける。
+// cursor を持たない: 入力ごとに 1 件の結果を返す形で、続きの概念がない
+export const itemNameMatchNamesMax = 50;
+export const itemNameMatchCandidateLimitMax = 5;
+
+export const itemNameMatchInputSchema = z
+    .object({
+        names: z
+            .array(z.string().trim().min(1).max(200))
+            .min(1)
+            .max(itemNameMatchNamesMax),
+        candidateLimit: z.coerce
+            .number()
+            .int()
+            .min(0)
+            .max(itemNameMatchCandidateLimitMax)
+            .default(itemNameMatchCandidateLimitMax),
+    })
+    .strict();
+
+export const itemNameMatchCandidateSchema = z
+    .object({
+        itemId: z.string().min(1),
+        name: z.string().min(1),
+        score: z.int().min(0).max(100),
+    })
+    .strict();
+
+export const itemNameMatchResultSchema = z
+    .object({
+        // 問い合わせた表記そのまま。呼び出し側が入力と突き合わせられるようにする
+        query: z.string(),
+        // 照合キーへ正規化した表記。空になる表記はどの品目とも一致しない
+        normalizedQuery: z.string(),
+        itemId: z.string().nullable(),
+        method: z.enum(["exact", "alias"]).nullable(),
+        score: z.int().min(0).max(100).nullable(),
+        // 類似度だけでは確定させないため、確定した表記では空配列になる
+        candidates: z.array(itemNameMatchCandidateSchema),
+    })
+    .strict();
+
+export const itemNameMatchOutputSchema = z
+    .object({
+        results: z.array(itemNameMatchResultSchema),
+        // 照合の母集合が上限で切れたかどうか。true のときは一致しない表記が
+        // 「存在しない」ことの根拠にならない
+        poolTruncated: z.boolean(),
+    })
+    .strict();
+
+export type ItemNameMatchInput = z.infer<typeof itemNameMatchInputSchema>;
+export type ItemNameMatchResult = z.infer<typeof itemNameMatchResultSchema>;
+export type ItemNameMatchOutput = z.infer<typeof itemNameMatchOutputSchema>;
+
 export type ItemCreateInput = z.infer<typeof itemCreateSchema>;
 export type ItemUpdateInput = z.infer<typeof itemUpdateSchema>;
 export type ItemListQuery = z.infer<typeof itemListQuerySchema>;

@@ -103,6 +103,29 @@ export const listLocations = async (
     };
 };
 
+/**
+ * 全件を 1 クエリで読む。ツリー表示や照合のように木全体が必要な用途で、
+ * 階層ごとのページングを繰り返さないために使う。並び順は階層ごとの一覧と揃える。
+ */
+export const listAllLocations = async (
+    db: D1Database,
+    limit: number,
+): Promise<LocationListResult> => {
+    const result = await db
+        .prepare(
+            `${locationSelect}
+			ORDER BY sort_order ASC, id ASC
+			LIMIT ?1`,
+        )
+        .bind(limit + 1)
+        .all<LocationSelectRow>();
+    const rows = result.results.map(toLocationRecord);
+    return {
+        rows: rows.slice(0, limit),
+        hasMore: rows.length > limit,
+    };
+};
+
 export const findLocationById = async (
     db: D1Database,
     id: LocationId,

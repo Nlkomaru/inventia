@@ -5,6 +5,9 @@ import {
     itemDetailDtoSchema,
     itemDtoSchema,
     itemListQuerySchema,
+    itemNameMatchInputSchema,
+    itemNameMatchNamesMax,
+    itemNameMatchOutputSchema,
     itemSemanticSearchQuerySchema,
     itemSemanticSearchResultSchema,
 } from "../../../domain/item";
@@ -19,6 +22,7 @@ import {
     staleStocktakeQuerySchema,
 } from "../../../domain/stock";
 import { EmbeddingServiceError } from "../../../services/embeddingService";
+import { matchItemNames } from "../../../services/itemMatchService";
 import {
     type ItemSearchEnv,
     searchItemsByVector,
@@ -114,6 +118,23 @@ export const registerInventoryTools = (
                 return mcpSuccess(await listItems(db, input));
             } catch (error) {
                 return inventoryError(error, "inventory search failed");
+            }
+        },
+    );
+
+    server.registerTool(
+        "resolve_inventory_items",
+        {
+            title: "Resolve printed names to inventory items",
+            description: `Match up to ${itemNameMatchNamesMax} product names against existing items in one call, so a caller reading a receipt or a shopping list does not have to search once per line. Names are normalised the same way the item alias dictionary is (NFKC, case-folded, spaces and symbols dropped), so half-width katakana and full-width digits match their counterparts. A result is confirmed only by an exact item-name match (method exact) or by the alias dictionary (method alias); otherwise itemId is null and candidates carries the closest names by similarity, ranked, for the caller to choose from — similarity alone never confirms an item. candidateLimit trims those suggestions and 0 returns confirmed matches only. poolTruncated is true when there are more items than the matcher reads, in which case a null itemId is not evidence that no such item exists. This tool only reads data.`,
+            inputSchema: itemNameMatchInputSchema,
+            outputSchema: itemNameMatchOutputSchema,
+        },
+        async (input) => {
+            try {
+                return mcpSuccess(await matchItemNames(db, input));
+            } catch (error) {
+                return inventoryError(error, "inventory name matching failed");
             }
         },
     );
