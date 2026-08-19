@@ -809,6 +809,13 @@ const resolvePriceContent = (
     return { contentAmount: quantity, setCount: 1 };
 };
 
+// 単位の食い違いを利用者へ伝えるための表示名。UI の選択肢と同じ文言にする
+const dimensionLabels: Record<ReceiptBaseDimension, string> = {
+    mass: "重量",
+    volume: "体積",
+    count: "個数",
+};
+
 /**
  * 明細の数量を反映先の品目の単位へ揃える。数量は解析時に提案した単位
  * （`suggested_base_unit`）で表されているため、品目が別の単位で在庫を数えて
@@ -826,6 +833,15 @@ const resolveLineQuantity = (
     ) {
         return line.quantity;
     }
+    // 量の種類が違う行は数量を直しても筋が通らないため、品目の選び直しを促す
+    if (
+        line.suggestedBaseDimension !== null &&
+        line.suggestedBaseDimension !== pricing.baseDimension
+    ) {
+        throw invalidInput(
+            `${line.lineNo} 行目はレシートが${dimensionLabels[line.suggestedBaseDimension]}（${line.suggestedBaseUnit}）、品目が${dimensionLabels[pricing.baseDimension]}（${pricing.baseUnit}）で数えているため反映できません。反映先の品目を選び直すか、数量を品目の単位に直して指定してください。`,
+        );
+    }
     const converted = normalizeContentAmount(
         line.quantity,
         line.suggestedBaseUnit,
@@ -834,7 +850,7 @@ const resolveLineQuantity = (
     );
     if (converted === null) {
         throw invalidInput(
-            `${line.lineNo} 行目はレシートの単位（${line.suggestedBaseUnit}）と品目の単位（${pricing.baseUnit}）が違うため、そのままでは反映できません。数量を品目の単位に直して指定してください。`,
+            `${line.lineNo} 行目はレシートの単位（${line.suggestedBaseUnit}）と品目の単位（${pricing.baseUnit}）が違い、換算できないため反映できません。数量を品目の単位に直して指定してください。`,
         );
     }
     return converted;
