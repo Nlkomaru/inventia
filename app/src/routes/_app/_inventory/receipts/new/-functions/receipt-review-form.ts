@@ -1,10 +1,11 @@
-import type {
-    ReceiptApplyInput,
-    ReceiptApplyLineInput,
-    ReceiptExpiryConfidence,
-    ReceiptExpirySource,
-    ReceiptLineDto,
-    ReceiptMatchMethodValue,
+import {
+    type ReceiptApplyInput,
+    type ReceiptApplyLineInput,
+    type ReceiptExpiryConfidence,
+    type ReceiptExpirySource,
+    type ReceiptLineDto,
+    type ReceiptMatchMethodValue,
+    receiptApplyQuantityMax,
 } from "@/domain/receipt";
 
 // 確認画面のフォーム状態と、承認内容（ReceiptApplyInput）への変換。
@@ -17,7 +18,7 @@ type ReceiptApplyNewItem = NonNullable<ReceiptApplyLineInput["newItem"]>;
 type ReceiptBaseDimension = NonNullable<ReceiptApplyNewItem["baseDimension"]>;
 
 /** 数量は在庫調整の入力上限に合わせる（domain の receiptApplyLineSchema と同じ値）。 */
-export const reviewQuantityMax = 100_000;
+export const reviewQuantityMax = receiptApplyQuantityMax;
 /** 品目名の上限。レシート表記をそのまま初期値にするため、ここで丸める。 */
 export const reviewItemNameMax = 200;
 
