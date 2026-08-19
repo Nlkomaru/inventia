@@ -624,13 +624,11 @@ export const parseReceipt = async (
             // リトライは 1 回まで（既定の 2 回は使わない）。タイムアウトは
             // リトライと tool 呼び出しを含む呼び出し全体へ掛ける
             const result = await generateText({
-                model: openrouter.chat(status.chatModel, {
-                    // レシートの読み取りに思考は要らない。返させないことで、
-                    // tool 呼び出しの次のリクエストへ思考を送り返す経路自体を無くす。
-                    // 送り返した思考の署名が壊れると、プロバイダが 400 を返して
-                    // 解析全体が失敗する（Gemini の "Corrupted thought signature"）
-                    reasoning: { effort: "none", exclude: true },
-                }),
+                // reasoning は設定しない。思考を無効化する指定
+                // (`reasoning: { effort: "none" }`) は、思考が必須のモデルでは
+                // プロバイダが 400 (Reasoning is mandatory for this endpoint and
+                // cannot be disabled) を返して解析全体が失敗する
+                model: openrouter.chat(status.chatModel),
                 output: Output.object({ schema: receiptOcrResultSchema }),
                 instructions: status.receiptPrompt,
                 ...(toolSet
