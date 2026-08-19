@@ -21,8 +21,8 @@ export const receiptParseToolAllowlist = [
     "list_expiring_inventory",
     "get_price_history",
     "compare_unit_prices",
-    "list_categories",
-    "get_category",
+    // カテゴリは service が解析の指示へ一覧として載せる。`list_categories` は
+    // 1 階層ずつ返すため、tool として渡すと木を辿るだけで往復上限を使い切る
     "list_locations",
     "get_location",
 ] as const;

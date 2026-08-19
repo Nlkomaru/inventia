@@ -22,6 +22,7 @@ import {
     receiptListQuerySchema,
     receiptMaxByteSize,
     receiptOcrResultSchema,
+    receiptParseInstructionsWithCategories,
     receiptTaxIncludedPrice,
 } from "../domain/receipt";
 import {
@@ -594,10 +595,11 @@ export interface ReceiptParseOptions {
 }
 
 /**
- * tool 呼び出しを許す往復回数。全体のタイムアウトは変えないため、
- * 往復を増やすほど読み取り本体へ残る時間が減る。
+ * tool 呼び出しを許す往復回数。実質の上限は `receiptParseTimeoutMs` の側にあり、
+ * この値は往復が終わらない場合の歯止めである。少なすぎると明細を返す前に
+ * 打ち切られるため、行数ぶんの品目照合が収まる余裕を持たせる。
  */
-const receiptParseMaxSteps = 5;
+const receiptParseMaxSteps = 20;
 
 export const parseReceipt = async (
     env: ReceiptEnv,
@@ -643,6 +645,14 @@ export const parseReceipt = async (
         }
         const bytes = new Uint8Array(await object.arrayBuffer());
         const openrouter = createOpenRouter({ apiKey, fetch: fetcher });
+        // カテゴリは tool で辿らせず指示へ載せる。`list_categories` は 1 階層ずつ
+        // 返すため、木を辿るだけで往復上限を使い切って明細が返らなくなる。
+        // 保存時の ID 解決にも同じ一覧を使う
+        const categories = await listCategoryTree(env.DB);
+        const instructions = receiptParseInstructionsWithCategories(
+            status.receiptPrompt,
+            categories.items.map((category) => category.name),
+        );
         // tool は常に渡す。構築できない環境では tool 無しで解析を続ける
         const toolSet = options.createToolSet
             ? await options.createToolSet()
@@ -657,11 +667,17 @@ export const parseReceipt = async (
                 // cannot be disabled) を返して解析全体が失敗する
                 model: openrouter.chat(status.chatModel),
                 output: Output.object({ schema: receiptOcrResultSchema }),
-                instructions: status.receiptPrompt,
+                instructions,
                 ...(toolSet
                     ? {
                           tools: toolSet.tools,
                           stopWhen: stepCountIs(receiptParseMaxSteps),
+                          // 上限で打ち切られた step は明細を返せないため、最後の
+                          // 1 回は tool を封じて必ず出力させる
+                          prepareStep: ({ stepNumber }) =>
+                              stepNumber >= receiptParseMaxSteps - 1
+                                  ? { toolChoice: "none" }
+                                  : {},
                       }
                     : {}),
                 messages: [
@@ -701,7 +717,6 @@ export const parseReceipt = async (
             if (!parsed.success) {
                 throw new ReceiptParseFailure(parseFailureMessages.malformed);
             }
-            const categories = await listCategoryTree(env.DB);
             const lines = toLineWrites(
                 parsed.data.lines,
                 categoryIdByName(categories.items),
