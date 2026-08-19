@@ -226,18 +226,18 @@ function ReceiptDetailPage() {
                                         </TableCell>
                                         <TableCell className="text-right align-top whitespace-nowrap">
                                             {line.quantity}{" "}
-                                            {line.suggestedBaseUnit ?? ""}
+                                            {line.suggestion.baseUnit ?? ""}
                                         </TableCell>
                                         <TableCell className="text-right align-top whitespace-nowrap">
                                             {formatYen(line.price)}
                                         </TableCell>
                                         <TableCell className="align-top whitespace-nowrap">
                                             {formatExpiryDate(
-                                                line.suggestedExpiryDate,
+                                                line.expiry.suggestedDate,
                                             )}
                                         </TableCell>
                                         <TableCell className="align-top">
-                                            {line.matchedItemId === null ? (
+                                            {line.match.itemId === null ? (
                                                 <span className="text-sm text-muted-foreground">
                                                     {line.stockRelevant
                                                         ? "—"
@@ -247,12 +247,13 @@ function ReceiptDetailPage() {
                                                 <Link
                                                     className="text-sm underline-offset-4 hover:underline"
                                                     params={{
-                                                        itemId: line.matchedItemId,
+                                                        itemId: line.match
+                                                            .itemId,
                                                     }}
                                                     to="/inventory/items/$itemId"
                                                 >
-                                                    {line.matchedItemName ??
-                                                        line.matchedItemId}
+                                                    {line.match.itemName ??
+                                                        line.match.itemId}
                                                 </Link>
                                             )}
                                         </TableCell>

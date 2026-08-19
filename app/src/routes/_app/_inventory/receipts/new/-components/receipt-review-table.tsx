@@ -117,7 +117,7 @@ const columns = columnHelper.columns([
                             : `${review.rawName} / `}
                         {/* 数量は基準単位での量なので、読み取れた単位を添えて
                             1000（g）を 1000 点と読み違えないようにする */}
-                        {line.quantity} {line.suggestedBaseUnit ?? "点"} /{" "}
+                        {line.quantity} {line.suggestion.baseUnit ?? "点"} /{" "}
                         {formatYen(line.price)}
                     </span>
                     {detailInvalid ? (
@@ -253,8 +253,8 @@ const columns = columnHelper.columns([
                             }
                             aria-invalid={invalid}
                             aria-label={
-                                line.suggestedBaseUnit
-                                    ? `${review.lineNo} 行目の数量（${line.suggestedBaseUnit}）`
+                                line.suggestion.baseUnit
+                                    ? `${review.lineNo} 行目の数量（${line.suggestion.baseUnit}）`
                                     : `${review.lineNo} 行目の数量`
                             }
                             className="w-24"
@@ -271,9 +271,9 @@ const columns = columnHelper.columns([
                             value={review.quantity}
                         />
                         {/* 数量は基準単位での量なので、読み取れた単位を並べて示す */}
-                        {line.suggestedBaseUnit ? (
+                        {line.suggestion.baseUnit ? (
                             <span className="text-xs text-muted-foreground">
-                                {line.suggestedBaseUnit}
+                                {line.suggestion.baseUnit}
                             </span>
                         ) : null}
                     </div>

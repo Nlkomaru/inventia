@@ -22,6 +22,7 @@ import {
     receiptListQuerySchema,
     receiptMaxByteSize,
     receiptOcrResultSchema,
+    receiptParseInstructionsWithCategories,
     receiptTaxIncludedPrice,
 } from "../domain/receipt";
 import {
@@ -231,6 +232,9 @@ const toReceiptDto = (row: ReceiptRow): ReceiptDto => ({
     updatedAt: row.updatedAt,
 });
 
+// 保存列は 1 行に平たく並ぶが、公開する DTO は期限・提案・照合の 3 つに束ねる。
+// 期限の由来と日付、単位と量の種類のように、片方だけを読むと意味を誤る組み合わせを
+// 同じ入れ物へ置く
 const toLineDto = (
     row: ReceiptLineRow,
     matchedItemName: string | null,
@@ -240,25 +244,31 @@ const toLineDto = (
     lineNo: row.lineNo,
     rawName: row.rawName,
     completedName: row.completedName,
-    stockRelevant: row.stockRelevant,
-    suggestedCategoryId: row.suggestedCategoryId,
-    suggestedCategoryName: row.suggestedCategoryName,
-    suggestedBaseUnit: row.suggestedBaseUnit,
-    suggestedBaseDimension: row.suggestedBaseDimension,
     normalizedName: row.normalizedName,
     quantity: row.quantity,
     price: row.price,
-    printedExpiryDate: row.printedExpiryDate,
-    estimatedExpiryDate: row.estimatedExpiryDate,
-    expirySource: row.expirySource,
-    expiryConfidence: row.expiryConfidence,
-    expiryEstimateReason: row.expiryReason,
-    suggestedExpiryDate: resolveLineExpiry(row),
-    matchedItemId: row.matchedItemId,
-    matchedItemName,
-    matchMethod: row.matchMethod,
-    matchScore: row.matchScore,
-    candidates,
+    stockRelevant: row.stockRelevant,
+    expiry: {
+        printedDate: row.printedExpiryDate,
+        estimatedDate: row.estimatedExpiryDate,
+        source: row.expirySource,
+        confidence: row.expiryConfidence,
+        estimateReason: row.expiryReason,
+        suggestedDate: resolveLineExpiry(row),
+    },
+    suggestion: {
+        categoryId: row.suggestedCategoryId,
+        categoryName: row.suggestedCategoryName,
+        baseUnit: row.suggestedBaseUnit,
+        baseDimension: row.suggestedBaseDimension,
+    },
+    match: {
+        itemId: row.matchedItemId,
+        itemName: matchedItemName,
+        method: row.matchMethod,
+        score: row.matchScore,
+        candidates,
+    },
 });
 
 // 金額を読めない行が 1 つでもあれば合計は出せない。0 を代入して
@@ -490,16 +500,20 @@ const toLineWrites = (
         completedName: string | null;
         quantity: number;
         price: number | null;
-        printedExpiryDate: string | null;
-        estimatedExpiryDate: string | null;
-        expirySource: "printed" | "estimated" | "unknown";
-        expiryConfidence: "high" | "medium" | "low" | null;
-        expiryEstimateReason: string | null;
         taxRate: 8 | 10 | null;
         stockRelevant: boolean;
-        suggestedCategoryName: string | null;
-        suggestedBaseUnit: string | null;
-        suggestedBaseDimension: ReceiptBaseDimension | null;
+        expiry: {
+            printedDate: string | null;
+            estimatedDate: string | null;
+            source: "printed" | "estimated" | "unknown";
+            confidence: "high" | "medium" | "low" | null;
+            estimateReason: string | null;
+        };
+        stocking: {
+            categoryName: string | null;
+            baseUnit: string | null;
+            baseDimension: ReceiptBaseDimension | null;
+        };
     }[],
     categoryIndex: ReadonlyMap<string, string>,
     pricesIncludeTax: boolean,
@@ -513,19 +527,20 @@ const toLineWrites = (
         }
         // 由来と値が食い違う組み合わせをそのまま保存すると、確認画面が
         // 「レシートの印字」と書いた捏造値を提示してしまう
+        // 保存列は平たいため、束ねた OCR の期限をここで列の名前へ戻す
         const expiry = normalizeReceiptLineExpiry({
-            printedExpiryDate: line.printedExpiryDate,
-            estimatedExpiryDate: line.estimatedExpiryDate,
-            expirySource: line.expirySource,
-            expiryConfidence: line.expiryConfidence,
-            expiryEstimateReason: line.expiryEstimateReason,
+            printedExpiryDate: line.expiry.printedDate,
+            estimatedExpiryDate: line.expiry.estimatedDate,
+            expirySource: line.expiry.source,
+            expiryConfidence: line.expiry.confidence,
+            expiryEstimateReason: line.expiry.estimateReason,
         });
         // 単位は表記と量の種類が対でないと品目を作れないため、片方だけの提案は捨てる
-        const baseUnit = line.suggestedBaseUnit?.trim().slice(0, 50) ?? "";
+        const baseUnit = line.stocking.baseUnit?.trim().slice(0, 50) ?? "";
         const unitPaired =
-            baseUnit.length > 0 && line.suggestedBaseDimension !== null;
+            baseUnit.length > 0 && line.stocking.baseDimension !== null;
         const suggestedCategoryName =
-            line.suggestedCategoryName?.trim().toLocaleLowerCase("ja") ?? "";
+            line.stocking.categoryName?.trim().toLocaleLowerCase("ja") ?? "";
         writes.push({
             lineNo: writes.length + 1,
             rawName,
@@ -534,10 +549,10 @@ const toLineWrites = (
             // 解決できた ID だけを保存する。名前が一致しなければ確認画面で選ばせる
             suggestedCategoryId:
                 categoryIndex.get(suggestedCategoryName) ?? null,
-            suggestedCategoryName: line.suggestedCategoryName?.trim() || null,
+            suggestedCategoryName: line.stocking.categoryName?.trim() || null,
             suggestedBaseUnit: unitPaired ? baseUnit : null,
             suggestedBaseDimension: unitPaired
-                ? line.suggestedBaseDimension
+                ? line.stocking.baseDimension
                 : null,
             normalizedName: normalizeReceiptName(rawName),
             quantity: line.quantity,
@@ -580,10 +595,11 @@ export interface ReceiptParseOptions {
 }
 
 /**
- * tool 呼び出しを許す往復回数。全体のタイムアウトは変えないため、
- * 往復を増やすほど読み取り本体へ残る時間が減る。
+ * tool 呼び出しを許す往復回数。実質の上限は `receiptParseTimeoutMs` の側にあり、
+ * この値は往復が終わらない場合の歯止めである。少なすぎると明細を返す前に
+ * 打ち切られるため、行数ぶんの品目照合が収まる余裕を持たせる。
  */
-const receiptParseMaxSteps = 5;
+const receiptParseMaxSteps = 20;
 
 export const parseReceipt = async (
     env: ReceiptEnv,
@@ -629,6 +645,14 @@ export const parseReceipt = async (
         }
         const bytes = new Uint8Array(await object.arrayBuffer());
         const openrouter = createOpenRouter({ apiKey, fetch: fetcher });
+        // カテゴリは tool で辿らせず指示へ載せる。`list_categories` は 1 階層ずつ
+        // 返すため、木を辿るだけで往復上限を使い切って明細が返らなくなる。
+        // 保存時の ID 解決にも同じ一覧を使う
+        const categories = await listCategoryTree(env.DB);
+        const instructions = receiptParseInstructionsWithCategories(
+            status.receiptPrompt,
+            categories.items.map((category) => category.name),
+        );
         // tool は常に渡す。構築できない環境では tool 無しで解析を続ける
         const toolSet = options.createToolSet
             ? await options.createToolSet()
@@ -643,11 +667,17 @@ export const parseReceipt = async (
                 // cannot be disabled) を返して解析全体が失敗する
                 model: openrouter.chat(status.chatModel),
                 output: Output.object({ schema: receiptOcrResultSchema }),
-                instructions: status.receiptPrompt,
+                instructions,
                 ...(toolSet
                     ? {
                           tools: toolSet.tools,
                           stopWhen: stepCountIs(receiptParseMaxSteps),
+                          // 上限で打ち切られた step は明細を返せないため、最後の
+                          // 1 回は tool を封じて必ず出力させる
+                          prepareStep: ({ stepNumber }) =>
+                              stepNumber >= receiptParseMaxSteps - 1
+                                  ? { toolChoice: "none" }
+                                  : {},
                       }
                     : {}),
                 messages: [
@@ -687,7 +717,6 @@ export const parseReceipt = async (
             if (!parsed.success) {
                 throw new ReceiptParseFailure(parseFailureMessages.malformed);
             }
-            const categories = await listCategoryTree(env.DB);
             const lines = toLineWrites(
                 parsed.data.lines,
                 categoryIdByName(categories.items),
