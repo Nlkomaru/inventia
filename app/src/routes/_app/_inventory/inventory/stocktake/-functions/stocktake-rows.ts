@@ -45,7 +45,7 @@ export const buildStocktakeLots = (
             issues.push({
                 key: row.key,
                 field: "expiry",
-                message: "期限日時を正しく入力してください",
+                message: "期限を 2020-01-01 の形式で入力してください",
             });
             continue;
         }

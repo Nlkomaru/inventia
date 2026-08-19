@@ -133,7 +133,7 @@ export function ItemReceiveForm({ item }: { item: ItemDetailDto }) {
         }
         if (expiryMode === "date" && expiryDate === null) {
             setExpiryError(
-                "期限日時を入力するか、「期限なし」を選択してください",
+                "期限を 2020-01-01 の形式で入力するか、「期限なし」を選択してください",
             );
             return;
         }

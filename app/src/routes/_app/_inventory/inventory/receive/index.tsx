@@ -219,7 +219,7 @@ function ReceiveStockPage() {
             expiryMode === "none" ? null : toIsoFromDate(expiryInput);
         if (expiryMode === "date" && expiryDate === null) {
             next.expiryDate =
-                "期限日時を入力するか、「期限なし」を選択してください";
+                "期限を 2020-01-01 の形式で入力するか、「期限なし」を選択してください";
         }
         setErrors(next);
         setSubmitError(null);

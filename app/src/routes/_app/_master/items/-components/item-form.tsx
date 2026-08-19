@@ -372,8 +372,10 @@ export function ItemForm({
         }
 
         if (form.expiryDate && !toIsoFromDate(form.expiryDate)) {
-            setFieldErrors({ expiryDate: "期限日時を正しく入力してください" });
-            setError("期限日時を正しく入力してください");
+            setFieldErrors({
+                expiryDate: "期限を 2020-01-01 の形式で入力してください",
+            });
+            setError("期限を 2020-01-01 の形式で入力してください");
             return;
         }
         const expiryDate = toIsoFromDate(form.expiryDate);
