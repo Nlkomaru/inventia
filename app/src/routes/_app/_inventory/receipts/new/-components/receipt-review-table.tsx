@@ -233,31 +233,49 @@ const columns = columnHelper.columns([
         id: "quantity",
         header: "数量",
         cell: ({ row }) => {
-            const { row: review, issues, disabled, onChange } = row.original;
+            const {
+                line,
+                row: review,
+                issues,
+                disabled,
+                onChange,
+            } = row.original;
             const invalid = Boolean(issues.quantity);
             return (
                 <div className="flex flex-col gap-1">
-                    <Input
-                        aria-describedby={
-                            invalid
-                                ? cellErrorId(review.lineNo, "quantity")
-                                : undefined
-                        }
-                        aria-invalid={invalid}
-                        aria-label={`${review.lineNo} 行目の数量`}
-                        className="w-24"
-                        disabled={disabled || review.action === "skip"}
-                        id={cellId(review.lineNo, "quantity")}
-                        inputMode="numeric"
-                        max={reviewQuantityMax}
-                        min={1}
-                        onChange={(event) =>
-                            onChange({ quantity: event.target.value })
-                        }
-                        step={1}
-                        type="number"
-                        value={review.quantity}
-                    />
+                    <div className="flex items-baseline gap-1.5">
+                        <Input
+                            aria-describedby={
+                                invalid
+                                    ? cellErrorId(review.lineNo, "quantity")
+                                    : undefined
+                            }
+                            aria-invalid={invalid}
+                            aria-label={
+                                line.suggestedBaseUnit
+                                    ? `${review.lineNo} 行目の数量（${line.suggestedBaseUnit}）`
+                                    : `${review.lineNo} 行目の数量`
+                            }
+                            className="w-24"
+                            disabled={disabled || review.action === "skip"}
+                            id={cellId(review.lineNo, "quantity")}
+                            inputMode="numeric"
+                            max={reviewQuantityMax}
+                            min={1}
+                            onChange={(event) =>
+                                onChange({ quantity: event.target.value })
+                            }
+                            step={1}
+                            type="number"
+                            value={review.quantity}
+                        />
+                        {/* 数量は基準単位での量なので、読み取れた単位を並べて示す */}
+                        {line.suggestedBaseUnit ? (
+                            <span className="text-xs text-muted-foreground">
+                                {line.suggestedBaseUnit}
+                            </span>
+                        ) : null}
+                    </div>
                     {invalid ? (
                         <FieldError
                             className="max-w-40 whitespace-normal"

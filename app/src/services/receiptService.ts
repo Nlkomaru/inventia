@@ -810,6 +810,37 @@ const resolvePriceContent = (
 };
 
 /**
+ * 明細の数量を反映先の品目の単位へ揃える。数量は解析時に提案した単位
+ * （`suggested_base_unit`）で表されているため、品目が別の単位で在庫を数えて
+ * いる場合はそのまま足すと桁が変わる（ml の 1000 を L の品目へ足すなど）。
+ * 換算できない組み合わせは反映を止め、数量の入れ直しを促す。
+ * 確認画面で数量を指定した行はその値を品目の単位での入力とみなし、換算しない。
+ */
+const resolveLineQuantity = (
+    line: ReceiptLineRow,
+    pricing: ItemPricingRow,
+): number => {
+    if (
+        line.suggestedBaseUnit === null ||
+        line.suggestedBaseUnit === pricing.baseUnit
+    ) {
+        return line.quantity;
+    }
+    const converted = normalizeContentAmount(
+        line.quantity,
+        line.suggestedBaseUnit,
+        pricing.baseUnit,
+        pricing.baseDimension,
+    );
+    if (converted === null) {
+        throw invalidInput(
+            `${line.lineNo} 行目はレシートの単位（${line.suggestedBaseUnit}）と品目の単位（${pricing.baseUnit}）が違うため、そのままでは反映できません。数量を品目の単位に直して指定してください。`,
+        );
+    }
+    return converted;
+};
+
+/**
  * 反映の同一性の基点になる購入を決める。まだ反映が始まっていなければ
  * 購入を 1 件作ってレシートへ結び付け（反映開始の宣言）、既に始まっていれば
  * 保存済みの購入をそのまま返す。以後の在庫調整の idempotency key と購入日時は
@@ -1060,7 +1091,8 @@ export const applyReceipt = async (
                     matchScore: null,
                 });
             }
-            const quantity = lineInput.quantity ?? line.quantity;
+            const quantity =
+                lineInput.quantity ?? resolveLineQuantity(line, pricing);
             const expiryDate =
                 lineInput.expiryDate !== undefined
                     ? lineInput.expiryDate

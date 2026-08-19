@@ -305,6 +305,9 @@ export const decodeReceiptCursor = (cursor: string): ReceiptCursor | null => {
     }
 };
 
+/** 反映で受け付ける数量の上限。基準単位（g・ml）での量を許す桁にする。 */
+export const receiptApplyQuantityMax = 1_000_000;
+
 export const receiptApplyActions = [
     "add_to_item",
     "create_item",
@@ -343,8 +346,9 @@ export const receiptApplyLineSchema = z
         itemId: z.string().trim().min(1).optional(),
         // action = create_item のときに作る品目
         newItem: receiptNewItemSchema.optional(),
-        // 確認画面で修正した数量。省略時は行の数量
-        quantity: z.int().min(1).max(100_000).optional(),
+        // 確認画面で修正した数量。省略時は行の数量。数量は基準単位での量なので、
+        // 20L の容器 6 本（120,000 ml）のような行が収まる上限にする
+        quantity: z.int().min(1).max(receiptApplyQuantityMax).optional(),
         // 確認画面で修正した金額（数量分の小計）。省略時は行の金額、null は金額なし
         price: z.int().min(0).nullable().optional(),
         // 確認画面で確定した期限（日付）。省略時は印字 → 推測の順で解決した値、
