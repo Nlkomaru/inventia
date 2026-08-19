@@ -296,7 +296,9 @@ function ReceiptListPage() {
                                     {receipt.lineCount}
                                 </TableCell>
                                 <TableCell className="px-5 py-3 text-right align-top">
-                                    <div className="flex justify-end">
+                                    {/* アイコンボタンは行のテキストより背が高い。上下の
+                                        余白を相殺して、他の列の文字と同じ高さに揃える */}
+                                    <div className="-my-1 flex justify-end">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger
                                                 render={
