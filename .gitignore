@@ -20,8 +20,14 @@ todos.json
 !.env.example
 
 
+# ローカルで解析を試すレシート画像。実データなので追跡しない。
+receipt/
+
 # APM dependencies
 apm_modules/
+# APM の構成はローカルで入れる agent や MCP に合わせて変わるため追跡しない。
+apm.yml
+apm.lock.yaml
 !.vscode/mcp.json
 .agents/
 .github/skills
