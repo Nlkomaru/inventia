@@ -141,6 +141,19 @@ const parseFailureMessages = {
         "レシートの内容を読み取れませんでした。明るい場所で全体が入るように撮り直してから再解析してください。",
 } as const;
 
+/**
+ * 解析失敗の切り分け情報を運用ログにだけ残す。利用者向けメッセージは
+ * 固定文のままにし、記録も返却もしない上流の理由をここで観測できるようにする。
+ * 画像・明細・API key は出さず、失敗の種類が分かる値に限る。
+ */
+const logParseFailure = (receiptId: string, error: unknown): void => {
+    console.error("receipt parse failed", {
+        receiptId,
+        name: error instanceof Error ? error.name : typeof error,
+        message: error instanceof Error ? error.message : String(error),
+    });
+};
+
 class ReceiptParseFailure extends Error {
     constructor(readonly userMessage: string) {
         super("receipt parse failed");
@@ -657,6 +670,19 @@ export const parseReceipt = async (
                 maxRetries: 1,
                 abortSignal: AbortSignal.timeout(receiptParseTimeoutMs),
             });
+            // 出力が得られない失敗（tool 往復が step 上限で打ち切られた等）と、
+            // 出力はあるが schema に合わない失敗をログで切り分ける。
+            // 明細の内容は出さず、終了理由と件数だけ残す。
+            console.info("receipt parse finished", {
+                receiptId: receipt.id,
+                finishReason: result.finishReason,
+                stepCount: result.steps.length,
+                toolCallCount: result.steps.reduce(
+                    (total, step) => total + step.toolCalls.length,
+                    0,
+                ),
+                hasOutput: result.output !== undefined,
+            });
             const parsed = receiptOcrResultSchema.safeParse(result.output);
             if (!parsed.success) {
                 throw new ReceiptParseFailure(parseFailureMessages.malformed);
@@ -683,6 +709,7 @@ export const parseReceipt = async (
             await toolSet?.close();
         }
     } catch (error) {
+        logParseFailure(receipt.id, error);
         await updateReceiptStatus(env.DB, receipt.id, {
             status: "failed",
             errorMessage: toParseFailureMessage(error),
