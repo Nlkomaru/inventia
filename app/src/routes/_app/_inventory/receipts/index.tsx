@@ -238,17 +238,25 @@ function ReceiptListPage() {
                 <Table>
                     <TableHeader className="bg-muted/50">
                         <TableRow>
-                            <TableHead className="px-5">取込日時</TableHead>
-                            <TableHead className="px-5">状態</TableHead>
-                            <TableHead className="px-5">店舗</TableHead>
-                            <TableHead className="px-5">購入日時</TableHead>
-                            <TableHead className="px-5 text-right">
+                            <TableHead className="px-5" scope="col">
+                                取込日時
+                            </TableHead>
+                            <TableHead className="px-5" scope="col">
+                                状態
+                            </TableHead>
+                            <TableHead className="px-5" scope="col">
+                                店舗
+                            </TableHead>
+                            <TableHead className="px-5" scope="col">
+                                購入日時
+                            </TableHead>
+                            <TableHead className="px-5 text-right" scope="col">
                                 合計
                             </TableHead>
-                            <TableHead className="px-5 text-right">
+                            <TableHead className="px-5 text-right" scope="col">
                                 明細
                             </TableHead>
-                            <TableHead className="px-5 text-right">
+                            <TableHead className="px-5 text-right" scope="col">
                                 操作
                             </TableHead>
                         </TableRow>
@@ -295,7 +303,7 @@ function ReceiptListPage() {
                                 <TableCell className="px-5 py-3 text-right align-top">
                                     {receipt.lineCount}
                                 </TableCell>
-                                <TableCell className="px-5 py-3 text-right align-top">
+                                <TableCell className="px-5 py-3 align-top">
                                     {/* アイコンボタンは行のテキストより背が高い。上下の
                                         余白を相殺して、他の列の文字と同じ高さに揃える */}
                                     <div className="-my-1 flex justify-end">
