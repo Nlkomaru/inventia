@@ -13,6 +13,7 @@ import {
     MapPin,
     TriangleAlert,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -286,6 +287,12 @@ export type InventoryTableProps = {
     locationLabels?: ReadonlyMap<string, string>;
     loading?: boolean;
     soonWithinDays?: number;
+    /**
+     * 品目名をリンクにする場合の描画。ルーターに依存させないため、
+     * リンク要素は呼び出し側（ルート配下）で組み立てて渡す。
+     * 省略すると品目名はテキストのまま表示する。
+     */
+    renderItemName?: (item: ItemDto, name: string) => ReactNode;
 };
 
 export function InventoryTable({
@@ -295,6 +302,7 @@ export function InventoryTable({
     locationLabels,
     loading = false,
     soonWithinDays = defaultSoonWithinDays,
+    renderItemName,
 }: InventoryTableProps) {
     // 期限判定の基準時刻。行ごとに Date.now() を読むと同一描画内で基準が
     // ずれるため、マウント時に 1 回だけ求める
@@ -312,7 +320,9 @@ export function InventoryTable({
                     cell: ({ getValue, row }) => (
                         <div className="min-w-48 max-w-72">
                             <p className="font-semibold break-words">
-                                {getValue()}
+                                {renderItemName
+                                    ? renderItemName(row.original, getValue())
+                                    : getValue()}
                             </p>
                             <p className="mt-0.5 text-xs text-muted-foreground">
                                 {categoryLabels?.get(row.original.categoryId) ??
@@ -413,7 +423,14 @@ export function InventoryTable({
                     ),
                 }),
             ]),
-        [categoryLabels, locationLabels, lotsByItemId, now, soonWithinDays],
+        [
+            categoryLabels,
+            locationLabels,
+            lotsByItemId,
+            now,
+            renderItemName,
+            soonWithinDays,
+        ],
     );
     const table = useTable({
         columns,

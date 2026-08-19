@@ -5,6 +5,7 @@ import {
 import {
     createFileRoute,
     type ErrorComponentProps,
+    Link,
     redirect,
     useRouter,
 } from "@tanstack/react-router";
@@ -274,8 +275,18 @@ function StockHistoryPage() {
                                             )}
                                         </TableCell>
                                         <TableCell className="px-5 py-3 align-top">
-                                            {itemNames.get(movement.itemId) ??
-                                                movement.itemId}
+                                            {/* 品目名から詳細ページへ入れるようにする */}
+                                            <Link
+                                                className="underline-offset-4 hover:underline"
+                                                params={{
+                                                    itemId: movement.itemId,
+                                                }}
+                                                to="/inventory/items/$itemId"
+                                            >
+                                                {itemNames.get(
+                                                    movement.itemId,
+                                                ) ?? movement.itemId}
+                                            </Link>
                                         </TableCell>
                                         <TableCell className="px-5 py-3 align-top">
                                             {reasonLabels[movement.reason]}
