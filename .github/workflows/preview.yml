@@ -227,34 +227,34 @@ jobs:
             7fca16ab-3904-4706-9849-b49900de563a > AWS_ACCESS_KEY_ID
             769a462b-bf2d-466c-ae1f-b49900de56c8 > AWS_SECRET_ACCESS_KEY
 
-      # QR が作れなくてもプレビュー URL のコメントは出したいので、失敗しても続行する。
-      # apt が対話プロンプトやミラー待ちで止まるとジョブ全体が張り付くため、
-      # 非対話に固定したうえで時間で打ち切る。
-      - name: Install qrencode
-        continue-on-error: true
-        timeout-minutes: 3
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo apt-get update -qq -o Dpkg::Use-Pty=0
-          sudo apt-get install -y -qq -o Dpkg::Use-Pty=0 qrencode
+      # QR の描画は pnpm の qrcode を dlx で取る。このジョブは checkout しないため
+      # ワークスペースの依存としては入れられず、バージョンは実行時に固定する。
+      # 版を上げるときは Render and upload QR codes の指定も合わせて変える。
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          # checkout しないジョブでは package.json の packageManager を読めないため明示する。
+          version: 11.18.0
+          run_install: false
 
       # GitHub の Markdown は data: URI の画像を表示しないため、QR は R2 へ置いて参照する。
       - name: Render and upload QR codes
         id: qr
+        timeout-minutes: 5
         env:
           COMMIT_SHORT_SHA: ${{ steps.vars.outputs.commit_sha }}
           APP_PREVIEW_URL: ${{ needs.deploy-app-preview.outputs.deployment_url }}
           STORYBOOK_PREVIEW_URL: ${{ needs.deploy-storybook-preview.outputs.deployment_url }}
         run: |
           # QR は補助情報なので、生成や配置に失敗してもコメント投稿までは止めない。
-          # 文字列は引数ではなく stdin へ渡し、URL が - で始まる場合でも壊れないようにする。
+          # URL は -- の後ろへ置き、- で始まる場合でもオプションと解釈されないようにする。
+          # -s はモジュール 1 つの辺の px、-q はクワイエットゾーンのモジュール数。
           upload_qr() {
             name="$1"
             url="$2"
             [ -n "$url" ] || return 0
 
-            if ! printf '%s' "$url" | qrencode -o "$name.png" -s 6 -m 2; then
+            if ! pnpm dlx qrcode@1.5.4 -t png -s 6 -q 2 -o "$name.png" -- "$url"; then
               echo "::warning::failed to render the $name QR code"
               return 0
             fi
