@@ -326,10 +326,9 @@ function ReceiveStockPage() {
                                 のページで入庫してください。
                             </div>
                         ) : nameMatch && nameMatch.candidates.length > 0 ? (
-                            <div
-                                aria-live="polite"
-                                className="flex flex-col gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm"
-                            >
+                            // 候補は打鍵のたびに入れ替わるため読み上げ対象にしない。
+                            // 同名が既にある場合の警告だけを live region で伝える
+                            <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm">
                                 <span>
                                     名前の近い品目があります。同じ物ならそちらへ入庫してください。
                                 </span>
@@ -403,6 +402,18 @@ function ReceiveStockPage() {
                                     </SelectGroup>
                                 </SelectContent>
                             </Select>
+                            {categoryOptions.length === 0 ? (
+                                <FieldDescription>
+                                    カテゴリがまだありません。
+                                    <Link
+                                        className="underline underline-offset-4"
+                                        to="/categories"
+                                    >
+                                        カテゴリ
+                                    </Link>
+                                    で先に作ってください。
+                                </FieldDescription>
+                            ) : null}
                             {errors.categoryId ? (
                                 <FieldError id={errorId("category")}>
                                     {errors.categoryId}
@@ -455,6 +466,18 @@ function ReceiveStockPage() {
                                     </SelectGroup>
                                 </SelectContent>
                             </Select>
+                            {locationOptions.length === 0 ? (
+                                <FieldDescription>
+                                    保管場所がまだありません。
+                                    <Link
+                                        className="underline underline-offset-4"
+                                        to="/locations"
+                                    >
+                                        保管場所
+                                    </Link>
+                                    で先に作ってください。
+                                </FieldDescription>
+                            ) : null}
                             {errors.locationId ? (
                                 <FieldError id={errorId("location")}>
                                     {errors.locationId}
