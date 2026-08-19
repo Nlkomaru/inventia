@@ -23,15 +23,20 @@ export const receiptOcrLineSchema = z.object({
         .max(200)
         .nullable()
         .describe(
-            "表示用に整えた商品名。先頭の ※ や「軽」など税率を示す記号を除き、幅の都合で途切れている場合は確信を持てる範囲だけ補う。在庫を検索する tool が提供されている場合は、既存の品目と同一だと判断できるものに限りその品目名をそのまま入れてよい。整える必要がない場合は null",
+            "在庫の品目名として使う商品名。内容量の違う同じ商品を 1 つの品目へまとめるため、先頭の ※ や「軽」など税率を示す記号、メーカー名や括弧書き、内容量・入り数・規格の表記（1kg、500ml、3個入、徳用）を除いた商品そのものの名前にする（例: 「エクリチュール (日清製粉) 1kg」→「エクリチュール」）。幅の都合で途切れている場合は確信を持てる範囲だけ補う。在庫を検索する tool が提供されている場合は、既存の品目と同一だと判断できるものに限りその品目名をそのまま入れてよい。整える必要がない場合は null",
         ),
-    quantity: z.int().min(1).describe("購入個数。表記がない行は 1"),
+    quantity: z
+        .int()
+        .min(1)
+        .describe(
+            "在庫へ加える数量。suggestedBaseUnit で表した合計量とし、内容量が読み取れる商品は「内容量 × 購入個数」を入れる（例: 1kg の小麦粉 1 袋は suggestedBaseUnit が g で 1000、500ml の牛乳 2 本は ml で 1000）。個・本・袋のように数える商品（suggestedBaseDimension が count）と stockRelevant が false の行は購入個数を入れ、表記がない行は 1。内容量を読み取れない商品は重さや容量へ換算せず、count の単位と購入個数にする",
+        ),
     price: z
         .int()
         .min(0)
         .nullable()
         .describe(
-            "その行に印字された金額（円、整数、数量分の小計）。印字された数字をそのまま入れ、税の計算をしない。読み取れない場合は null",
+            "その行に印字された金額（円、整数）。複数個の行はその小計であり、印字された数字をそのまま入れ、税の計算も個数での割り算もしない。読み取れない場合は null",
         ),
     taxRate: z
         .union([z.literal(8), z.literal(10)])
@@ -88,12 +93,12 @@ export const receiptOcrLineSchema = z.object({
         .max(50)
         .nullable()
         .describe(
-            "在庫を数える単位の表記（例: 個、本、袋、g、ml）。商品名や内容量から判断する。suggestedBaseDimension と必ず対で設定し、片方だけにしない。判断できない場合と stockRelevant が false の場合は null",
+            "在庫を数える単位の表記（例: 個、本、袋、g、ml）。商品名や内容量から判断する。内容量が重さや容量で表される商品（小麦粉、砂糖、精肉、牛乳、洗剤など）は、内容量の違う同じ商品を同じ品目へ積めるよう最小単位の g または ml にし、kg は g、L は ml へ換算する（quantity が整数のため kg や L のままにしない）。個数で数える商品は 個・本・袋 のような表記にする。suggestedBaseDimension と必ず対で設定し、片方だけにしない。判断できない場合と stockRelevant が false の場合は null",
         ),
     suggestedBaseDimension: receiptBaseDimensionSchema
         .nullable()
         .describe(
-            "suggestedBaseUnit が属する量の種類。g や kg は mass、ml や L は volume、個・本・袋のように数えるものは count。suggestedBaseUnit と必ず対で設定する",
+            "suggestedBaseUnit が属する量の種類。g は mass、ml は volume、個・本・袋のように数えるものは count。suggestedBaseUnit と必ず対で設定する",
         ),
 });
 
@@ -456,12 +461,16 @@ export const receiptParseDefaultInstructions = [
     "※印や「軽」印が付く商品は taxRate を 8、それ以外は 10 にしてください。",
     "",
     "name には印字をそのまま入れてください。",
-    "completedName には、※などの記号を除き、途切れた名前を補った商品名を入れてください。",
+    "completedName には、※などの記号、メーカー名や括弧書き、内容量・入り数の表記を除き、途切れた名前を補った商品名を入れてください。内容量が違う同じ商品を 1 つの品目へまとめるためです。",
     "在庫を検索する tool があれば既存の品目を調べ、同一と判断できるものはその品目名を completedName に入れてください。",
     "",
     "在庫として管理する品物は stockRelevant を true、レジ袋・箸・送料・手数料は false にしてください。",
     "true の行では、カテゴリ一覧の tool を必ず使い、一覧にある名前だけを suggestedCategoryName に入れてください。一覧に無ければ null です。",
     "数える単位は suggestedBaseUnit と suggestedBaseDimension を対で入れてください。",
+    "内容量が重さ・容量で表される商品は suggestedBaseUnit を g または ml にし、kg は g、L は ml へ換算してください。",
+    "quantity は suggestedBaseUnit で表した合計量（内容量 × 購入個数）です。個数で数える商品だけ購入個数を入れてください。",
+    "例: 「エクリチュール (日清製粉) 1kg」を 1 袋なら、completedName は「エクリチュール」、suggestedBaseUnit は g、suggestedBaseDimension は mass、quantity は 1000 です。",
+    "内容量を読み取れない商品は重さや容量を推測せず、suggestedBaseUnit を 個 などにして quantity を購入個数にしてください。",
     "",
     "期限は、その商品の行に印字されている場合だけ printedExpiryDate に入れてください。",
     "印字が無い食品は購入日からの保存期間を estimatedExpiryDate に入れ、expirySource を estimated にしてください。",

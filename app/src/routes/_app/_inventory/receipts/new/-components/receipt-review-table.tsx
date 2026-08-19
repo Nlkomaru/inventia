@@ -114,7 +114,10 @@ const columns = columnHelper.columns([
                         {review.displayName === review.rawName
                             ? null
                             : `${review.rawName} / `}
-                        {line.quantity} 点 / {formatYen(line.price)}
+                        {/* 数量は基準単位での量なので、読み取れた単位を添えて
+                            1000（g）を 1000 点と読み違えないようにする */}
+                        {line.quantity} {line.suggestedBaseUnit ?? "点"} /{" "}
+                        {formatYen(line.price)}
                     </span>
                     {detailInvalid ? (
                         <span className="w-fit rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
