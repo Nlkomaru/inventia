@@ -195,7 +195,7 @@ receiptsApp.openAPIRegistry.registerPath({
     summary: "Get the stored receipt image",
     operationId: "getReceiptImage",
     description:
-        "Returns the stored photo of one receipt as image bytes, with the content type it was uploaded with. This endpoint only reads data. It exists so the confirmation screen and the receipt detail page can show the photo next to the extracted lines; the object storage key stays private and is never part of any response. The response is marked private and may be cached by the caller for an hour; the entity tag comes from object storage, so a conditional request can skip the transfer.",
+        "Returns the stored photo of one receipt as image bytes, with the content type it was uploaded with. This endpoint only reads data. It exists so the confirmation screen and the receipt detail page can show the photo next to the extracted lines; the object storage key stays private and is never part of any response. The response is marked private and may be cached by the caller for an hour; the entity tag comes from object storage and a request whose If-None-Match matches it is answered with 304 without transferring the image again.",
     request: {
         params: z.object({ id: receiptIdParameter }),
     },
@@ -207,6 +207,10 @@ receiptsApp.openAPIRegistry.registerPath({
                 "image/png": { schema: imageBinarySchema },
                 "image/webp": { schema: imageBinarySchema },
             },
+        },
+        304: {
+            description:
+                "The caller already holds this image; If-None-Match matched the stored entity tag.",
         },
         400: jsonError("RECEIPT_INVALID_INPUT: the receipt id is empty."),
         404: jsonError(
@@ -440,6 +444,16 @@ receiptsApp.get("/:id", async (c) => {
 receiptsApp.get("/:id/image", async (c) => {
     try {
         const image = await getReceiptImage(c.env, c.req.param("id"));
+        // R2 の ETag は引用符ごと返しているため、条件付き要求の値と直接比べられる
+        if (c.req.header("if-none-match") === image.etag) {
+            return new Response(null, {
+                status: 304,
+                headers: {
+                    "cache-control": "private, max-age=3600",
+                    etag: image.etag,
+                },
+            });
+        }
         return new Response(image.body, {
             headers: {
                 "content-type": image.contentType,
