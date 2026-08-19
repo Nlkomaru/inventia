@@ -1,18 +1,19 @@
 import {
     useMutation,
-    useQuery,
     useQueryClient,
     useSuspenseQuery,
 } from "@tanstack/react-query";
 import {
     createFileRoute,
     type ErrorComponentProps,
+    Link,
     useRouter,
 } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
     Field,
+    FieldDescription,
     FieldError,
     FieldGroup,
     FieldLabel,
@@ -26,34 +27,35 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import type { ItemBaseDimension, ItemDto } from "@/domain/item";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import type { ItemLotDto, LotAllocationDto } from "@/domain/lot";
-import type { StockMovementReason } from "@/domain/stock";
-import { formatDisplayDateTime } from "@/lib/datetime";
-import { type ReceiveStockInput, receiveStock } from "./-api/stock-api";
+    buildReceiptMatchIndex,
+    matchLine,
+    normalizeReceiptName,
+} from "@/domain/receipt-match";
+import { parsePositiveInteger, toIsoDateTime } from "@/lib/expiry-input";
 import {
+    buildHierarchyLabels,
+    getEffectiveCategoryKind,
+} from "@/lib/hierarchy";
+import { createItem } from "./-api/stock-api";
+import {
+    categoryTreeQueryOptions,
     inventoryKeys,
     itemKeys,
     itemListQueryOptions,
-    itemLotsQueryOptions,
+    locationTreeQueryOptions,
     stockHistoryKeys,
 } from "./-api/stock-queries";
-import {
-    parsePositiveInteger,
-    toDateTimeLocalValue,
-    toIsoDateTime,
-} from "./-functions/expiry-input";
 
 export const Route = createFileRoute("/_app/_inventory/inventory/receive/")({
     loader: ({ context }) =>
-        context.queryClient.ensureQueryData(itemListQueryOptions()),
+        Promise.all([
+            context.queryClient.ensureQueryData(itemListQueryOptions()),
+            context.queryClient.ensureQueryData(categoryTreeQueryOptions()),
+            context.queryClient.ensureQueryData(locationTreeQueryOptions()),
+        ]),
     staticData: {
         breadcrumbs: [{ label: "入庫" }],
     },
@@ -64,12 +66,6 @@ export const Route = createFileRoute("/_app/_inventory/inventory/receive/")({
 
 const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
 
-// 入庫の理由は増加側のものだけを出す（消費・廃棄は出庫画面、棚卸しは棚卸画面で扱う）
-const reasonOptions: { label: string; value: StockMovementReason }[] = [
-    { label: "購入", value: "purchase" },
-    { label: "その他", value: "other" },
-];
-
 type ExpiryMode = "date" | "none";
 
 const expiryModeOptions: { label: string; value: ExpiryMode }[] = [
@@ -77,187 +73,191 @@ const expiryModeOptions: { label: string; value: ExpiryMode }[] = [
     { label: "期限なし", value: "none" },
 ];
 
-// 未取得時の既定値は参照を固定する。毎描画で新しい配列を作ると
-// ロットに依存する derive が無限に走る
-const noLots: ItemLotDto[] = [];
+const dimensionOptions: { label: string; value: ItemBaseDimension }[] = [
+    { label: "重量", value: "mass" },
+    { label: "体積", value: "volume" },
+    { label: "個数", value: "count" },
+];
 
-type ReceiveSubmitInput = ReceiveStockInput & { itemId: string };
+const toDimension = (value: string | null): ItemBaseDimension | "" =>
+    value === "mass" || value === "volume" || value === "count" ? value : "";
+
+// 同じ物を二重に登録しないため、名前が近い品目を提示する上限
+const similarItemLimit = 5;
 
 function ReceiveStockPage() {
     const queryClient = useQueryClient();
+    const router = useRouter();
     const { data: items } = useSuspenseQuery(itemListQueryOptions());
-    const [selectedItemId, setSelectedItemId] = useState("");
-    const lotsQuery = useQuery(itemLotsQueryOptions(selectedItemId));
-    const lots = lotsQuery.data ?? noLots;
-    const [quantity, setQuantity] = useState("");
-    const [expiryMode, setExpiryMode] = useState<ExpiryMode>("date");
-    const [expiryInput, setExpiryInput] = useState("");
-    const [reason, setReason] = useState<StockMovementReason>("purchase");
-    const [selectionError, setSelectionError] = useState<string | null>(null);
-    const [quantityError, setQuantityError] = useState<string | null>(null);
-    const [expiryError, setExpiryError] = useState<string | null>(null);
-    const [submitError, setSubmitError] = useState<string | null>(null);
-    const [notice, setNotice] = useState<string | null>(null);
-    const [allocations, setAllocations] = useState<LotAllocationDto[]>([]);
-    // 送信内容が同じ限り同じ idempotency key で再送し、二重計上を防ぐ
-    const pendingKey = useRef<{ signature: string; value: string } | null>(
-        null,
-    );
+    const { data: categories } = useSuspenseQuery(categoryTreeQueryOptions());
+    const { data: locations } = useSuspenseQuery(locationTreeQueryOptions());
 
-    // 入庫はロット構成・品目の在庫数・在庫履歴を同時に変えるため、関係する query をまとめて無効化する。
-    // onSuccess の Promise を返すと mutateAsync が再取得完了まで待つ。
-    const receiveMutation = useMutation({
-        mutationFn: ({ itemId, ...input }: ReceiveSubmitInput) =>
-            receiveStock(itemId, input),
+    const [name, setName] = useState("");
+    const [categoryId, setCategoryId] = useState("");
+    const [locationId, setLocationId] = useState("");
+    const [baseUnit, setBaseUnit] = useState("");
+    const [baseDimension, setBaseDimension] = useState<ItemBaseDimension | "">(
+        "",
+    );
+    const [quantity, setQuantity] = useState("1");
+    const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
+    const [expiryInput, setExpiryInput] = useState("");
+    const [memo, setMemo] = useState("");
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const [created, setCreated] = useState<ItemDto | null>(null);
+
+    // 登録は品目・ロット・在庫履歴を一度に作る。在庫一覧と履歴のキャッシュも流す
+    const createMutation = useMutation({
+        mutationFn: createItem,
         onSuccess: () =>
             Promise.all([
                 queryClient.invalidateQueries({ queryKey: itemKeys.all }),
                 queryClient.invalidateQueries({
                     queryKey: stockHistoryKeys.all,
                 }),
-                queryClient.invalidateQueries({
-                    queryKey: inventoryKeys.all,
-                }),
+                queryClient.invalidateQueries({ queryKey: inventoryKeys.all }),
             ]),
     });
-    const saving = receiveMutation.isPending;
-    const lotsLoading = lotsQuery.isLoading;
-    const lotsError = lotsQuery.error
-        ? errorMessage(lotsQuery.error, "ロットを読み込めませんでした")
-        : null;
+    const saving = createMutation.isPending;
 
-    const selectedItem = useMemo(
-        () => items.find((item) => item.id === selectedItemId) ?? null,
-        [items, selectedItemId],
+    const categoryLabels = useMemo(
+        () => buildHierarchyLabels(categories),
+        [categories],
     );
-    const parsedQuantity = useMemo(
-        () => parsePositiveInteger(quantity),
-        [quantity],
+    const locationLabels = useMemo(
+        () => buildHierarchyLabels(locations),
+        [locations],
     );
-    const expiryDate = useMemo(
-        () => (expiryMode === "none" ? null : toIsoDateTime(expiryInput)),
-        [expiryInput, expiryMode],
+    const categoryOptions = useMemo(
+        () =>
+            categories.map((category) => ({
+                label: categoryLabels.get(category.id) ?? category.name,
+                value: category.id,
+            })),
+        [categories, categoryLabels],
+    );
+    const locationOptions = useMemo(
+        () =>
+            locations.map((location) => ({
+                label: locationLabels.get(location.id) ?? location.name,
+                value: location.id,
+            })),
+        [locations, locationLabels],
+    );
+
+    // 書籍などの種別は基準単位を service が補うため、入力を必須にしない
+    const effectiveKind = useMemo(
+        () => getEffectiveCategoryKind(categoryId || null, categories),
+        [categories, categoryId],
+    );
+    const unitRequired = effectiveKind !== "document";
+
+    // 同じ物が登録済みかを名前で照合する。確定はせず候補として見せるだけで、
+    // 反映先は利用者が品目のページで選ぶ（レシート取込と同じ方針）
+    const matchIndex = useMemo(() => buildReceiptMatchIndex(items), [items]);
+    const nameMatch = useMemo(() => {
+        const normalized = normalizeReceiptName(name);
+        if (normalized.length === 0) return null;
+        return matchLine(
+            normalized,
+            {
+                exact: matchIndex.exact,
+                aliases: new Map(),
+                candidates: matchIndex.candidates,
+            },
+            { candidateLimit: similarItemLimit },
+        );
+    }, [matchIndex, name]);
+    const matchedItem = useMemo(
+        () =>
+            nameMatch?.itemId
+                ? (items.find((item) => item.id === nameMatch.itemId) ?? null)
+                : null,
+        [items, nameMatch],
     );
 
     const resetFeedback = () => {
-        setSelectionError(null);
-        setQuantityError(null);
-        setExpiryError(null);
+        setErrors({});
         setSubmitError(null);
-        setNotice(null);
-        setAllocations([]);
-        pendingKey.current = null;
-    };
-
-    const handleItemChange = (value: string | null) => {
-        setSelectedItemId(value ?? "");
-        resetFeedback();
-    };
-
-    const handleQuantityChange = (value: string) => {
-        setQuantity(value);
-        resetFeedback();
-    };
-
-    const handleExpiryModeChange = (value: string | null) => {
-        setExpiryMode(value === "none" ? "none" : "date");
-        resetFeedback();
-    };
-
-    const handleExpiryInputChange = (value: string) => {
-        setExpiryInput(value);
-        setExpiryMode("date");
-        resetFeedback();
-    };
-
-    const handleReasonChange = (value: string | null) => {
-        const next = reasonOptions.find((option) => option.value === value);
-        if (next) setReason(next.value);
-        resetFeedback();
-    };
-
-    const applyExistingLot = (lot: ItemLotDto) => {
-        if (lot.expiryDate === null) {
-            setExpiryMode("none");
-            setExpiryInput("");
-        } else {
-            setExpiryMode("date");
-            setExpiryInput(toDateTimeLocalValue(lot.expiryDate));
-        }
-        resetFeedback();
+        setCreated(null);
     };
 
     const submit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        setSelectionError(null);
-        setQuantityError(null);
-        setExpiryError(null);
-        setSubmitError(null);
-        setNotice(null);
-
-        if (!selectedItem) {
-            setSelectionError("品目を選択してください");
-            return;
-        }
+        const next: Record<string, string> = {};
+        const trimmedName = name.trim();
+        if (trimmedName.length === 0) next.name = "品目名を入力してください";
+        if (categoryId === "") next.categoryId = "カテゴリを選択してください";
+        if (locationId === "") next.locationId = "保管場所を選択してください";
+        const parsedQuantity = parsePositiveInteger(quantity);
         if (parsedQuantity === null) {
-            setQuantityError("1以上の整数で入力してください");
-            return;
+            next.quantity = "1以上の整数で入力してください";
         }
+        // baseUnit と baseDimension は対で送る契約。片方だけでは API が 400 を返す
+        if (unitRequired && baseUnit.trim() === "") {
+            next.baseUnit = "基準単位を入力してください";
+        }
+        if (unitRequired && baseDimension === "") {
+            next.baseDimension = "数量の種類を選択してください";
+        }
+        const expiryDate =
+            expiryMode === "none" ? null : toIsoDateTime(expiryInput);
         if (expiryMode === "date" && expiryDate === null) {
-            setExpiryError(
-                "期限日時を入力するか、「期限なし」を選択してください",
-            );
-            return;
+            next.expiryDate =
+                "期限日時を入力するか、「期限なし」を選択してください";
         }
+        setErrors(next);
+        setSubmitError(null);
+        setCreated(null);
+        if (Object.keys(next).length > 0) return;
 
-        const signature = JSON.stringify({
-            itemId: selectedItem.id,
-            quantity: parsedQuantity,
-            expiryDate,
-            reason,
-        });
-        const idempotencyKey =
-            pendingKey.current?.signature === signature
-                ? pendingKey.current.value
-                : crypto.randomUUID();
-        pendingKey.current = { signature, value: idempotencyKey };
         try {
-            const result = await receiveMutation.mutateAsync({
-                itemId: selectedItem.id,
-                quantity: parsedQuantity,
-                expiryDate,
-                reason,
-                idempotencyKey,
+            const item = await createMutation.mutateAsync({
+                name: trimmedName,
+                categoryId,
+                locationId,
+                currentQuantity: parsedQuantity ?? 1,
+                ...(expiryDate === null ? {} : { expiryDate }),
+                ...(unitRequired && baseDimension !== ""
+                    ? { baseUnit: baseUnit.trim(), baseDimension }
+                    : {}),
+                ...(memo.trim() === "" ? {} : { memo: memo.trim() }),
             });
-            setAllocations(result.allocations);
-            setQuantity("");
-            pendingKey.current = null;
-            setNotice(
-                result.replayed
-                    ? "この入庫は既に記録済みです。保存済みの内訳を表示しました（再送）。"
-                    : "入庫を記録しました。",
-            );
+            setCreated(item);
+            setName("");
+            setBaseUnit("");
+            setBaseDimension("");
+            setQuantity("1");
+            setExpiryMode("none");
+            setExpiryInput("");
+            setMemo("");
         } catch (cause) {
-            setSubmitError(errorMessage(cause, "入庫を記録できませんでした"));
+            setSubmitError(errorMessage(cause, "品目を登録できませんでした"));
         }
     };
-
-    const itemOptions = items.map((item) => ({
-        label: item.name,
-        value: item.id,
-    }));
-    const baseUnit = selectedItem?.baseUnit ?? "—";
 
     return (
         <main className={pageClassName}>
             <header>
                 <h1 className="mt-1 text-2xl font-bold">入庫</h1>
+                <p className="mt-2 text-sm text-muted-foreground">
+                    まだ登録していない手持ちの物を、品目として作りながら在庫に入れます。
+                    登録済みの品目へ足す場合は、
+                    <Link
+                        className="underline underline-offset-4"
+                        to="/inventory"
+                    >
+                        在庫一覧
+                    </Link>
+                    から品目のページを開いてください。
+                </p>
             </header>
 
             <section aria-labelledby="receive-form-title">
                 <div className="mb-5 flex items-center gap-3">
                     <h2 className="font-bold" id="receive-form-title">
-                        入庫を記録
+                        手持ちの在庫を登録
                     </h2>
                 </div>
                 <form
@@ -265,35 +265,117 @@ function ReceiveStockPage() {
                     onSubmit={submit}
                 >
                     <FieldGroup>
-                        <Field data-invalid={Boolean(selectionError)}>
-                            <FieldLabel htmlFor="receive-item">品目</FieldLabel>
+                        <Field data-invalid={Boolean(errors.name)}>
+                            <FieldLabel htmlFor="receive-name">
+                                品目名
+                            </FieldLabel>
+                            <Input
+                                aria-describedby={
+                                    errors.name
+                                        ? "receive-name-error"
+                                        : "receive-name-description"
+                                }
+                                aria-invalid={Boolean(errors.name)}
+                                autoComplete="off"
+                                disabled={saving}
+                                id="receive-name"
+                                maxLength={200}
+                                onChange={(event) => {
+                                    setName(event.target.value);
+                                    resetFeedback();
+                                }}
+                                placeholder="小麦粉、トイレットペーパー など"
+                                value={name}
+                            />
+                            <FieldDescription id="receive-name-description">
+                                同じ物が登録済みかどうかを、入力に合わせて下に出します。
+                            </FieldDescription>
+                            {errors.name ? (
+                                <FieldError id="receive-name-error">
+                                    {errors.name}
+                                </FieldError>
+                            ) : null}
+                        </Field>
+
+                        {matchedItem ? (
+                            <div
+                                aria-live="polite"
+                                className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm"
+                            >
+                                同じ名前の品目が既にあります。こちらへ足す場合は{" "}
+                                <Link
+                                    className="underline underline-offset-4"
+                                    params={{ itemId: matchedItem.id }}
+                                    to="/inventory/items/$itemId"
+                                >
+                                    {matchedItem.name}
+                                </Link>{" "}
+                                のページで入庫してください。
+                            </div>
+                        ) : nameMatch && nameMatch.candidates.length > 0 ? (
+                            <div
+                                aria-live="polite"
+                                className="flex flex-col gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm"
+                            >
+                                <span>
+                                    名前の近い品目があります。同じ物ならそちらへ入庫してください。
+                                </span>
+                                <ul className="flex flex-wrap gap-2">
+                                    {nameMatch.candidates.map((candidate) => (
+                                        <li key={candidate.itemId}>
+                                            <Button
+                                                nativeButton={false}
+                                                render={
+                                                    <Link
+                                                        params={{
+                                                            itemId: candidate.itemId,
+                                                        }}
+                                                        to="/inventory/items/$itemId"
+                                                    />
+                                                }
+                                                size="xs"
+                                                variant="outline"
+                                            >
+                                                {candidate.name}（一致度{" "}
+                                                {candidate.score}）
+                                            </Button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ) : null}
+
+                        <Field data-invalid={Boolean(errors.categoryId)}>
+                            <FieldLabel htmlFor="receive-category">
+                                カテゴリ
+                            </FieldLabel>
                             <Select
-                                disabled={items.length === 0}
-                                items={itemOptions}
-                                onValueChange={handleItemChange}
-                                value={selectedItemId || null}
+                                disabled={
+                                    saving || categoryOptions.length === 0
+                                }
+                                items={categoryOptions}
+                                onValueChange={(value) => {
+                                    setCategoryId(value ?? "");
+                                    resetFeedback();
+                                }}
+                                value={categoryId || null}
                             >
                                 <SelectTrigger
-                                    aria-describedby={
-                                        selectionError
-                                            ? "receive-item-error"
-                                            : undefined
-                                    }
-                                    aria-invalid={Boolean(selectionError)}
+                                    aria-invalid={Boolean(errors.categoryId)}
                                     className="w-full"
-                                    id="receive-item"
+                                    id="receive-category"
                                 >
                                     <SelectValue
                                         placeholder={
-                                            items.length === 0
-                                                ? "品目がありません"
-                                                : "品目を選択"
+                                            categoryOptions.length === 0
+                                                ? "カテゴリがありません"
+                                                : "カテゴリを選択"
                                         }
                                     />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectGroup>
-                                        {itemOptions.map((option) => (
+                                        {categoryOptions.map((option) => (
                                             <SelectItem
                                                 key={option.value}
                                                 value={option.value}
@@ -304,39 +386,155 @@ function ReceiveStockPage() {
                                     </SelectGroup>
                                 </SelectContent>
                             </Select>
-                            {selectionError ? (
-                                <FieldError id="receive-item-error">
-                                    {selectionError}
-                                </FieldError>
+                            {errors.categoryId ? (
+                                <FieldError>{errors.categoryId}</FieldError>
                             ) : null}
                         </Field>
 
-                        <Field data-invalid={Boolean(quantityError)}>
+                        <Field data-invalid={Boolean(errors.locationId)}>
+                            <FieldLabel htmlFor="receive-location">
+                                保管場所
+                            </FieldLabel>
+                            <Select
+                                disabled={
+                                    saving || locationOptions.length === 0
+                                }
+                                items={locationOptions}
+                                onValueChange={(value) => {
+                                    setLocationId(value ?? "");
+                                    resetFeedback();
+                                }}
+                                value={locationId || null}
+                            >
+                                <SelectTrigger
+                                    aria-invalid={Boolean(errors.locationId)}
+                                    className="w-full"
+                                    id="receive-location"
+                                >
+                                    <SelectValue
+                                        placeholder={
+                                            locationOptions.length === 0
+                                                ? "保管場所がありません"
+                                                : "保管場所を選択"
+                                        }
+                                    />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        {locationOptions.map((option) => (
+                                            <SelectItem
+                                                key={option.value}
+                                                value={option.value}
+                                            >
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                            {errors.locationId ? (
+                                <FieldError>{errors.locationId}</FieldError>
+                            ) : null}
+                        </Field>
+
+                        {unitRequired ? (
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <Field data-invalid={Boolean(errors.baseUnit)}>
+                                    <FieldLabel htmlFor="receive-unit">
+                                        基準単位
+                                    </FieldLabel>
+                                    <Input
+                                        aria-invalid={Boolean(errors.baseUnit)}
+                                        disabled={saving}
+                                        id="receive-unit"
+                                        maxLength={50}
+                                        onChange={(event) => {
+                                            setBaseUnit(event.target.value);
+                                            resetFeedback();
+                                        }}
+                                        placeholder="個、袋、g、ml など"
+                                        value={baseUnit}
+                                    />
+                                    {errors.baseUnit ? (
+                                        <FieldError>
+                                            {errors.baseUnit}
+                                        </FieldError>
+                                    ) : null}
+                                </Field>
+
+                                <Field
+                                    data-invalid={Boolean(errors.baseDimension)}
+                                >
+                                    <FieldLabel htmlFor="receive-dimension">
+                                        数量の種類
+                                    </FieldLabel>
+                                    <Select
+                                        disabled={saving}
+                                        items={dimensionOptions}
+                                        onValueChange={(value) => {
+                                            setBaseDimension(
+                                                toDimension(value),
+                                            );
+                                            resetFeedback();
+                                        }}
+                                        value={baseDimension || null}
+                                    >
+                                        <SelectTrigger
+                                            aria-invalid={Boolean(
+                                                errors.baseDimension,
+                                            )}
+                                            className="w-full"
+                                            id="receive-dimension"
+                                        >
+                                            <SelectValue placeholder="種類を選択" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectGroup>
+                                                {dimensionOptions.map(
+                                                    (option) => (
+                                                        <SelectItem
+                                                            key={option.value}
+                                                            value={option.value}
+                                                        >
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectGroup>
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.baseDimension ? (
+                                        <FieldError>
+                                            {errors.baseDimension}
+                                        </FieldError>
+                                    ) : null}
+                                </Field>
+                            </div>
+                        ) : null}
+
+                        <Field data-invalid={Boolean(errors.quantity)}>
                             <FieldLabel htmlFor="receive-quantity">
-                                入庫数量{selectedItem ? `（${baseUnit}）` : ""}
+                                いまある数量
+                                {baseUnit.trim()
+                                    ? `（${baseUnit.trim()}）`
+                                    : ""}
                             </FieldLabel>
                             <Input
-                                aria-describedby={
-                                    quantityError
-                                        ? "receive-quantity-error"
-                                        : undefined
-                                }
-                                aria-invalid={Boolean(quantityError)}
-                                disabled={!selectedItem || saving}
+                                aria-invalid={Boolean(errors.quantity)}
+                                disabled={saving}
                                 id="receive-quantity"
                                 inputMode="numeric"
                                 min={1}
-                                onChange={(event) =>
-                                    handleQuantityChange(event.target.value)
-                                }
+                                onChange={(event) => {
+                                    setQuantity(event.target.value);
+                                    resetFeedback();
+                                }}
                                 step={1}
                                 type="number"
                                 value={quantity}
                             />
-                            {quantityError ? (
-                                <FieldError id="receive-quantity-error">
-                                    {quantityError}
-                                </FieldError>
+                            {errors.quantity ? (
+                                <FieldError>{errors.quantity}</FieldError>
                             ) : null}
                         </Field>
 
@@ -345,9 +543,14 @@ function ReceiveStockPage() {
                                 期限の扱い
                             </FieldLabel>
                             <Select
-                                disabled={!selectedItem || saving}
+                                disabled={saving}
                                 items={expiryModeOptions}
-                                onValueChange={handleExpiryModeChange}
+                                onValueChange={(value) => {
+                                    setExpiryMode(
+                                        value === "date" ? "date" : "none",
+                                    );
+                                    resetFeedback();
+                                }}
                                 value={expiryMode}
                             >
                                 <SelectTrigger
@@ -372,76 +575,48 @@ function ReceiveStockPage() {
                         </Field>
 
                         {expiryMode === "date" ? (
-                            <Field data-invalid={Boolean(expiryError)}>
+                            <Field data-invalid={Boolean(errors.expiryDate)}>
                                 <FieldLabel htmlFor="receive-expiry-date">
                                     期限日時
                                 </FieldLabel>
                                 <Input
-                                    aria-describedby={
-                                        expiryError
-                                            ? "receive-expiry-error"
-                                            : undefined
-                                    }
-                                    aria-invalid={Boolean(expiryError)}
-                                    disabled={!selectedItem || saving}
+                                    aria-invalid={Boolean(errors.expiryDate)}
+                                    disabled={saving}
                                     id="receive-expiry-date"
-                                    onChange={(event) =>
-                                        handleExpiryInputChange(
-                                            event.target.value,
-                                        )
-                                    }
+                                    onChange={(event) => {
+                                        setExpiryInput(event.target.value);
+                                        resetFeedback();
+                                    }}
                                     type="datetime-local"
                                     value={expiryInput}
                                 />
-                                {expiryError ? (
-                                    <FieldError id="receive-expiry-error">
-                                        {expiryError}
-                                    </FieldError>
+                                {errors.expiryDate ? (
+                                    <FieldError>{errors.expiryDate}</FieldError>
                                 ) : null}
                             </Field>
                         ) : null}
 
                         <Field>
-                            <FieldLabel htmlFor="receive-reason">
-                                理由
+                            <FieldLabel htmlFor="receive-memo">
+                                メモ（任意）
                             </FieldLabel>
-                            <Select
-                                disabled={!selectedItem || saving}
-                                items={reasonOptions}
-                                onValueChange={handleReasonChange}
-                                value={reason}
-                            >
-                                <SelectTrigger
-                                    className="w-full"
-                                    id="receive-reason"
-                                >
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectGroup>
-                                        {reasonOptions.map((option) => (
-                                            <SelectItem
-                                                key={option.value}
-                                                value={option.value}
-                                            >
-                                                {option.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectGroup>
-                                </SelectContent>
-                            </Select>
+                            <Textarea
+                                disabled={saving}
+                                id="receive-memo"
+                                maxLength={2000}
+                                onChange={(event) => {
+                                    setMemo(event.target.value);
+                                    resetFeedback();
+                                }}
+                                rows={2}
+                                value={memo}
+                            />
                         </Field>
                     </FieldGroup>
+
                     <div className="flex justify-end gap-2">
-                        <Button
-                            disabled={saving || !selectedItem}
-                            type="submit"
-                        >
-                            {saving
-                                ? "送信中…"
-                                : submitError
-                                  ? "入庫を再送"
-                                  : "入庫を記録"}
+                        <Button disabled={saving} type="submit">
+                            {saving ? "登録中…" : "品目を登録して在庫に入れる"}
                         </Button>
                     </div>
                 </form>
@@ -456,100 +631,29 @@ function ReceiveStockPage() {
                     {submitError}
                 </div>
             ) : null}
-            {notice ? (
+            {created ? (
                 <output
                     aria-live="polite"
-                    className="flex flex-col gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm"
+                    className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm"
                 >
-                    <span>{notice}</span>
-                    {allocations.length > 0 ? (
-                        <ul className="flex flex-col gap-1 text-muted-foreground">
-                            {allocations.map((allocation) => (
-                                <li key={allocation.lotId}>
-                                    {formatExpiry(allocation.expiryDate)}:{" "}
-                                    {formatDelta(allocation.delta)} {baseUnit}
-                                </li>
-                            ))}
-                        </ul>
-                    ) : null}
+                    <span>
+                        {created.name} を {created.currentQuantity}{" "}
+                        {created.baseUnit} で登録しました。
+                    </span>
+                    <Button
+                        onClick={() =>
+                            void router.navigate({
+                                params: { itemId: created.id },
+                                to: "/inventory/items/$itemId",
+                            })
+                        }
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                    >
+                        品目のページを開く
+                    </Button>
                 </output>
-            ) : null}
-
-            {selectedItem ? (
-                <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                    <div className="border-b p-5">
-                        <h2 className="font-bold">現在のロット</h2>
-                        <p className="text-xs text-muted-foreground">
-                            {selectedItem.name}の在庫は合計{" "}
-                            {selectedItem.currentQuantity} {baseUnit} です。
-                        </p>
-                    </div>
-                    {lotsError ? (
-                        <div className="p-5">
-                            <div
-                                aria-live="polite"
-                                className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
-                                role="alert"
-                            >
-                                <span>{lotsError}</span>
-                                <Button
-                                    onClick={() => void lotsQuery.refetch()}
-                                    size="sm"
-                                    type="button"
-                                    variant="outline"
-                                >
-                                    再読み込み
-                                </Button>
-                            </div>
-                        </div>
-                    ) : lotsLoading ? (
-                        <p className="p-5 text-sm text-muted-foreground">
-                            ロットを読み込み中…
-                        </p>
-                    ) : lots.length === 0 ? (
-                        <p className="p-5 text-sm text-muted-foreground">
-                            在庫のあるロットはありません。
-                        </p>
-                    ) : (
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead className="px-5">期限</TableHead>
-                                    <TableHead className="px-5 text-right">
-                                        数量
-                                    </TableHead>
-                                    <TableHead className="px-5 text-right">
-                                        操作
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {lots.map((lot) => (
-                                    <TableRow key={lot.id}>
-                                        <TableCell className="px-5 py-3">
-                                            {formatExpiry(lot.expiryDate)}
-                                        </TableCell>
-                                        <TableCell className="px-5 py-3 text-right">
-                                            {lot.quantity} {baseUnit}
-                                        </TableCell>
-                                        <TableCell className="px-5 py-3 text-right">
-                                            <Button
-                                                onClick={() =>
-                                                    applyExistingLot(lot)
-                                                }
-                                                size="sm"
-                                                type="button"
-                                                variant="outline"
-                                            >
-                                                この期限に追加
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    )}
-                </section>
             ) : null}
         </main>
     );
@@ -559,7 +663,7 @@ function ReceivePending() {
     return (
         <main className={pageClassName}>
             <p className="text-sm text-muted-foreground">
-                品目を読み込んでいます…
+                入庫画面を読み込んでいます…
             </p>
         </main>
     );
@@ -570,11 +674,13 @@ function ReceiveError({ error, reset }: ErrorComponentProps) {
     return (
         <main className={pageClassName}>
             <div
-                aria-live="polite"
+                aria-live="assertive"
                 className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
                 role="alert"
             >
-                <span>{errorMessage(error, "品目を読み込めませんでした")}</span>
+                <span>
+                    {errorMessage(error, "入庫画面を読み込めませんでした")}
+                </span>
                 <Button
                     onClick={() => {
                         reset();
@@ -593,9 +699,3 @@ function ReceiveError({ error, reset }: ErrorComponentProps) {
 
 const errorMessage = (cause: unknown, fallback: string): string =>
     cause instanceof Error ? cause.message : fallback;
-
-const formatExpiry = (value: string | null): string =>
-    (value === null ? null : formatDisplayDateTime(value)) ?? "期限なし";
-
-const formatDelta = (delta: number): string =>
-    delta > 0 ? `+${delta}` : String(delta);

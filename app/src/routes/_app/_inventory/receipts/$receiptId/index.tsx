@@ -84,6 +84,7 @@ function ReceiptDetailPage() {
                 </div>
                 {resumable ? (
                     <Button
+                        nativeButton={false}
                         render={
                             <Link
                                 search={resumeSearch(receipt.id)}
@@ -303,6 +304,7 @@ function ReceiptDetailError({ error, reset }: ErrorComponentProps) {
                         再読み込み
                     </Button>
                     <Button
+                        nativeButton={false}
                         render={<Link to="/receipts" />}
                         size="sm"
                         variant="outline"
