@@ -24,12 +24,13 @@ export const locationKeys = {
     detail: (id: string) => [...locationKeys.all, "detail", id] as const,
 };
 
-// 履歴一覧の画面（絞り込みつき）とは別の key にして、片方の再取得が
-// もう片方のページ位置を巻き戻さないようにする
+// 入出庫・棚卸・レシート反映は `stock-history` 名前空間をまとめて無効化するため、
+// この画面の履歴もその配下へ入れる。`list` とは別の階層にして、
+// 履歴一覧（絞り込みつき）と品目ごとの履歴が互いのページ位置を巻き戻さないようにする
 export const itemStockHistoryKeys = {
-    all: ["item-stock-history"] as const,
-    list: (itemId: string) =>
-        [...itemStockHistoryKeys.all, "list", itemId] as const,
+    all: ["stock-history"] as const,
+    item: (itemId: string) =>
+        [...itemStockHistoryKeys.all, "item", itemId] as const,
 };
 
 export const itemHistoryPageSize = 20;
@@ -55,7 +56,7 @@ export const locationDetailQueryOptions = (id: string) =>
 /** cursor ページング。品目ごとに key が変わるため、品目を移ると先頭から読む。 */
 export const itemStockHistoryQueryOptions = (itemId: string) =>
     infiniteQueryOptions({
-        queryKey: itemStockHistoryKeys.list(itemId),
+        queryKey: itemStockHistoryKeys.item(itemId),
         queryFn: ({ pageParam }) =>
             listItemStockHistory({
                 data: {
