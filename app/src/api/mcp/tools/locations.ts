@@ -5,11 +5,14 @@ import {
     locationIdSchema,
     locationListInputSchema,
     locationListOutputSchema,
+    locationTreeOutputSchema,
 } from "../../../domain/location";
 import {
     getLocation,
     LocationServiceError,
     listLocations,
+    listLocationTree,
+    locationTreeMaxSize,
 } from "../../../services/locationService";
 import { mcpError, mcpSuccess } from "../result";
 
@@ -45,10 +48,28 @@ export const registerLocationTools = (
     );
 
     server.registerTool(
+        "list_location_tree",
+        {
+            title: "List the whole storage location tree",
+            description: `Return every storage location in one call, ordered by sortOrder then by id, so a caller does not have to walk the tree one level at a time with list_locations. Each item carries its parentId, which is enough to rebuild the hierarchy and to match a name anywhere in the tree — names are only unique among siblings, so a full path needs the ancestors. At most ${locationTreeMaxSize} locations are returned and truncated is true when there are more; there is no cursor for the rest, so fall back to list_locations per level in that case. This tool only reads data.`,
+            inputSchema: z.object({}).strict(),
+            outputSchema: locationTreeOutputSchema,
+        },
+        async () => {
+            try {
+                return mcpSuccess(await listLocationTree(db));
+            } catch (error) {
+                return locationError(error, "location tree listing failed");
+            }
+        },
+    );
+
+    server.registerTool(
         "get_location",
         {
             title: "Get storage location",
-            description: "Get one storage location by its system ID.",
+            description:
+                "Get one storage location by its system ID. To resolve several locations, or to build a location's full path from its ancestors, read the whole tree once with list_location_tree instead of calling this per id.",
             inputSchema: locationIdInputSchema,
             outputSchema: locationDtoSchema,
         },

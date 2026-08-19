@@ -21,6 +21,7 @@ import {
     hasReferencingItems,
     insertLocation,
     type LocationRecord,
+    listAllLocations,
     listLocations as listLocationRows,
     parentExists,
     updateLocation as updateLocationRow,
@@ -172,6 +173,21 @@ export const listLocations = async (
                   })
                 : null,
     };
+};
+
+// ツリー表示は全件が必要なため、階層ごとのページングを繰り返さず 1 クエリで読む
+export const locationTreeMaxSize = 1000;
+
+export type LocationTreeResponse = {
+    items: LocationDto[];
+    truncated: boolean;
+};
+
+export const listLocationTree = async (
+    db: D1Database,
+): Promise<LocationTreeResponse> => {
+    const page = await listAllLocations(db, locationTreeMaxSize);
+    return { items: page.rows.map(toDto), truncated: page.hasMore };
 };
 
 export const getLocation = async (

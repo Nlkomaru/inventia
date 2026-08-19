@@ -10,6 +10,9 @@ import { createMcpServer } from "./server";
  * server.ts へ書き込み系 tool が増えても解析経路へ漏れないようにする。
  */
 export const receiptParseToolAllowlist = [
+    // 明細の表記をまとめて照合する。1 行ずつ search_inventory を呼ばせると
+    // 呼び出し回数が明細の行数に比例し、往復上限を使い切る
+    "resolve_inventory_items",
     "search_inventory",
     // レシートの表記（略称やブランド名の前置きなど）は在庫の品目名と語彙が
     // ずれやすく、search_inventory の LIKE 検索だけでは既存品目を見落とす。
@@ -22,9 +25,10 @@ export const receiptParseToolAllowlist = [
     "get_price_history",
     "compare_unit_prices",
     // カテゴリは service が解析の指示へ一覧として載せる。`list_categories` は
-    // 1 階層ずつ返すため、tool として渡すと木を辿るだけで往復上限を使い切る
-    "list_locations",
-    "get_location",
+    // 1 階層ずつ返すため、tool として渡すと木を辿るだけで往復上限を使い切る。
+    // 保管場所は木を 1 回で返す tool だけを渡し、階層ごとの list_locations と
+    // 1 件ずつの get_location は同じ理由で渡さない
+    "list_location_tree",
 ] as const;
 
 export interface InProcessMcpToolSet {

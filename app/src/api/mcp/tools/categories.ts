@@ -5,11 +5,14 @@ import {
     categoryIdSchema,
     categoryListInputSchema,
     categoryListOutputSchema,
+    categoryTreeOutputSchema,
 } from "../../../domain/category";
 import {
     CategoryServiceError,
+    categoryTreeMaxSize,
     getCategory,
     listCategories,
+    listCategoryTree,
 } from "../../../services/categoryService";
 import { mcpError, mcpSuccess } from "../result";
 
@@ -45,10 +48,28 @@ export const registerCategoryTools = (
     );
 
     server.registerTool(
+        "list_category_tree",
+        {
+            title: "List the whole category tree",
+            description: `Return every category in one call, ordered by sortOrder then by id, so a caller does not have to walk the tree one level at a time with list_categories. Each item carries its parentId, which is enough to rebuild the hierarchy and to resolve an effective kind by following ancestors. At most ${categoryTreeMaxSize} categories are returned and truncated is true when there are more; there is no cursor for the rest, so fall back to list_categories per level in that case. This tool only reads data.`,
+            inputSchema: z.object({}).strict(),
+            outputSchema: categoryTreeOutputSchema,
+        },
+        async () => {
+            try {
+                return mcpSuccess(await listCategoryTree(db));
+            } catch (error) {
+                return categoryError(error, "category tree listing failed");
+            }
+        },
+    );
+
+    server.registerTool(
         "get_category",
         {
             title: "Get category",
-            description: "Get one category by its system ID.",
+            description:
+                "Get one category by its system ID. To resolve several categories, or to follow a category's ancestors (needed when kind is null), read the whole tree once with list_category_tree instead of calling this per id.",
             inputSchema: categoryIdInputSchema,
             outputSchema: categoryDtoSchema,
         },

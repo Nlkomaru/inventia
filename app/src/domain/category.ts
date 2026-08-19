@@ -76,6 +76,15 @@ export const categoryListOutputSchema = z
     })
     .strict();
 
+// ツリーは階層ごとのページングをせず全件返すため、continuation ではなく
+// 打ち切りの有無だけを返す。上限を超えた場合の続きは階層ごとの一覧で辿る
+export const categoryTreeOutputSchema = z
+    .object({
+        items: z.array(categoryDtoSchema),
+        truncated: z.boolean(),
+    })
+    .strict();
+
 export const categoryDeleteOutputSchema = z
     .object({ deleted: z.literal(true) })
     .strict();

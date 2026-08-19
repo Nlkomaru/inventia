@@ -82,6 +82,15 @@ export const locationListOutputSchema = z
     })
     .strict();
 
+// ツリーは階層ごとのページングをせず全件返すため、continuation ではなく
+// 打ち切りの有無だけを返す。上限を超えた場合の続きは階層ごとの一覧で辿る
+export const locationTreeOutputSchema = z
+    .object({
+        items: z.array(locationDtoSchema),
+        truncated: z.boolean(),
+    })
+    .strict();
+
 export const locationDeleteOutputSchema = z
     .object({ deleted: z.literal(true) })
     .strict();
