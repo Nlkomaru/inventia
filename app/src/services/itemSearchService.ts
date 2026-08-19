@@ -177,6 +177,7 @@ export const reindexAllItems = async (
     let cursor: string | undefined;
     do {
         const page = await listItemRecords(env.DB, {
+            sort: "name",
             limit: embeddingBatchSize,
             cursor,
         });

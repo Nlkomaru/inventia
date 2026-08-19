@@ -46,7 +46,12 @@ export class InvalidItemCursorError extends Error {
     }
 }
 
-type Cursor = { name: string; id: string };
+// 並び順ごとにキーが違うため cursor も分ける。`sort` を持たない cursor は
+// 名前順しか存在しなかった頃に発行したものとして受け、期限順の要求には使わせない
+// （並び順の違う cursor を流用すると位置がずれたページを返す）
+type NameCursor = { sort?: "name"; name: string; id: string };
+type ExpiryCursor = { sort: "expiry"; expiry: string | null; id: string };
+type Cursor = NameCursor | ExpiryCursor;
 
 const encodeCursor = (cursor: Cursor): string =>
     btoa(encodeURIComponent(JSON.stringify(cursor)))
@@ -54,19 +59,29 @@ const encodeCursor = (cursor: Cursor): string =>
         .replaceAll("/", "_")
         .replaceAll("=", "");
 
-const decodeCursor = (value: string): Cursor => {
+const isNameCursor = (value: Record<string, unknown>): boolean =>
+    (value.sort === undefined || value.sort === "name") &&
+    typeof value.name === "string" &&
+    value.name.length > 0 &&
+    typeof value.id === "string" &&
+    value.id.length > 0;
+
+const isExpiryCursor = (value: Record<string, unknown>): boolean =>
+    value.sort === "expiry" &&
+    (value.expiry === null || typeof value.expiry === "string") &&
+    typeof value.id === "string" &&
+    (value.id as string).length > 0;
+
+const decodeCursor = (value: string, sort: "name" | "expiry"): Cursor => {
     try {
         const padded = value.replaceAll("-", "+").replaceAll("_", "/");
         const decoded = decodeURIComponent(atob(padded));
         const parsed: unknown = JSON.parse(decoded);
-        if (
-            typeof parsed !== "object" ||
-            parsed === null ||
-            typeof (parsed as Cursor).name !== "string" ||
-            typeof (parsed as Cursor).id !== "string" ||
-            (parsed as Cursor).name.length === 0 ||
-            (parsed as Cursor).id.length === 0
-        ) {
+        if (typeof parsed !== "object" || parsed === null) {
+            throw new Error("invalid cursor");
+        }
+        const record = parsed as Record<string, unknown>;
+        if (sort === "name" ? !isNameCursor(record) : !isExpiryCursor(record)) {
             throw new Error("invalid cursor");
         }
         return parsed as Cursor;
@@ -99,6 +114,15 @@ export const itemColumns = `id, name, category_id AS categoryId, location_id AS 
 			WHERE item_id = items.id AND quantity > 0) AS lotCount,
 		low_stock_threshold AS lowStockThreshold, memo,
 		created_at AS createdAt, updated_at AS updatedAt`;
+
+// 期限順の並び替えと keyset 条件で使う式。`itemColumns` の earliestExpiryDate と
+// 同じ定義で、SELECT の別名は WHERE では参照できないため式を再掲する
+const earliestExpiryExpression = `(SELECT MIN(expiry_date) FROM item_lots
+		WHERE item_id = items.id AND quantity > 0 AND expiry_date IS NOT NULL)`;
+
+// 期限が早い順。期限なしは最後に置き、同じ期限は id で一意に安定させる
+const expiryOrder = `ORDER BY (${earliestExpiryExpression} IS NULL) ASC,
+		${earliestExpiryExpression} ASC, id ASC`;
 
 // 読書状態は品目と 1:1 の別テーブルにあるため EXISTS で絞る。
 // 行が無い品目はどの状態にも一致しない
@@ -206,17 +230,30 @@ export const listItems = async (
         bindings.push(query.readingStatus);
     }
     if (query.cursor) {
-        const cursor = decodeCursor(query.cursor);
-        where.push(
-            "(name COLLATE NOCASE > ? OR (name COLLATE NOCASE = ? AND id > ?))",
-        );
-        bindings.push(cursor.name, cursor.name, cursor.id);
+        const cursor = decodeCursor(query.cursor, query.sort);
+        if ("expiry" in cursor) {
+            // 期限なしのグループは末尾にあるため、そこから先は id だけで進む
+            if (cursor.expiry === null) {
+                where.push(`${earliestExpiryExpression} IS NULL AND id > ?`);
+                bindings.push(cursor.id);
+            } else {
+                where.push(`(${earliestExpiryExpression} IS NULL
+					OR ${earliestExpiryExpression} > ?
+					OR (${earliestExpiryExpression} = ? AND id > ?))`);
+                bindings.push(cursor.expiry, cursor.expiry, cursor.id);
+            }
+        } else {
+            where.push(
+                "(name COLLATE NOCASE > ? OR (name COLLATE NOCASE = ? AND id > ?))",
+            );
+            bindings.push(cursor.name, cursor.name, cursor.id);
+        }
     }
 
     const limit = query.limit;
     const sql = `SELECT ${itemColumns}
 		FROM items${where.length > 0 ? ` WHERE ${where.join(" AND ")}` : ""}
-		ORDER BY name COLLATE NOCASE ASC, id ASC LIMIT ?`;
+		${query.sort === "expiry" ? expiryOrder : "ORDER BY name COLLATE NOCASE ASC, id ASC"} LIMIT ?`;
     const result = await db
         .prepare(sql)
         .bind(...bindings, limit + 1)
@@ -229,7 +266,15 @@ export const listItems = async (
         items,
         nextCursor:
             hasMore && last
-                ? encodeCursor({ name: last.name, id: last.id })
+                ? encodeCursor(
+                      query.sort === "expiry"
+                          ? {
+                                sort: "expiry",
+                                expiry: last.earliestExpiryDate,
+                                id: last.id,
+                            }
+                          : { sort: "name", name: last.name, id: last.id },
+                  )
                 : null,
     };
 };
@@ -252,11 +297,13 @@ export const listBookItems = async (
         bindings.push(query.status);
     }
     if (query.cursor) {
-        const cursor = decodeCursor(query.cursor);
-        where.push(
-            "(name COLLATE NOCASE > ? OR (name COLLATE NOCASE = ? AND id > ?))",
-        );
-        bindings.push(cursor.name, cursor.name, cursor.id);
+        const cursor = decodeCursor(query.cursor, "name");
+        if ("name" in cursor) {
+            where.push(
+                "(name COLLATE NOCASE > ? OR (name COLLATE NOCASE = ? AND id > ?))",
+            );
+            bindings.push(cursor.name, cursor.name, cursor.id);
+        }
     }
 
     const limit = query.limit;

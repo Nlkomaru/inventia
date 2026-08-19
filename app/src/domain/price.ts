@@ -103,6 +103,43 @@ export const priceRecordListOutputSchema = z
     })
     .strict();
 
+// 複数品目の一括読み取り。cursor は品目ごとに紐付くため一括では扱わず、
+// 品目ごとに打ち切りの有無だけを返す。続きは 1 品目ずつの tool で辿る
+export const priceBatchItemIdsMax = 20;
+export const priceBatchLimitPerItemMax = 20;
+
+export const priceBatchInputSchema = z
+    .object({
+        itemIds: z.array(priceRecordIdSchema).min(1).max(priceBatchItemIdsMax),
+        limitPerItem: z.coerce
+            .number()
+            .int()
+            .min(1)
+            .max(priceBatchLimitPerItemMax)
+            .default(5),
+    })
+    .strict();
+
+export const priceBatchResultSchema = z
+    .object({
+        itemId: z.string().min(1),
+        items: z.array(priceRecordDtoSchema),
+        // limitPerItem で切れたかどうか。続きは 1 品目ずつの tool で辿る
+        truncated: z.boolean(),
+    })
+    .strict();
+
+export const priceBatchOutputSchema = z
+    .object({
+        results: z.array(priceBatchResultSchema),
+        // 価格履歴を引けなかった品目 id。1 件の欠落で全体を失わせない
+        notFound: z.array(z.string()),
+    })
+    .strict();
+
+export type PriceBatchInput = z.infer<typeof priceBatchInputSchema>;
+export type PriceBatchOutput = z.infer<typeof priceBatchOutputSchema>;
+
 export type PriceRecordDimension = z.infer<typeof priceRecordDimensionSchema>;
 export type PriceContentUnit = z.infer<typeof priceContentUnitSchema>;
 export type PriceRecordCreateInput = z.infer<

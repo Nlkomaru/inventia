@@ -21,13 +21,18 @@ import {
     deleteItem as deleteItemRecord,
     getCategoryKind,
     getItem as getItemRecord,
+    getItemsByIds,
     InvalidItemCursorError,
     type ItemRow,
     listItems as listItemRecords,
     locationExists,
     updateItem as updateItemRecord,
 } from "../repositories/itemRepository";
-import { type ItemLotRow, listItemLots } from "../repositories/lotRepository";
+import {
+    type ItemLotRow,
+    listItemLots,
+    listItemLotsByItemIds,
+} from "../repositories/lotRepository";
 import {
     getReadingState as getReadingStateRecord,
     listReadingStatesByItemIds,
@@ -184,6 +189,55 @@ export const getItem = async (
         getReadingStateRecord(db, id),
     ]);
     return toDetailDto(row, lots, reading);
+};
+
+/**
+ * 複数の品目をまとめて読む。1 件ずつ引くと呼び出し回数が id の数に比例するため、
+ * 品目・ロット・読書状態をそれぞれ IN 句 1 回（必要ならチャンク分割）で解決する。
+ * 見つからない id は例外にせず `notFound` へ返し、1 件の欠落で全体を失わせない。
+ * 結果は渡した id の順に並べる（repository の結果順は DB 依存で不定）。
+ */
+export const getItems = async (
+    db: D1Database,
+    ids: readonly string[],
+    options: { includeLots: boolean } = { includeLots: true },
+): Promise<{ items: ItemDetailDto[]; notFound: string[] }> => {
+    const unique = [...new Set(ids.map((id) => id.trim()))].filter(
+        (id) => id.length > 0,
+    );
+    if (unique.length === 0) {
+        return { items: [], notFound: [] };
+    }
+    const [rows, lotsByItemId, readingStates] = await Promise.all([
+        getItemsByIds(db, unique),
+        options.includeLots
+            ? listItemLotsByItemIds(db, unique, { includeEmpty: false })
+            : Promise.resolve(new Map<string, ItemLotRow[]>()),
+        listReadingStatesByItemIds(db, unique),
+    ]);
+    const rowById = new Map(rows.map((row) => [row.id, row]));
+    const items: ItemDetailDto[] = [];
+    const notFound: string[] = [];
+    for (const id of unique) {
+        const row = rowById.get(id);
+        if (!row) {
+            notFound.push(id);
+            continue;
+        }
+        const reading = readingStates.get(id) ?? null;
+        if (options.includeLots) {
+            items.push(toDetailDto(row, lotsByItemId.get(id) ?? [], reading));
+            continue;
+        }
+        // ロットを載せない場合も件数と最短期限は行の集計列から返す（`itemColumns` が
+        // 数量 > 0 のロットを数えている）。lots だけが空になる
+        items.push({
+            ...toItemDto(row, reading?.status ?? null),
+            lots: [],
+            readingState: reading ? toReadingStateDto(reading) : null,
+        });
+    }
+    return { items, notFound };
 };
 
 /**
