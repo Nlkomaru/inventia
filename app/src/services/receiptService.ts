@@ -594,7 +594,13 @@ export const parseReceipt = async (
             // リトライは 1 回まで（既定の 2 回は使わない）。タイムアウトは
             // リトライと tool 呼び出しを含む呼び出し全体へ掛ける
             const result = await generateText({
-                model: openrouter.chat(status.chatModel),
+                model: openrouter.chat(status.chatModel, {
+                    // レシートの読み取りに思考は要らない。返させないことで、
+                    // tool 呼び出しの次のリクエストへ思考を送り返す経路自体を無くす。
+                    // 送り返した思考の署名が壊れると、プロバイダが 400 を返して
+                    // 解析全体が失敗する（Gemini の "Corrupted thought signature"）
+                    reasoning: { effort: "none", exclude: true },
+                }),
                 output: Output.object({ schema: receiptOcrResultSchema }),
                 instructions: status.receiptPrompt,
                 ...(toolSet
