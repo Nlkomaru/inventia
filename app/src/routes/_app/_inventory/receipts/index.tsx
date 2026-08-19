@@ -480,5 +480,3 @@ function ReceiptListError({ error, reset }: ErrorComponentProps) {
 
 const errorMessage = (cause: unknown, fallback: string): string =>
     cause instanceof Error ? cause.message : fallback;
-
-/** 取込途中のレシートは receiptId 付きの URL で確認画面へ戻れる。 */

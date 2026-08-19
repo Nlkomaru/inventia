@@ -82,6 +82,19 @@ const dimensionOptions: { label: string; value: ItemBaseDimension }[] = [
 const toDimension = (value: string | null): ItemBaseDimension | "" =>
     value === "mass" || value === "volume" || value === "count" ? value : "";
 
+// エラーはコントロールから aria-describedby で辿れるようにする。
+// 入力欄ごとに id を組み立て、説明文がある欄では両方を並べる
+const errorId = (field: string): string => `receive-${field}-error`;
+
+const describedBy = (
+    hasError: boolean,
+    field: string,
+    descriptionId?: string,
+): string | undefined =>
+    [hasError ? errorId(field) : null, descriptionId ?? null]
+        .filter((value): value is string => value !== null)
+        .join(" ") || undefined;
+
 // 同じ物を二重に登録しないため、名前が近い品目を提示する上限
 const similarItemLimit = 5;
 
@@ -270,11 +283,11 @@ function ReceiveStockPage() {
                                 品目名
                             </FieldLabel>
                             <Input
-                                aria-describedby={
-                                    errors.name
-                                        ? "receive-name-error"
-                                        : "receive-name-description"
-                                }
+                                aria-describedby={describedBy(
+                                    Boolean(errors.name),
+                                    "name",
+                                    "receive-name-description",
+                                )}
                                 aria-invalid={Boolean(errors.name)}
                                 autoComplete="off"
                                 disabled={saving}
@@ -291,7 +304,7 @@ function ReceiveStockPage() {
                                 同じ物が登録済みかどうかを、入力に合わせて下に出します。
                             </FieldDescription>
                             {errors.name ? (
-                                <FieldError id="receive-name-error">
+                                <FieldError id={errorId("name")}>
                                     {errors.name}
                                 </FieldError>
                             ) : null}
@@ -361,6 +374,10 @@ function ReceiveStockPage() {
                                 value={categoryId || null}
                             >
                                 <SelectTrigger
+                                    aria-describedby={describedBy(
+                                        Boolean(errors.categoryId),
+                                        "category",
+                                    )}
                                     aria-invalid={Boolean(errors.categoryId)}
                                     className="w-full"
                                     id="receive-category"
@@ -387,7 +404,9 @@ function ReceiveStockPage() {
                                 </SelectContent>
                             </Select>
                             {errors.categoryId ? (
-                                <FieldError>{errors.categoryId}</FieldError>
+                                <FieldError id={errorId("category")}>
+                                    {errors.categoryId}
+                                </FieldError>
                             ) : null}
                         </Field>
 
@@ -407,6 +426,10 @@ function ReceiveStockPage() {
                                 value={locationId || null}
                             >
                                 <SelectTrigger
+                                    aria-describedby={describedBy(
+                                        Boolean(errors.locationId),
+                                        "location",
+                                    )}
                                     aria-invalid={Boolean(errors.locationId)}
                                     className="w-full"
                                     id="receive-location"
@@ -433,7 +456,9 @@ function ReceiveStockPage() {
                                 </SelectContent>
                             </Select>
                             {errors.locationId ? (
-                                <FieldError>{errors.locationId}</FieldError>
+                                <FieldError id={errorId("location")}>
+                                    {errors.locationId}
+                                </FieldError>
                             ) : null}
                         </Field>
 
@@ -444,6 +469,10 @@ function ReceiveStockPage() {
                                         基準単位
                                     </FieldLabel>
                                     <Input
+                                        aria-describedby={describedBy(
+                                            Boolean(errors.baseUnit),
+                                            "unit",
+                                        )}
                                         aria-invalid={Boolean(errors.baseUnit)}
                                         disabled={saving}
                                         id="receive-unit"
@@ -456,7 +485,7 @@ function ReceiveStockPage() {
                                         value={baseUnit}
                                     />
                                     {errors.baseUnit ? (
-                                        <FieldError>
+                                        <FieldError id={errorId("unit")}>
                                             {errors.baseUnit}
                                         </FieldError>
                                     ) : null}
@@ -480,6 +509,10 @@ function ReceiveStockPage() {
                                         value={baseDimension || null}
                                     >
                                         <SelectTrigger
+                                            aria-describedby={describedBy(
+                                                Boolean(errors.baseDimension),
+                                                "dimension",
+                                            )}
                                             aria-invalid={Boolean(
                                                 errors.baseDimension,
                                             )}
@@ -504,7 +537,7 @@ function ReceiveStockPage() {
                                         </SelectContent>
                                     </Select>
                                     {errors.baseDimension ? (
-                                        <FieldError>
+                                        <FieldError id={errorId("dimension")}>
                                             {errors.baseDimension}
                                         </FieldError>
                                     ) : null}
@@ -520,6 +553,10 @@ function ReceiveStockPage() {
                                     : ""}
                             </FieldLabel>
                             <Input
+                                aria-describedby={describedBy(
+                                    Boolean(errors.quantity),
+                                    "quantity",
+                                )}
                                 aria-invalid={Boolean(errors.quantity)}
                                 disabled={saving}
                                 id="receive-quantity"
@@ -534,7 +571,9 @@ function ReceiveStockPage() {
                                 value={quantity}
                             />
                             {errors.quantity ? (
-                                <FieldError>{errors.quantity}</FieldError>
+                                <FieldError id={errorId("quantity")}>
+                                    {errors.quantity}
+                                </FieldError>
                             ) : null}
                         </Field>
 
@@ -580,6 +619,10 @@ function ReceiveStockPage() {
                                     期限日時
                                 </FieldLabel>
                                 <Input
+                                    aria-describedby={describedBy(
+                                        Boolean(errors.expiryDate),
+                                        "expiry",
+                                    )}
                                     aria-invalid={Boolean(errors.expiryDate)}
                                     disabled={saving}
                                     id="receive-expiry-date"
@@ -591,7 +634,9 @@ function ReceiveStockPage() {
                                     value={expiryInput}
                                 />
                                 {errors.expiryDate ? (
-                                    <FieldError>{errors.expiryDate}</FieldError>
+                                    <FieldError id={errorId("expiry")}>
+                                        {errors.expiryDate}
+                                    </FieldError>
                                 ) : null}
                             </Field>
                         ) : null}

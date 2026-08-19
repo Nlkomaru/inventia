@@ -149,6 +149,7 @@ export type ItemSemanticSearchResult = z.infer<
     typeof itemSemanticSearchResultSchema
 >;
 
+export type ItemBaseDimension = z.infer<typeof itemBaseDimensionSchema>;
 export type ItemDto = z.infer<typeof itemDtoSchema>;
 export type ItemDetailDto = z.infer<typeof itemDetailDtoSchema>;
 export type BookReadingItemDto = z.infer<typeof bookReadingItemDtoSchema>;

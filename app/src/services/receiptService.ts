@@ -362,10 +362,6 @@ export const listReceipts = async (
 };
 
 /**
- * レシート画像を R2 へ保存し、`uploaded` のレシートを作る。
- * content-type は許可リストで判定し、上限サイズを超える入力は R2 へ書く前に拒否する。
- */
-/**
  * 保存済みのレシート画像を読み出す。本文はストリームのまま返し、Worker が
  * 画像全体をメモリへ載せないようにする。R2 のオブジェクトキーは公開しないため、
  * 呼び出し側はレシート ID だけで画像を参照する。
@@ -395,6 +391,10 @@ export const getReceiptImage = async (
     };
 };
 
+/**
+ * レシート画像を R2 へ保存し、`uploaded` のレシートを作る。
+ * content-type は許可リストで判定し、上限サイズを超える入力は R2 へ書く前に拒否する。
+ */
 export const uploadReceipt = async (
     env: ReceiptEnv,
     input: { bytes: ArrayBuffer | Uint8Array; contentType: string },

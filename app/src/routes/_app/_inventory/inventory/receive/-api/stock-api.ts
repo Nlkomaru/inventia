@@ -60,31 +60,17 @@ export const listItems = createServerFn({ method: "GET" }).handler(
     },
 );
 
-// カテゴリと保管場所は階層を丸ごと使う。親を辿って表示名を組み立てるため、
-// 1 階層ずつ返す service を cursor が尽きるまで辿って全件集める
+// カテゴリは service が階層を 1 クエリで返す。保管場所は同等の service が
+// 無いため、1 階層ずつ返す一覧を親から辿って集める
 export const listCategoryTree = createServerFn({ method: "GET" }).handler(
     async (): Promise<CategoryDto[]> => {
-        const [{ env }, { listCategories }] = await Promise.all([
-            import("cloudflare:workers"),
-            import("@/services/categoryService"),
-        ]);
-        const result: CategoryDto[] = [];
-        const visit = async (parentId: string | null): Promise<void> => {
-            const start = result.length;
-            let cursor: string | undefined;
-            do {
-                const page = await listCategories(env.DB, {
-                    parentId,
-                    limit: 100,
-                    ...(cursor === undefined ? {} : { cursor }),
-                });
-                result.push(...page.items);
-                cursor = page.nextCursor ?? undefined;
-            } while (cursor);
-            for (const child of result.slice(start)) await visit(child.id);
-        };
-        await visit(null);
-        return result;
+        const [{ env }, { listCategoryTree: fetchCategoryTree }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/categoryService"),
+            ]);
+        const tree = await fetchCategoryTree(env.DB);
+        return tree.items;
     },
 );
 
