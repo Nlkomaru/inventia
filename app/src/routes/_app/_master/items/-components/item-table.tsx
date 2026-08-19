@@ -27,8 +27,8 @@ import type { CategoryDto } from "@/domain/category";
 import type { ItemDto } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
 import { formatDisplayDateTime } from "@/lib/datetime";
+import { buildHierarchyLabels } from "@/lib/hierarchy";
 import { readingStatusLabels } from "../-functions/reading-state-form";
-import { getHierarchyLabels } from "./item-options";
 
 const features = tableFeatures({});
 const columnHelper = createColumnHelper<typeof features, ItemDto>();
@@ -75,11 +75,11 @@ export function ItemTable({
         [announce],
     );
     const categoryNames = useMemo(
-        () => getHierarchyLabels(categories),
+        () => buildHierarchyLabels(categories),
         [categories],
     );
     const locationNames = useMemo(
-        () => getHierarchyLabels(locations),
+        () => buildHierarchyLabels(locations),
         [locations],
     );
     const columns = useMemo(

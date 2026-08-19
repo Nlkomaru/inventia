@@ -16,6 +16,7 @@ import type { CategoryDto } from "@/domain/category";
 import type { ItemCreateInput, ItemDto, ItemUpdateInput } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
 import type { ReadingStateUpsertInput } from "@/domain/reading";
+import { buildHierarchyLabels } from "@/lib/hierarchy";
 import {
     clearReadingState,
     createItem,
@@ -32,7 +33,6 @@ import {
 } from "../-api/item-queries";
 import type { ReadingStateChange } from "../-functions/reading-state-form";
 import { ItemForm } from "./item-form";
-import { getHierarchyLabels } from "./item-options";
 import { ItemTable } from "./item-table";
 
 const errorMessage = (cause: unknown, fallback: string): string =>
@@ -230,11 +230,11 @@ export function ItemMasterPage({
     };
 
     const categoryLabels = useMemo(
-        () => getHierarchyLabels(categories),
+        () => buildHierarchyLabels(categories),
         [categories],
     );
     const locationLabels = useMemo(
-        () => getHierarchyLabels(locations),
+        () => buildHierarchyLabels(locations),
         [locations],
     );
     const categoryItems = useMemo(

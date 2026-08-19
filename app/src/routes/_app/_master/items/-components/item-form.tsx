@@ -40,12 +40,15 @@ import {
     readingStatuses,
 } from "@/domain/reading";
 import {
+    buildHierarchyLabels,
+    getEffectiveCategoryKind,
+} from "@/lib/hierarchy";
+import {
     type ReadingStateChange,
     readingStateFormValues,
     readingStatusLabels,
     resolveReadingStateChange,
 } from "../-functions/reading-state-form";
-import { getEffectiveCategoryKind, getHierarchyLabels } from "./item-options";
 
 type BaseDimension = "mass" | "volume" | "count";
 
@@ -189,11 +192,11 @@ export function ItemForm({
         [categories, form.categoryId],
     );
     const categoryLabels = useMemo(
-        () => getHierarchyLabels(categories),
+        () => buildHierarchyLabels(categories),
         [categories],
     );
     const locationLabels = useMemo(
-        () => getHierarchyLabels(locations),
+        () => buildHierarchyLabels(locations),
         [locations],
     );
     const effectiveCategoryKind = useMemo(
