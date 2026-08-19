@@ -29,7 +29,7 @@ export const receiptOcrLineSchema = z.object({
         .int()
         .min(1)
         .describe(
-            "在庫へ加える数量。suggestedBaseUnit で表した合計量とし、内容量が読み取れる商品は「内容量 × 購入個数」を入れる（例: 1kg の小麦粉 1 袋は suggestedBaseUnit が g で 1000、500ml の牛乳 2 本は ml で 1000）。個・本・袋のように数える商品（suggestedBaseDimension が count）と stockRelevant が false の行は購入個数を入れ、表記がない行は 1。内容量を読み取れない商品は重さや容量へ換算せず、count の単位と購入個数にする",
+            "在庫へ加える数量。suggestedBaseUnit で表した合計量とし、内容量や入り数が読み取れる商品は「1 パックの内容量（入り数）× 購入パック数」を入れる（例: 1kg の小麦粉 1 袋は suggestedBaseUnit が g で 1000、500ml の牛乳 2 本は ml で 1000、10 個入の卵 2 パックは 個 で 20）。内容量も入り数も読み取れない行と stockRelevant が false の行は購入個数を入れ、表記がない行は 1。内容量を読み取れない商品は重さや容量へ換算しない",
         ),
     price: z
         .int()
@@ -93,7 +93,7 @@ export const receiptOcrLineSchema = z.object({
         .max(50)
         .nullable()
         .describe(
-            "在庫を数える単位の表記（例: 個、本、袋、g、ml）。商品名や内容量から判断する。内容量が重さや容量で表される商品（小麦粉、砂糖、精肉、牛乳、洗剤など）は、内容量の違う同じ商品を同じ品目へ積めるよう最小単位の g または ml にし、kg は g、L は ml へ換算する（quantity が整数のため kg や L のままにしない）。個数で数える商品は 個・本・袋 のような表記にする。suggestedBaseDimension と必ず対で設定し、片方だけにしない。判断できない場合と stockRelevant が false の場合は null",
+            "在庫を数える単位の表記（例: 個、本、袋、g、ml）。商品名や内容量から判断する。内容量が重さや容量で表される商品（小麦粉、砂糖、精肉、牛乳、洗剤など）は、内容量の違う同じ商品を同じ品目へ積めるよう最小単位の g または ml にし、kg は g、L は ml へ換算する（quantity が整数のため kg や L のままにしない）。個数で数える商品は、入り数の違うパックを同じ品目へ積めるよう、パック・箱・ケースのような包装ではなく中身を数える単位（個・本・枚）にする。suggestedBaseDimension と必ず対で設定し、片方だけにしない。判断できない場合と stockRelevant が false の場合は null",
         ),
     suggestedBaseDimension: receiptBaseDimensionSchema
         .nullable()
@@ -468,9 +468,10 @@ export const receiptParseDefaultInstructions = [
     "true の行では、カテゴリ一覧の tool を必ず使い、一覧にある名前だけを suggestedCategoryName に入れてください。一覧に無ければ null です。",
     "数える単位は suggestedBaseUnit と suggestedBaseDimension を対で入れてください。",
     "内容量が重さ・容量で表される商品は suggestedBaseUnit を g または ml にし、kg は g、L は ml へ換算してください。",
-    "quantity は suggestedBaseUnit で表した合計量（内容量 × 購入個数）です。個数で数える商品だけ購入個数を入れてください。",
+    "個数で数える商品は、パックや箱ではなく中身を数える単位（個・本・枚）を suggestedBaseUnit にしてください。",
+    "quantity は suggestedBaseUnit で表した合計量（1 パックの内容量や入り数 × 購入パック数）です。10 個入の卵を 2 パックなら 個 で 20 になります。",
     "例: 「エクリチュール (日清製粉) 1kg」を 1 袋なら、completedName は「エクリチュール」、suggestedBaseUnit は g、suggestedBaseDimension は mass、quantity は 1000 です。",
-    "内容量を読み取れない商品は重さや容量を推測せず、suggestedBaseUnit を 個 などにして quantity を購入個数にしてください。",
+    "内容量も入り数も読み取れない商品は推測せず、suggestedBaseUnit を 個 などにして quantity を購入個数にしてください。",
     "",
     "期限は、その商品の行に印字されている場合だけ printedExpiryDate に入れてください。",
     "印字が無い食品は購入日からの保存期間を estimatedExpiryDate に入れ、expirySource を estimated にしてください。",

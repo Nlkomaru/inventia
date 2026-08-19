@@ -30,6 +30,7 @@ import {
     normalizeReceiptLineExpiry,
     normalizeReceiptName,
     type ReceiptMatchCandidate,
+    type ReceiptMatchSource,
     receiptExpiryDateToLotExpiry,
     receiptLocalDateTimeToUtc,
     resolveLineExpiry,
@@ -657,6 +658,46 @@ export const parseReceipt = async (
 };
 
 /**
+ * 補完名の照合キー。内容量やメーカー名を落とした名前で引けるようにする。
+ * 補完名が無い行や印字と同じ行は空文字を返し、照合をレシート表記だけに委ねる。
+ */
+const completedMatchKey = (line: {
+    completedName: string | null;
+    normalizedName: string;
+}): string => {
+    if (line.completedName === null) {
+        return "";
+    }
+    const normalized = normalizeReceiptName(line.completedName);
+    return normalized === line.normalizedName ? "" : normalized;
+};
+
+/**
+ * レシート表記で決まらなかった行を補完名でも照合する。「商品 1kg」と
+ * 「商品 500g」のように表記が内容量で変わる行を、同じ品目へ寄せるための経路。
+ * 補完名は AI の推測を含むが、反映先は確認画面での承認を経るため、
+ * 誤った補完でも利用者が反映前に選び直せる。
+ */
+const matchLineWithCompletedName = (
+    line: { completedName: string | null; normalizedName: string },
+    source: ReceiptMatchSource,
+) => {
+    const primary = matchLine(line.normalizedName, source);
+    if (primary.itemId !== null) {
+        return primary;
+    }
+    const completed = completedMatchKey(line);
+    if (completed.length === 0) {
+        return primary;
+    }
+    const fallback = matchLine(completed, source);
+    // 候補しか出なかった場合は、印字そのままの候補を優先して残す
+    return fallback.itemId !== null || primary.candidates.length === 0
+        ? fallback
+        : primary;
+};
+
+/**
  * 明細の照合結果を更新する。品目一覧とエイリアス辞書はそれぞれ 1 クエリで読み、
  * 更新も 1 batch にまとめる。類似度だけで確定させないため、候補は保存しない。
  * 利用者が確定させた行（`match_method = 'manual'`）は上書きしない。
@@ -672,14 +713,21 @@ export const matchReceiptLines = async (
         const [items, aliases] = await Promise.all([
             listMatchableItems(db, receiptMatchItemLimit),
             listItemAliasesByNormalizedNames(db, [
-                ...new Set(targets.map((line) => line.normalizedName)),
+                ...new Set(
+                    targets
+                        .flatMap((line) => [
+                            line.normalizedName,
+                            completedMatchKey(line),
+                        ])
+                        .filter((key) => key.length > 0),
+                ),
             ]),
         ]);
         const index = buildReceiptMatchIndex(items);
         await updateReceiptLineMatches(
             db,
             targets.map((line) => {
-                const match = matchLine(line.normalizedName, {
+                const match = matchLineWithCompletedName(line, {
                     exact: index.exact,
                     aliases,
                     candidates: index.candidates,
@@ -738,6 +786,27 @@ const resolvePriceContentAmount = (
         pricing.baseUnit,
         pricing.baseDimension,
     );
+};
+
+/**
+ * 価格履歴の内容量とセット数を決める。明細の数量は基準単位での合計量なので、
+ * 「1 セットの内容量 × セット数」へ分解し直す（合計量をそのままセット数にすると
+ * 単価が内容量の分だけ小さくなる）。割り切れない指定は合計量を 1 セットとして
+ * 記録する。総量が変わらないため単価の比較は保てる。
+ */
+const resolvePriceContent = (
+    pricing: ItemPricingRow,
+    lineInput: ReceiptApplyLineInput,
+    quantity: number,
+): { contentAmount: number; setCount: number } | null => {
+    const contentAmount = resolvePriceContentAmount(pricing, lineInput);
+    if (contentAmount === null) {
+        return null;
+    }
+    if (quantity % contentAmount === 0) {
+        return { contentAmount, setCount: quantity / contentAmount };
+    }
+    return { contentAmount: quantity, setCount: 1 };
 };
 
 /**
@@ -1011,16 +1080,17 @@ export const applyReceipt = async (
             // movement 確定後に価格記録だけ落ちた場合は再実行でも補えないが、
             // 二重計上より欠測の方が在庫・支出の整合を壊さない
             if (!stock.replayed && price !== null) {
-                const contentAmount = resolvePriceContentAmount(
+                const content = resolvePriceContent(
                     pricing,
                     lineInput,
+                    quantity,
                 );
-                if (contentAmount !== null) {
+                if (content !== null) {
                     await insertPriceRecord(db, {
                         itemId,
                         purchaseId: purchase.id,
-                        contentAmount,
-                        setCount: quantity,
+                        contentAmount: content.contentAmount,
+                        setCount: content.setCount,
                         packaging: lineInput.packaging ?? null,
                         price,
                         source: purchase.source,
