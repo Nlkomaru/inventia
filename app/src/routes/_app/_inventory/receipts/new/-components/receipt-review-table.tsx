@@ -6,6 +6,7 @@ import {
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Fragment, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -368,7 +369,7 @@ const columns = columnHelper.columns([
                         </SelectContent>
                     </Select>
                     {review.expiryMode === "date" ? (
-                        <Input
+                        <DatePicker
                             aria-describedby={
                                 invalid
                                     ? cellErrorId(review.lineNo, "expiry-date")
@@ -376,13 +377,13 @@ const columns = columnHelper.columns([
                             }
                             aria-invalid={invalid}
                             aria-label={`${review.lineNo} 行目の期限（年月日）`}
-                            className="w-44"
+                            calendarLabel={`${review.lineNo} 行目の期限をカレンダーから選ぶ`}
+                            className="w-52"
                             disabled={disabled || review.action === "skip"}
                             id={cellId(review.lineNo, "expiry-date")}
-                            onChange={(event) =>
-                                onChange({ expiryDate: event.target.value })
+                            onValueChange={(value) =>
+                                onChange({ expiryDate: value })
                             }
-                            type="date"
                             value={review.expiryDate}
                         />
                     ) : null}

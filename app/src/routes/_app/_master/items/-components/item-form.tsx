@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
     Field,
     FieldDescription,
@@ -39,6 +40,7 @@ import {
     type ReadingStatus,
     readingStatuses,
 } from "@/domain/reading";
+import { toIsoFromDate } from "@/lib/expiry-input";
 import {
     buildHierarchyLabels,
     getEffectiveCategoryKind,
@@ -120,13 +122,6 @@ const readingStatusItems = [
 
 const toReadingStatus = (value: string | null): ReadingStatus | "" =>
     readingStatuses.find((status) => status === value) ?? "";
-
-const toIsoDateTime = (value: string): string | null => {
-    if (!value) return null;
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return null;
-    return date.toISOString();
-};
 
 const parseNullableInteger = (value: string): number | null => {
     if (!value.trim()) return null;
@@ -376,12 +371,12 @@ export function ItemForm({
             return;
         }
 
-        if (form.expiryDate && !toIsoDateTime(form.expiryDate)) {
+        if (form.expiryDate && !toIsoFromDate(form.expiryDate)) {
             setFieldErrors({ expiryDate: "期限日時を正しく入力してください" });
             setError("期限日時を正しく入力してください");
             return;
         }
-        const expiryDate = toIsoDateTime(form.expiryDate);
+        const expiryDate = toIsoFromDate(form.expiryDate);
         const currentQuantity = parseNullableInteger(form.currentQuantity);
         if (!isDocument && (!form.baseUnit.trim() || !form.baseDimension)) {
             const errors: FieldErrors = {};
@@ -772,24 +767,21 @@ export function ItemForm({
                                 <FieldLabel htmlFor="item-reading-started-at">
                                     開始日（任意）
                                 </FieldLabel>
-                                <Input
+                                <DatePicker
                                     aria-invalid={Boolean(
                                         fieldErrors.readingStartedAt,
                                     )}
+                                    calendarLabel="開始日をカレンダーから選ぶ"
                                     disabled={
                                         readingStateLoading ||
                                         form.readingStatus === "" ||
                                         form.readingStatus === "unread"
                                     }
                                     id="item-reading-started-at"
-                                    type="date"
-                                    value={form.readingStartedAt}
-                                    onChange={(event) =>
-                                        update(
-                                            "readingStartedAt",
-                                            event.target.value,
-                                        )
+                                    onValueChange={(value) =>
+                                        update("readingStartedAt", value)
                                     }
+                                    value={form.readingStartedAt}
                                 />
                                 <FieldError>
                                     {fieldErrors.readingStartedAt}
@@ -807,23 +799,20 @@ export function ItemForm({
                                 <FieldLabel htmlFor="item-reading-finished-at">
                                     読了日（任意）
                                 </FieldLabel>
-                                <Input
+                                <DatePicker
                                     aria-invalid={Boolean(
                                         fieldErrors.readingFinishedAt,
                                     )}
+                                    calendarLabel="読了日をカレンダーから選ぶ"
                                     disabled={
                                         readingStateLoading ||
                                         form.readingStatus !== "finished"
                                     }
                                     id="item-reading-finished-at"
-                                    type="date"
-                                    value={form.readingFinishedAt}
-                                    onChange={(event) =>
-                                        update(
-                                            "readingFinishedAt",
-                                            event.target.value,
-                                        )
+                                    onValueChange={(value) =>
+                                        update("readingFinishedAt", value)
                                     }
+                                    value={form.readingFinishedAt}
                                 />
                                 <FieldError>
                                     {fieldErrors.readingFinishedAt}
@@ -840,16 +829,16 @@ export function ItemForm({
                                 <FieldLabel htmlFor="item-expiry-date">
                                     初期ロットの期限（任意）
                                 </FieldLabel>
-                                <Input
+                                <DatePicker
                                     aria-invalid={Boolean(
                                         fieldErrors.expiryDate,
                                     )}
+                                    calendarLabel="初期ロットの期限をカレンダーから選ぶ"
                                     id="item-expiry-date"
-                                    type="datetime-local"
-                                    value={form.expiryDate}
-                                    onChange={(event) =>
-                                        update("expiryDate", event.target.value)
+                                    onValueChange={(value) =>
+                                        update("expiryDate", value)
                                     }
+                                    value={form.expiryDate}
                                 />
                                 <FieldError>
                                     {fieldErrors.expiryDate}

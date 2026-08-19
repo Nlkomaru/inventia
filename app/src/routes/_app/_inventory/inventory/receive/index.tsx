@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
     Field,
     FieldDescription,
@@ -34,7 +35,7 @@ import {
     matchLine,
     normalizeReceiptName,
 } from "@/domain/receipt-match";
-import { parsePositiveInteger, toIsoDateTime } from "@/lib/expiry-input";
+import { parsePositiveInteger, toIsoFromDate } from "@/lib/expiry-input";
 import {
     buildHierarchyLabels,
     getEffectiveCategoryKind,
@@ -215,7 +216,7 @@ function ReceiveStockPage() {
             next.baseDimension = "数量の種類を選択してください";
         }
         const expiryDate =
-            expiryMode === "none" ? null : toIsoDateTime(expiryInput);
+            expiryMode === "none" ? null : toIsoFromDate(expiryInput);
         if (expiryMode === "date" && expiryDate === null) {
             next.expiryDate =
                 "期限日時を入力するか、「期限なし」を選択してください";
@@ -639,21 +640,21 @@ function ReceiveStockPage() {
                         {expiryMode === "date" ? (
                             <Field data-invalid={Boolean(errors.expiryDate)}>
                                 <FieldLabel htmlFor="receive-expiry-date">
-                                    期限日時
+                                    期限（日付）
                                 </FieldLabel>
-                                <Input
+                                <DatePicker
                                     aria-describedby={describedBy(
                                         Boolean(errors.expiryDate),
                                         "expiry",
                                     )}
                                     aria-invalid={Boolean(errors.expiryDate)}
+                                    calendarLabel="期限をカレンダーから選ぶ"
                                     disabled={saving}
                                     id="receive-expiry-date"
-                                    onChange={(event) => {
-                                        setExpiryInput(event.target.value);
+                                    onValueChange={(value) => {
+                                        setExpiryInput(value);
                                         resetFeedback();
                                     }}
-                                    type="datetime-local"
                                     value={expiryInput}
                                 />
                                 {errors.expiryDate ? (

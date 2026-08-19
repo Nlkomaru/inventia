@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -39,14 +40,15 @@ export function StocktakeRow({
                 {isExistingLot ? (
                     formatExpiry(row.expiryDate)
                 ) : (
-                    <Input
+                    <DatePicker
                         aria-invalid={Boolean(expiryError)}
-                        aria-label={`${position}行目の期限日時`}
+                        aria-label={`${position}行目の期限`}
+                        calendarLabel={`${position}行目の期限をカレンダーから選ぶ`}
                         disabled={disabled}
-                        onChange={(event) =>
-                            onChange({ expiryInput: event.target.value })
+                        id={`stocktake-expiry-${position}`}
+                        onValueChange={(value) =>
+                            onChange({ expiryInput: value })
                         }
-                        type="datetime-local"
                         value={row.expiryInput ?? ""}
                     />
                 )}

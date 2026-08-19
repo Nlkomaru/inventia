@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
     Field,
     FieldError,
@@ -22,8 +23,8 @@ import type { StockMovementReason } from "@/domain/stock";
 import { formatDisplayDateTime } from "@/lib/datetime";
 import {
     parsePositiveInteger,
-    toDateTimeLocalValue,
-    toIsoDateTime,
+    toDateInputValue,
+    toIsoFromDate,
 } from "@/lib/expiry-input";
 import {
     inventoryKeys,
@@ -95,7 +96,7 @@ export function ItemReceiveForm({ item }: { item: ItemDetailDto }) {
         [quantity],
     );
     const expiryDate = useMemo(
-        () => (expiryMode === "none" ? null : toIsoDateTime(expiryInput)),
+        () => (expiryMode === "none" ? null : toIsoFromDate(expiryInput)),
         [expiryInput, expiryMode],
     );
 
@@ -114,7 +115,7 @@ export function ItemReceiveForm({ item }: { item: ItemDetailDto }) {
             setExpiryInput("");
         } else {
             setExpiryMode("date");
-            setExpiryInput(toDateTimeLocalValue(lotExpiryDate));
+            setExpiryInput(toDateInputValue(lotExpiryDate));
         }
         resetFeedback();
     };
@@ -273,23 +274,23 @@ export function ItemReceiveForm({ item }: { item: ItemDetailDto }) {
                 {expiryMode === "date" ? (
                     <Field data-invalid={Boolean(expiryError)}>
                         <FieldLabel htmlFor="item-receive-expiry-date">
-                            期限日時
+                            期限（日付）
                         </FieldLabel>
-                        <Input
+                        <DatePicker
                             aria-describedby={
                                 expiryError
                                     ? "item-receive-expiry-error"
                                     : undefined
                             }
                             aria-invalid={Boolean(expiryError)}
+                            calendarLabel="期限をカレンダーから選ぶ"
                             disabled={saving}
                             id="item-receive-expiry-date"
-                            onChange={(event) => {
-                                setExpiryInput(event.target.value);
+                            onValueChange={(value) => {
+                                setExpiryInput(value);
                                 setExpiryMode("date");
                                 resetFeedback();
                             }}
-                            type="datetime-local"
                             value={expiryInput}
                         />
                         {expiryError ? (
