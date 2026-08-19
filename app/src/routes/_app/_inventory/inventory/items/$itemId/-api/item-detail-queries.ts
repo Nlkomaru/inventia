@@ -33,6 +33,11 @@ export const itemStockHistoryKeys = {
         [...itemStockHistoryKeys.all, "item", itemId] as const,
 };
 
+// 在庫の変更は在庫一覧の集計にも効くため、入庫の後にまとめて無効化する
+export const inventoryKeys = {
+    all: ["inventory"] as const,
+};
+
 export const itemHistoryPageSize = 20;
 
 export const itemDetailQueryOptions = (itemId: string) =>

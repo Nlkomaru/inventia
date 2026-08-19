@@ -362,6 +362,36 @@ export const listReceipts = async (
 };
 
 /**
+ * 保存済みのレシート画像を読み出す。本文はストリームのまま返し、Worker が
+ * 画像全体をメモリへ載せないようにする。R2 のオブジェクトキーは公開しないため、
+ * 呼び出し側はレシート ID だけで画像を参照する。
+ */
+export const getReceiptImage = async (
+    env: ReceiptEnv,
+    id: string,
+): Promise<{
+    body: ReadableStream;
+    contentType: string;
+    byteSize: number;
+    etag: string;
+}> => {
+    const receipt = await requireReceipt(env.DB, id);
+    const object = await env.RECEIPTS.get(receipt.objectKey);
+    if (!object) {
+        throw new ReceiptServiceError(
+            "RECEIPT_NOT_FOUND",
+            "レシート画像が見つかりません。取り込み直してください。",
+        );
+    }
+    return {
+        body: object.body,
+        contentType: receipt.contentType,
+        byteSize: receipt.byteSize,
+        etag: object.httpEtag,
+    };
+};
+
+/**
  * レシート画像を R2 へ保存し、`uploaded` のレシートを作る。
  * content-type は許可リストで判定し、上限サイズを超える入力は R2 へ書く前に拒否する。
  */

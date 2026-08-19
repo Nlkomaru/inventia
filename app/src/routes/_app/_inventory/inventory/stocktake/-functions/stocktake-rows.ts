@@ -1,10 +1,12 @@
+import { toIsoFromDate } from "@/lib/expiry-input";
+
 /** 棚卸しフォームの 1 行。 */
 export interface StocktakeRowInput {
     key: string;
     // 既存ロットは取得した ISO 8601 文字列をそのまま持つ。
     // 期限値がロットの同一性そのものなので、入力欄を経由して丸め直さない
     expiryDate: string | null;
-    // 新しい期限を追加した行の datetime-local 入力値。既存ロットの行は null。
+    // 新しい期限を追加した行の日付入力値（YYYY-MM-DD）。既存ロットの行は null。
     // 空文字は期限なしロットを意味する
     expiryInput: string | null;
     quantity: string;
@@ -43,7 +45,7 @@ export const buildStocktakeLots = (
             issues.push({
                 key: row.key,
                 field: "expiry",
-                message: "期限日時を正しく入力してください",
+                message: "期限を 2020-01-01 の形式で入力してください",
             });
             continue;
         }
@@ -105,6 +107,7 @@ const resolveExpiryDate = (
     if (!row.expiryInput.trim()) {
         return null;
     }
-    const date = new Date(row.expiryInput);
-    return Number.isNaN(date.getTime()) ? invalidExpiry : date.toISOString();
+    // 入力は日付だけなので、その日のローカル 0 時として扱う
+    const date = toIsoFromDate(row.expiryInput.trim());
+    return date ?? invalidExpiry;
 };

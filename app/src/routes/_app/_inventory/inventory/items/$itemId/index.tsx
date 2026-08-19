@@ -41,12 +41,14 @@ import {
     itemStockHistoryQueryOptions,
     locationDetailQueryOptions,
 } from "./-api/item-detail-queries";
+import { ItemReceiveForm } from "./-components/item-receive-form";
 
 // 期限が近いと見なす日数。在庫一覧の色分けと同じ値を使う
 const soonWithinDays = 7;
 
+// 幅は他の画面と揃える。ここだけ狭いと一覧から入ったときに幅が変わって見える
 const pageClassName =
-    "mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
+    "mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
 
 const dimensionLabels: Record<ItemDetailDto["baseDimension"], string> = {
     mass: "重量",
@@ -236,6 +238,18 @@ function ItemDetailPage() {
                             </TableBody>
                         </Table>
                     )}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>入庫</CardTitle>
+                    <CardDescription>
+                        この品目に在庫を足します。期限ごとにロットが分かれます。
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ItemReceiveForm item={item} />
                 </CardContent>
             </Card>
 
@@ -455,6 +469,7 @@ function ItemDetailError({ error, reset }: ErrorComponentProps) {
                         再読み込み
                     </Button>
                     <Button
+                        nativeButton={false}
                         render={<Link to="/inventory" />}
                         size="sm"
                         variant="outline"

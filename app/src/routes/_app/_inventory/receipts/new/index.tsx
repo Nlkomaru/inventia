@@ -28,6 +28,7 @@ import type {
     ReceiptApplyResult,
     ReceiptDetailDto,
 } from "@/domain/receipt";
+import { buildHierarchyLabels } from "@/lib/hierarchy";
 import {
     applyReceipt,
     parseReceipt,
@@ -53,7 +54,6 @@ import {
 import { ReceiptDropzone } from "./-components/receipt-dropzone";
 import type { SelectOption } from "./-components/receipt-review-detail";
 import { ReceiptReviewTable } from "./-components/receipt-review-table";
-import { buildHierarchyLabels } from "./-functions/hierarchy-labels";
 import { validateFile } from "./-functions/receipt-file";
 import {
     actionLabels,

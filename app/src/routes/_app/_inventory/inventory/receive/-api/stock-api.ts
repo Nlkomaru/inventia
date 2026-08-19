@@ -1,13 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import type { ItemDto } from "@/domain/item";
-import type { ItemLotDto } from "@/domain/lot";
+import type { CategoryDto } from "@/domain/category";
 import {
-    type StockMovementReason,
-    type StockOperationResult,
-    stockAdjustmentSchema,
-    stockOperationResultSchema,
-} from "@/domain/stock";
+    type ItemCreateInput,
+    type ItemDto,
+    itemCreateSchema,
+    itemDtoSchema,
+} from "@/domain/item";
+import type { LocationDto } from "@/domain/location";
 
 const apiErrorSchema = z.object({
     error: z
@@ -60,48 +60,53 @@ export const listItems = createServerFn({ method: "GET" }).handler(
     },
 );
 
-const itemLotsInputSchema = z.object({
-    itemId: z.string().trim().min(1),
-});
+// カテゴリは service が階層を 1 クエリで返す。保管場所は同等の service が
+// 無いため、1 階層ずつ返す一覧を親から辿って集める
+export const listCategoryTree = createServerFn({ method: "GET" }).handler(
+    async (): Promise<CategoryDto[]> => {
+        const [{ env }, { listCategoryTree: fetchCategoryTree }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/categoryService"),
+            ]);
+        const tree = await fetchCategoryTree(env.DB);
+        return tree.items;
+    },
+);
 
-/** 加算先の候補を示すため、数量 > 0 のロットを FEFO 順で取得する。 */
-export const listItemLots = createServerFn({ method: "GET" })
-    .validator(itemLotsInputSchema)
-    .handler(async ({ data }): Promise<ItemLotDto[]> => {
-        const [{ env }, { listItemLots: listLotsForItem }] = await Promise.all([
+export const listLocationTree = createServerFn({ method: "GET" }).handler(
+    async (): Promise<LocationDto[]> => {
+        const [{ env }, { listLocations }] = await Promise.all([
             import("cloudflare:workers"),
-            import("@/services/lotService"),
+            import("@/services/locationService"),
         ]);
-        const result = await listLotsForItem(env.DB, data.itemId, {});
-        return result.lots;
-    });
+        const result: LocationDto[] = [];
+        const visit = async (parentId: string | null): Promise<void> => {
+            const start = result.length;
+            let cursor: string | undefined;
+            do {
+                const page = await listLocations(env.DB, {
+                    parentId,
+                    limit: 100,
+                    ...(cursor === undefined ? {} : { cursor }),
+                });
+                result.push(...page.items);
+                cursor = page.nextCursor ?? undefined;
+            } while (cursor);
+            for (const child of result.slice(start)) await visit(child.id);
+        };
+        await visit(null);
+        return result;
+    },
+);
 
-export interface ReceiveStockInput {
-    quantity: number;
-    // null は期限なしロットへの加算を意味する
-    expiryDate: string | null;
-    reason: StockMovementReason;
-    idempotencyKey: string;
-}
-
-export const receiveStock = (
-    itemId: string,
-    input: ReceiveStockInput,
-): Promise<StockOperationResult> => {
-    const body = stockAdjustmentSchema.parse({
-        delta: input.quantity,
-        reason: input.reason,
-        expiryDate: input.expiryDate,
-        idempotencyKey: input.idempotencyKey,
+/**
+ * 品目を作る。初期数量と期限を一緒に送ると、品目・ロット・在庫履歴が
+ * 1 回の書き込みで揃うため、途中失敗で在庫 0 の品目だけが残らない。
+ */
+export const createItem = (input: ItemCreateInput): Promise<ItemDto> =>
+    request("/api/items", itemDtoSchema, "品目を登録できませんでした", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(itemCreateSchema.parse(input)),
     });
-    return request(
-        `/api/items/${encodeURIComponent(itemId)}/adjustments`,
-        stockOperationResultSchema,
-        "入庫を記録できませんでした",
-        {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(body),
-        },
-    );
-};

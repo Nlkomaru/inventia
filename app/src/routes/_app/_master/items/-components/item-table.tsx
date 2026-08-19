@@ -26,15 +26,10 @@ import {
 import type { CategoryDto } from "@/domain/category";
 import type { ItemDto } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
-import { formatDisplayDateTime } from "@/lib/datetime";
-import { readingStatusLabels } from "../-functions/reading-state-form";
-import { getHierarchyLabels } from "./item-options";
+import { buildHierarchyLabels } from "@/lib/hierarchy";
 
 const features = tableFeatures({});
 const columnHelper = createColumnHelper<typeof features, ItemDto>();
-const formatExpiry = (value: string | null): string =>
-    (value === null ? null : formatDisplayDateTime(value)) ?? "—";
-
 type ItemTableProps = {
     items: ItemDto[];
     categories: CategoryDto[];
@@ -75,11 +70,11 @@ export function ItemTable({
         [announce],
     );
     const categoryNames = useMemo(
-        () => getHierarchyLabels(categories),
+        () => buildHierarchyLabels(categories),
         [categories],
     );
     const locationNames = useMemo(
-        () => getHierarchyLabels(locations),
+        () => buildHierarchyLabels(locations),
         [locations],
     );
     const columns = useMemo(
@@ -105,52 +100,6 @@ export function ItemTable({
                 }),
                 columnHelper.accessor("baseUnit", {
                     header: "単位",
-                }),
-                columnHelper.accessor("currentQuantity", {
-                    header: "現在庫",
-                    cell: ({ row, getValue }) => {
-                        const threshold = row.original.lowStockThreshold;
-                        const low =
-                            threshold !== null && getValue() <= threshold;
-                        return (
-                            <span
-                                className={
-                                    low
-                                        ? "font-semibold text-destructive"
-                                        : undefined
-                                }
-                            >
-                                {getValue()}
-                            </span>
-                        );
-                    },
-                }),
-                columnHelper.accessor("earliestExpiryDate", {
-                    header: "最短期限",
-                    cell: ({ getValue, row }) => (
-                        <span className="whitespace-nowrap">
-                            {formatExpiry(getValue())}
-                            {row.original.lotCount > 1 ? (
-                                <span className="ml-1.5 text-xs text-muted-foreground">
-                                    （{row.original.lotCount} ロット）
-                                </span>
-                            ) : null}
-                        </span>
-                    ),
-                }),
-                columnHelper.accessor("readingStatus", {
-                    header: "読書状態",
-                    // 書籍カテゴリ以外と未設定はどちらも値を持たない
-                    cell: ({ getValue }) => {
-                        const status = getValue();
-                        return status === null ? (
-                            <span className="text-muted-foreground">—</span>
-                        ) : (
-                            <span className="whitespace-nowrap">
-                                {readingStatusLabels[status]}
-                            </span>
-                        );
-                    },
                 }),
                 columnHelper.display({
                     id: "actions",
@@ -233,7 +182,7 @@ export function ItemTable({
                     {items.length} 件
                 </p>
             </div>
-            <Table className="min-w-[980px]" aria-label="登録済み品目">
+            <Table className="min-w-[720px]" aria-label="登録済み品目">
                 <TableHeader className="bg-muted/50">
                     {table.getHeaderGroups().map((headerGroup) => (
                         <TableRow key={headerGroup.id}>

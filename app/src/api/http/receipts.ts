@@ -13,6 +13,7 @@ import {
     applyReceipt,
     deleteReceipt,
     getReceipt,
+    getReceiptImage,
     listReceipts,
     parseReceipt,
     ReceiptServiceError,
@@ -59,6 +60,9 @@ const receiptUploadFormSchema = z
     })
     .strict();
 
+// 画像応答は JSON ではないため、OpenAPI では binary 形式の文字列として表現する
+const imageBinarySchema = z.string().openapi({ format: "binary" });
+
 const receiptDeleteOutputSchema = z
     .object({ deleted: z.literal(true) })
     .strict();
@@ -84,7 +88,7 @@ receiptsApp.openAPIRegistry.registerPath({
     summary: "Upload a receipt image",
     operationId: "uploadReceipt",
     description:
-        "Uploads one receipt photo as multipart/form-data with the image in the file part and creates a receipt in status uploaded. Side effects: the image is stored in object storage and one receipt row is created; no inventory, price or purchase data changes. The accepted formats are decided from the part's content type, not from the file name: image/jpeg, image/png and image/webp, up to 10 MiB. The request body is rejected as soon as it exceeds that size, so an oversized upload is never read to the end. The stored image is never served back by this API and the object key is not part of any response. Run the parse endpoint next to extract the lines.",
+        "Uploads one receipt photo as multipart/form-data with the image in the file part and creates a receipt in status uploaded. Side effects: the image is stored in object storage and one receipt row is created; no inventory, price or purchase data changes. The accepted formats are decided from the part's content type, not from the file name: image/jpeg, image/png and image/webp, up to 10 MiB. The request body is rejected as soon as it exceeds that size, so an oversized upload is never read to the end. The stored image is only served back by the image endpoint and the object key is not part of any response. Run the parse endpoint next to extract the lines.",
     request: {
         body: {
             required: true,
@@ -148,7 +152,7 @@ receiptsApp.openAPIRegistry.registerPath({
     summary: "List receipts",
     operationId: "listReceipts",
     description:
-        "Lists uploaded receipts newest first with cursor pagination, optionally filtered by status. This endpoint only reads data. Each entry carries lineCount but not the lines themselves; read one receipt to get its lines and match candidates. The stored image is never returned. nextCursor is null on the last page; pass it back unchanged as cursor to continue.",
+        "Lists uploaded receipts newest first with cursor pagination, optionally filtered by status. This endpoint only reads data. Each entry carries lineCount but not the lines themselves; read one receipt to get its lines and match candidates. The stored image is not part of this response; read it from the image endpoint. nextCursor is null on the last page; pass it back unchanged as cursor to continue.",
     request: { query: receiptListQuerySchema },
     responses: {
         200: {
@@ -169,7 +173,7 @@ receiptsApp.openAPIRegistry.registerPath({
     summary: "Get a receipt with its lines and match candidates",
     operationId: "getReceipt",
     description:
-        "Returns one receipt with every extracted line, the confirmed match when there is one, and the remaining candidates. This endpoint only reads data. Candidates are recomputed on read instead of being stored, so a line that is already confirmed returns an empty candidates array. suggestedExpiryDate is the confirmation screen's initial value: the printed expiry date when the receipt showed one, otherwise the estimated one, otherwise null; expirySource, expiryConfidence and expiryEstimateReason explain where it came from. linesTotalPrice is the sum of the line prices for comparison against the receipt's own totalPrice, and is null when any line has no readable price. The stored image is never returned.",
+        "Returns one receipt with every extracted line, the confirmed match when there is one, and the remaining candidates. This endpoint only reads data. Candidates are recomputed on read instead of being stored, so a line that is already confirmed returns an empty candidates array. suggestedExpiryDate is the confirmation screen's initial value: the printed expiry date when the receipt showed one, otherwise the estimated one, otherwise null; expirySource, expiryConfidence and expiryEstimateReason explain where it came from. linesTotalPrice is the sum of the line prices for comparison against the receipt's own totalPrice, and is null when any line has no readable price. The stored image is not part of this response; read it from the image endpoint.",
     request: {
         params: z.object({ id: receiptIdParameter }),
     },
@@ -180,6 +184,38 @@ receiptsApp.openAPIRegistry.registerPath({
         },
         400: jsonError("RECEIPT_INVALID_INPUT: the receipt id is empty."),
         404: jsonError("RECEIPT_NOT_FOUND: the receipt does not exist."),
+        ...serverErrorResponses,
+    },
+});
+
+receiptsApp.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/{id}/image",
+    tags: ["Receipts"],
+    summary: "Get the stored receipt image",
+    operationId: "getReceiptImage",
+    description:
+        "Returns the stored photo of one receipt as image bytes, with the content type it was uploaded with. This endpoint only reads data. It exists so the confirmation screen and the receipt detail page can show the photo next to the extracted lines; the object storage key stays private and is never part of any response. The response is marked private and may be cached by the caller for an hour; the entity tag comes from object storage and a request whose If-None-Match matches it is answered with 304 without transferring the image again.",
+    request: {
+        params: z.object({ id: receiptIdParameter }),
+    },
+    responses: {
+        200: {
+            description: "The stored image bytes.",
+            content: {
+                "image/jpeg": { schema: imageBinarySchema },
+                "image/png": { schema: imageBinarySchema },
+                "image/webp": { schema: imageBinarySchema },
+            },
+        },
+        304: {
+            description:
+                "The caller already holds this image; If-None-Match matched the stored entity tag.",
+        },
+        400: jsonError("RECEIPT_INVALID_INPUT: the receipt id is empty."),
+        404: jsonError(
+            "RECEIPT_NOT_FOUND: the receipt does not exist, or its image is no longer stored. Upload the receipt again.",
+        ),
         ...serverErrorResponses,
     },
 });
@@ -400,6 +436,33 @@ receiptsApp.get("/", async (c) => {
 receiptsApp.get("/:id", async (c) => {
     try {
         return c.json(await getReceipt(c.env.DB, c.req.param("id")), 200);
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+receiptsApp.get("/:id/image", async (c) => {
+    try {
+        const image = await getReceiptImage(c.env, c.req.param("id"));
+        // R2 の ETag は引用符ごと返しているため、条件付き要求の値と直接比べられる
+        if (c.req.header("if-none-match") === image.etag) {
+            return new Response(null, {
+                status: 304,
+                headers: {
+                    "cache-control": "private, max-age=3600",
+                    etag: image.etag,
+                },
+            });
+        }
+        return new Response(image.body, {
+            headers: {
+                "content-type": image.contentType,
+                "content-length": String(image.byteSize),
+                // 画像は利用者ごとの private なデータなので共有キャッシュへ載せない
+                "cache-control": "private, max-age=3600",
+                etag: image.etag,
+            },
+        });
     } catch (error) {
         return errorResponse(c, error);
     }

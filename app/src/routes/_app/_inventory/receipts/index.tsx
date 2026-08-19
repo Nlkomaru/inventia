@@ -6,12 +6,28 @@ import {
 import {
     createFileRoute,
     type ErrorComponentProps,
+    Link,
     useRouter,
 } from "@tanstack/react-router";
-import { Trash2Icon } from "lucide-react";
-import { useMemo, useState } from "react";
+import {
+    CopyIcon,
+    EllipsisIcon,
+    FileTextIcon,
+    PlayIcon,
+    Trash2Icon,
+} from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuGroup,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
     Select,
@@ -30,6 +46,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import {
+    type ReceiptDto,
     type ReceiptStatus,
     receiptStatuses,
     receiptStatusSchema,
@@ -67,6 +84,10 @@ const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
 
 const allFilterValue = "all";
 
+/** 操作の読み上げに使う行の呼び名。店舗名を読めなかったレシートも区別できる。 */
+const receiptLabel = (receipt: ReceiptDto): string =>
+    receipt.storeName ?? "店舗名なしのレシート";
+
 const isStatus = (value: string): value is ReceiptStatus =>
     receiptStatuses.some((status) => status === value);
 
@@ -80,6 +101,32 @@ function ReceiptListPage() {
     );
     const queryClient = useQueryClient();
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    // トーストを持たないので、コピー結果は読み上げ専用の領域だけで伝える。
+    // 同じ文言でも読み上げ直すよう、連番を key にして要素ごと差し替える
+    const [copyMessage, setCopyMessage] = useState({ seq: 0, text: "" });
+    const announce = useCallback(
+        (text: string) =>
+            setCopyMessage((current) => ({ seq: current.seq + 1, text })),
+        [],
+    );
+    const copyReceiptId = useCallback(
+        (receipt: ReceiptDto) => {
+            // 安全なコンテキスト以外では navigator.clipboard 自体が存在しない
+            if (!navigator.clipboard) {
+                announce("レシートIDをコピーできませんでした");
+                return;
+            }
+            void navigator.clipboard
+                .writeText(receipt.id)
+                .then(() =>
+                    announce(
+                        `${receiptLabel(receipt)}のレシートIDをコピーしました`,
+                    ),
+                )
+                .catch(() => announce("レシートIDをコピーできませんでした"));
+        },
+        [announce],
+    );
     const deleteMutation = useMutation({
         mutationFn: (receiptId: string) => deleteReceipt(receiptId),
         onSuccess: () =>
@@ -191,17 +238,25 @@ function ReceiptListPage() {
                 <Table>
                     <TableHeader className="bg-muted/50">
                         <TableRow>
-                            <TableHead className="px-5">取込日時</TableHead>
-                            <TableHead className="px-5">状態</TableHead>
-                            <TableHead className="px-5">店舗</TableHead>
-                            <TableHead className="px-5">購入日時</TableHead>
-                            <TableHead className="px-5 text-right">
+                            <TableHead className="px-5" scope="col">
+                                取込日時
+                            </TableHead>
+                            <TableHead className="px-5" scope="col">
+                                状態
+                            </TableHead>
+                            <TableHead className="px-5" scope="col">
+                                店舗
+                            </TableHead>
+                            <TableHead className="px-5" scope="col">
+                                購入日時
+                            </TableHead>
+                            <TableHead className="px-5 text-right" scope="col">
                                 合計
                             </TableHead>
-                            <TableHead className="px-5 text-right">
+                            <TableHead className="px-5 text-right" scope="col">
                                 明細
                             </TableHead>
-                            <TableHead className="px-5 text-right">
+                            <TableHead className="px-5 text-right" scope="col">
                                 操作
                             </TableHead>
                         </TableRow>
@@ -248,41 +303,99 @@ function ReceiptListPage() {
                                 <TableCell className="px-5 py-3 text-right align-top">
                                     {receipt.lineCount}
                                 </TableCell>
-                                <TableCell className="px-5 py-3 text-right align-top">
-                                    <Button
-                                        nativeButton={false}
-                                        render={
-                                            // biome-ignore lint/a11y/useAnchorContent: Base UI forwards Button children to this anchor.
-                                            <a
-                                                aria-label={`${receipt.storeName ?? "レシート"}の取込を開く`}
-                                                href={resumeHref(receipt.id)}
+                                <TableCell className="px-5 py-3 align-top">
+                                    {/* アイコンボタンは行のテキストより背が高い。上下の
+                                        余白を相殺して、他の列の文字と同じ高さに揃える */}
+                                    <div className="-my-1 flex justify-end">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger
+                                                render={
+                                                    <Button
+                                                        aria-label={`${receiptLabel(receipt)}の操作`}
+                                                        size="icon-sm"
+                                                        type="button"
+                                                        variant="ghost"
+                                                    >
+                                                        <EllipsisIcon />
+                                                    </Button>
+                                                }
                                             />
-                                        }
-                                        size="sm"
-                                        variant="outline"
-                                    >
-                                        {receipt.status === "applied"
-                                            ? "内容を見る"
-                                            : "続きから確認"}
-                                    </Button>
-                                    {/* 反映を開始したレシートは在庫の根拠として残す */}
-                                    <Button
-                                        aria-label={`${receipt.storeName ?? "レシート"}の取込を削除`}
-                                        className="ml-2"
-                                        disabled={
-                                            deleting ||
-                                            receipt.status === "applied" ||
-                                            receipt.purchaseId !== null
-                                        }
-                                        onClick={() =>
-                                            void removeReceipt(receipt.id)
-                                        }
-                                        size="icon-sm"
-                                        type="button"
-                                        variant="ghost"
-                                    >
-                                        <Trash2Icon />
-                                    </Button>
+                                            <DropdownMenuContent
+                                                align="end"
+                                                // 既定では trigger 幅に揃うため項目名が折り返す
+                                                className="w-auto"
+                                            >
+                                                {/* Base UI では GroupLabel を Group の中に置く */}
+                                                <DropdownMenuGroup>
+                                                    <DropdownMenuLabel>
+                                                        操作
+                                                    </DropdownMenuLabel>
+                                                    <DropdownMenuItem
+                                                        render={
+                                                            <Link
+                                                                params={{
+                                                                    receiptId:
+                                                                        receipt.id,
+                                                                }}
+                                                                to="/receipts/$receiptId"
+                                                            />
+                                                        }
+                                                    >
+                                                        <FileTextIcon />
+                                                        内容を見る
+                                                    </DropdownMenuItem>
+                                                    {/* 反映済みのレシートは確認画面へ戻さない */}
+                                                    {receipt.status ===
+                                                    "applied" ? null : (
+                                                        <DropdownMenuItem
+                                                            render={
+                                                                <Link
+                                                                    search={{
+                                                                        receiptId:
+                                                                            receipt.id,
+                                                                    }}
+                                                                    to="/receipts/new"
+                                                                />
+                                                            }
+                                                        >
+                                                            <PlayIcon />
+                                                            続きから確認
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    <DropdownMenuItem
+                                                        onClick={() =>
+                                                            copyReceiptId(
+                                                                receipt,
+                                                            )
+                                                        }
+                                                    >
+                                                        <CopyIcon />
+                                                        レシートIDをコピー
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    {/* 反映を開始したレシートは在庫の根拠として残す */}
+                                                    <DropdownMenuItem
+                                                        disabled={
+                                                            deleting ||
+                                                            receipt.status ===
+                                                                "applied" ||
+                                                            receipt.purchaseId !==
+                                                                null
+                                                        }
+                                                        onClick={() =>
+                                                            void removeReceipt(
+                                                                receipt.id,
+                                                            )
+                                                        }
+                                                        variant="destructive"
+                                                    >
+                                                        <Trash2Icon />
+                                                        削除
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuGroup>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -318,6 +431,9 @@ function ReceiptListPage() {
                                 : "続きを読み込む"}
                         </Button>
                     </div>
+                </div>
+                <div aria-live="polite" className="sr-only">
+                    <span key={copyMessage.seq}>{copyMessage.text}</span>
                 </div>
             </section>
         </main>
@@ -364,7 +480,3 @@ function ReceiptListError({ error, reset }: ErrorComponentProps) {
 
 const errorMessage = (cause: unknown, fallback: string): string =>
     cause instanceof Error ? cause.message : fallback;
-
-/** 取込途中のレシートは receiptId 付きの URL で確認画面へ戻れる。 */
-const resumeHref = (receiptId: string): string =>
-    `/receipts/new?receiptId=${encodeURIComponent(receiptId)}`;
