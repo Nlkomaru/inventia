@@ -365,3 +365,20 @@ export const ReadingStatuses: Story = {
         lotsByItemId: new Map(),
     },
 };
+
+/**
+ * 品目名を詳細ページへのリンクにした表示。アプリ側は TanStack Router の
+ * `Link` を渡すが、story はルーターを持たないため素の `<a>` で同じ見た目を示す。
+ */
+export const LinkedItemNames: Story = {
+    args: {
+        renderItemName: (item, name) => (
+            <a
+                className="underline-offset-4 hover:underline"
+                href={`/inventory/items/${item.id}`}
+            >
+                {name}
+            </a>
+        ),
+    },
+};

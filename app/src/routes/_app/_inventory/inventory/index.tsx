@@ -6,6 +6,7 @@ import {
 import {
     createFileRoute,
     type ErrorComponentProps,
+    Link,
     useRouter,
 } from "@tanstack/react-router";
 import { RefreshCw, Search } from "lucide-react";
@@ -27,6 +28,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import type { ItemDto } from "@/domain/item";
 import { readingStatuses } from "@/domain/reading";
 import type { InventoryItemFilters } from "./-api/inventory-api";
 import {
@@ -131,6 +133,18 @@ export const Route = createFileRoute("/_app/_inventory/inventory/")({
     pendingComponent: InventoryPending,
     errorComponent: InventoryError,
 });
+
+// 品目名から詳細ページへ入れるようにする。共有コンポーネントはルーターに
+// 依存させないため、リンク要素はルート側で組み立てて渡す
+const renderItemName = (item: ItemDto, name: string) => (
+    <Link
+        className="underline-offset-4 hover:underline"
+        params={{ itemId: item.id }}
+        to="/inventory/items/$itemId"
+    >
+        {name}
+    </Link>
+);
 
 // 保管場所とカテゴリは末端の名前だけを表示する。一覧は行数が多く、
 // 親を連ねた経路表示は品目名や期限の視認性を落とす
@@ -396,6 +410,7 @@ function InventoryPage() {
                 loading={itemsQuery.isFetching}
                 locationLabels={locationLabels}
                 lotsByItemId={lotsByItemId}
+                renderItemName={renderItemName}
                 soonWithinDays={soonWithinDays}
             />
         </main>

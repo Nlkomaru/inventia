@@ -28,6 +28,7 @@ import { Route as AppInventoryInventoryIssueIndexRouteImport } from './routes/_a
 import { Route as AppInventoryInventoryReceiveIndexRouteImport } from './routes/_app/_inventory/inventory/receive/index'
 import { Route as AppInventoryInventoryStocktakeIndexRouteImport } from './routes/_app/_inventory/inventory/stocktake/index'
 import { Route as AppInventoryReceiptsNewIndexRouteImport } from './routes/_app/_inventory/receipts/new/index'
+import { Route as AppInventoryInventoryItemsItemIdIndexRouteImport } from './routes/_app/_inventory/inventory/items/$itemId/index'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -131,6 +132,12 @@ const AppInventoryReceiptsNewIndexRoute =
     path: '/receipts/new/',
     getParentRoute: () => AppInventoryRoute,
   } as any)
+const AppInventoryInventoryItemsItemIdIndexRoute =
+  AppInventoryInventoryItemsItemIdIndexRouteImport.update({
+    id: '/inventory/items/$itemId/',
+    path: '/inventory/items/$itemId/',
+    getParentRoute: () => AppInventoryRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -149,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/inventory/receive/': typeof AppInventoryInventoryReceiveIndexRoute
   '/inventory/stocktake/': typeof AppInventoryInventoryStocktakeIndexRoute
   '/receipts/new/': typeof AppInventoryReceiptsNewIndexRoute
+  '/inventory/items/$itemId/': typeof AppInventoryInventoryItemsItemIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
@@ -167,6 +175,7 @@ export interface FileRoutesByTo {
   '/inventory/receive': typeof AppInventoryInventoryReceiveIndexRoute
   '/inventory/stocktake': typeof AppInventoryInventoryStocktakeIndexRoute
   '/receipts/new': typeof AppInventoryReceiptsNewIndexRoute
+  '/inventory/items/$itemId': typeof AppInventoryInventoryItemsItemIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -189,6 +198,7 @@ export interface FileRoutesById {
   '/_app/_inventory/inventory/receive/': typeof AppInventoryInventoryReceiveIndexRoute
   '/_app/_inventory/inventory/stocktake/': typeof AppInventoryInventoryStocktakeIndexRoute
   '/_app/_inventory/receipts/new/': typeof AppInventoryReceiptsNewIndexRoute
+  '/_app/_inventory/inventory/items/$itemId/': typeof AppInventoryInventoryItemsItemIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
     | '/inventory/receive/'
     | '/inventory/stocktake/'
     | '/receipts/new/'
+    | '/inventory/items/$itemId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -227,6 +238,7 @@ export interface FileRouteTypes {
     | '/inventory/receive'
     | '/inventory/stocktake'
     | '/receipts/new'
+    | '/inventory/items/$itemId'
   id:
     | '__root__'
     | '/_app'
@@ -248,6 +260,7 @@ export interface FileRouteTypes {
     | '/_app/_inventory/inventory/receive/'
     | '/_app/_inventory/inventory/stocktake/'
     | '/_app/_inventory/receipts/new/'
+    | '/_app/_inventory/inventory/items/$itemId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -390,6 +403,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInventoryReceiptsNewIndexRouteImport
       parentRoute: typeof AppInventoryRoute
     }
+    '/_app/_inventory/inventory/items/$itemId/': {
+      id: '/_app/_inventory/inventory/items/$itemId/'
+      path: '/inventory/items/$itemId'
+      fullPath: '/inventory/items/$itemId/'
+      preLoaderRoute: typeof AppInventoryInventoryItemsItemIdIndexRouteImport
+      parentRoute: typeof AppInventoryRoute
+    }
   }
 }
 
@@ -401,6 +421,7 @@ interface AppInventoryRouteChildren {
   AppInventoryInventoryReceiveIndexRoute: typeof AppInventoryInventoryReceiveIndexRoute
   AppInventoryInventoryStocktakeIndexRoute: typeof AppInventoryInventoryStocktakeIndexRoute
   AppInventoryReceiptsNewIndexRoute: typeof AppInventoryReceiptsNewIndexRoute
+  AppInventoryInventoryItemsItemIdIndexRoute: typeof AppInventoryInventoryItemsItemIdIndexRoute
 }
 
 const AppInventoryRouteChildren: AppInventoryRouteChildren = {
@@ -414,6 +435,8 @@ const AppInventoryRouteChildren: AppInventoryRouteChildren = {
   AppInventoryInventoryStocktakeIndexRoute:
     AppInventoryInventoryStocktakeIndexRoute,
   AppInventoryReceiptsNewIndexRoute: AppInventoryReceiptsNewIndexRoute,
+  AppInventoryInventoryItemsItemIdIndexRoute:
+    AppInventoryInventoryItemsItemIdIndexRoute,
 }
 
 const AppInventoryRouteWithChildren = AppInventoryRoute._addFileChildren(
