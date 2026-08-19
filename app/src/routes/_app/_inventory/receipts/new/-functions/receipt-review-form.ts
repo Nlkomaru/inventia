@@ -82,10 +82,10 @@ const suggestedNewItem = (line: ReceiptLineDto): ReceiptReviewNewItemForm => ({
     name: (line.completedName ?? line.rawName)
         .trim()
         .slice(0, reviewItemNameMax),
-    categoryId: line.suggestedCategoryId ?? "",
+    categoryId: line.suggestion.categoryId ?? "",
     locationId: "",
-    baseUnit: line.suggestedBaseUnit ?? "",
-    baseDimension: line.suggestedBaseDimension ?? "",
+    baseUnit: line.suggestion.baseUnit ?? "",
+    baseDimension: line.suggestion.baseDimension ?? "",
     memo: "",
 });
 
@@ -94,7 +94,7 @@ const suggestedNewItem = (line: ReceiptLineDto): ReceiptReviewNewItemForm => ({
  * 新規作成を既定にする。レジ袋や送料のように在庫へ置かない行はスキップにする。
  */
 const resolveInitialAction = (line: ReceiptLineDto): ReceiptReviewAction => {
-    if (line.matchedItemId !== null) {
+    if (line.match.itemId !== null) {
         return "add_to_item";
     }
     return line.stockRelevant ? "create_item" : "skip";
@@ -110,11 +110,11 @@ export const createReviewRow = (line: ReceiptLineDto): ReceiptReviewRow => ({
     rawName: line.rawName,
     displayName: line.completedName ?? line.rawName,
     action: resolveInitialAction(line),
-    itemId: line.matchedItemId ?? "",
+    itemId: line.match.itemId ?? "",
     quantity: String(line.quantity),
     price: line.price === null ? "" : String(line.price),
-    expiryMode: line.suggestedExpiryDate === null ? "none" : "date",
-    expiryDate: line.suggestedExpiryDate ?? "",
+    expiryMode: line.expiry.suggestedDate === null ? "none" : "date",
+    expiryDate: line.expiry.suggestedDate ?? "",
     registerAlias: true,
     newItem: suggestedNewItem(line),
 });

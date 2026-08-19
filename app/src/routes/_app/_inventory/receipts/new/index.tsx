@@ -792,11 +792,11 @@ function ReceiptIntakePage() {
                                         {formatYen(line.price)}
                                     </TableCell>
                                     <TableCell className="px-5 py-3 align-top">
-                                        {line.matchedItemName ?? "—"}
+                                        {line.match.itemName ?? "—"}
                                     </TableCell>
                                     <TableCell className="px-5 py-3 align-top whitespace-nowrap">
                                         {formatExpiryDate(
-                                            line.suggestedExpiryDate,
+                                            line.expiry.suggestedDate,
                                         )}
                                     </TableCell>
                                 </TableRow>

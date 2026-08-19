@@ -88,7 +88,7 @@ export function ReceiptReviewDetail({
                 </p>
             </div>
 
-            {line.candidates.length > 0 ? (
+            {line.match.candidates.length > 0 ? (
                 <div className="flex flex-col gap-2">
                     <p
                         className="text-sm text-muted-foreground"
@@ -100,7 +100,7 @@ export function ReceiptReviewDetail({
                         aria-labelledby={fieldId("candidates")}
                         className="flex flex-wrap gap-2"
                     >
-                        {line.candidates.map((candidate) => {
+                        {line.match.candidates.map((candidate) => {
                             const selected =
                                 row.action === "add_to_item" &&
                                 row.itemId === candidate.itemId;
@@ -375,27 +375,27 @@ export function ReceiptReviewDetail({
 
 /** 照合の根拠を 1 行で示す。確定済みの行は候補が空になる。 */
 const matchSummary = (line: ReceiptLineDto): string => {
-    if (line.matchedItemId === null) {
-        return line.candidates.length === 0
+    const match = line.match;
+    if (match.itemId === null) {
+        return match.candidates.length === 0
             ? "一致する品目が見つかりませんでした。"
             : "候補は見つかりましたが自動では確定していません。";
     }
     const method =
-        line.matchMethod === null
-            ? "照合済み"
-            : matchMethodLabels[line.matchMethod];
-    const score = line.matchScore === null ? "" : `・一致度 ${line.matchScore}`;
-    return `${method}${score}: ${line.matchedItemName ?? line.matchedItemId}`;
+        match.method === null ? "照合済み" : matchMethodLabels[match.method];
+    const score = match.score === null ? "" : `・一致度 ${match.score}`;
+    return `${method}${score}: ${match.itemName ?? match.itemId}`;
 };
 
 /** 期限の初期値がどこから来たかを示す。推測は根拠と確度も出す。 */
 const expirySummary = (line: ReceiptLineDto): string => {
-    const parts = [`由来: ${expirySourceLabels[line.expirySource]}`];
-    if (line.expiryConfidence !== null) {
-        parts.push(expiryConfidenceLabels[line.expiryConfidence]);
+    const expiry = line.expiry;
+    const parts = [`由来: ${expirySourceLabels[expiry.source]}`];
+    if (expiry.confidence !== null) {
+        parts.push(expiryConfidenceLabels[expiry.confidence]);
     }
-    if (line.expiryEstimateReason !== null) {
-        parts.push(`根拠: ${line.expiryEstimateReason}`);
+    if (expiry.estimateReason !== null) {
+        parts.push(`根拠: ${expiry.estimateReason}`);
     }
     return parts.join(" / ");
 };

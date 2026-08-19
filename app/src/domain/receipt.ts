@@ -10,6 +10,77 @@ import { z } from "zod";
 // 単位の量の種類は品目側と同じ集合。OCR・DTO・保存で共有する
 export const receiptBaseDimensionSchema = z.enum(["mass", "volume", "count"]);
 
+/**
+ * 期限に関する読み取り結果。由来（source）と日付の対応をひとまとまりで扱い、
+ * 「印字」と言いながら印字が無い組み合わせを service 側で落とせるようにする。
+ */
+export const receiptOcrLineExpirySchema = z
+    .object({
+        printedDate: z.iso
+            .date()
+            .nullable()
+            .describe(
+                "レシートに消費期限・賞味期限が印字されている稀なケースでのその値（タイムゾーンなしの ISO 8601 日付、例: 2026-04-15）。印字を読み取れた場合だけ設定し、推測値をここへ入れない。印字がなければ null",
+            ),
+        estimatedDate: z.iso
+            .date()
+            .nullable()
+            .describe(
+                "印字がない食品について、購入日と商品種別から推測した期限（タイムゾーンなしの ISO 8601 日付）。印字がある場合は null。目安は葉物野菜・刺身・精肉が 1〜3 日、惣菜・弁当・パンが 2〜3 日、牛乳・豆腐・ヨーグルトが 1 週間前後、卵が 2 週間、冷蔵の加工品が 2 週間〜1 か月、冷凍食品が数か月、乾麺・缶詰・調味料などの常温加工品が 6〜12 か月。非食品や期限の概念がない品は null。推測値は確認画面でユーザーが必ず修正・削除できる前提の参考値であり、商品名から種別を絞れない場合は必ず null とし、値を捏造しない",
+            ),
+        source: z
+            .enum(["printed", "estimated", "unknown"])
+            .describe(
+                "期限の由来。印字を読み取れた場合は printed、推測した場合は estimated、どちらもできない場合は unknown。unknown のときは printedDate と estimatedDate の両方を null にする",
+            ),
+        confidence: z
+            .enum(["high", "medium", "low"])
+            .nullable()
+            .describe(
+                "推測の確度。商品種別が明確で一般的な保存期間が定まるなら high、種別の推定に幅があるなら medium、商品名から種別をほとんど絞れないなら low。source が printed または unknown のときは推測がないため null",
+            ),
+        estimateReason: z
+            .string()
+            .min(1)
+            .nullable()
+            .describe(
+                "推測根拠の短い日本語（例: 「常温の小麦粉は購入から約 12 か月」）。source が estimated のときだけ設定し、それ以外は null",
+            ),
+    })
+    .describe("この行の期限。由来と日付が食い違わない組み合わせで返す");
+
+/**
+ * 在庫へ登録するための提案。カテゴリと単位は品目を作るときに対で必要になるため、
+ * 同じ入れ物に置いて片方だけ埋まった状態を見つけやすくする。
+ */
+export const receiptOcrLineStockingSchema = z
+    .object({
+        categoryName: z
+            .string()
+            .min(1)
+            .max(200)
+            .nullable()
+            .describe(
+                "この品物を登録するカテゴリ名。カテゴリ一覧を取得する tool が提供されている場合は既存のカテゴリを調べ、当てはまるものがあればその名前をそのまま入れる。tool が無い場合や当てはまるものが無い場合は「食料品」「日用品」のような一般的な分類名でよい。判断できない場合と stockRelevant が false の場合は null",
+            ),
+        baseUnit: z
+            .string()
+            .min(1)
+            .max(50)
+            .nullable()
+            .describe(
+                "在庫を数える単位の表記（例: 個、本、袋、g、ml）。商品名や内容量から判断する。内容量が重さや容量で表される商品（小麦粉、砂糖、精肉、牛乳、洗剤など）は、内容量の違う同じ商品を同じ品目へ積めるよう最小単位の g または ml にし、kg は g、L は ml へ換算する（quantity が整数のため kg や L のままにしない）。個数で数える商品は、入り数の違うパックを同じ品目へ積めるよう、パック・箱・ケースのような包装ではなく中身を数える単位（個・本・枚）にする。baseDimension と必ず対で設定し、片方だけにしない。判断できない場合と stockRelevant が false の場合は null",
+            ),
+        baseDimension: receiptBaseDimensionSchema
+            .nullable()
+            .describe(
+                "baseUnit が属する量の種類。g は mass、ml は volume、個・本・袋のように数えるものは count。baseUnit と必ず対で設定する",
+            ),
+    })
+    .describe(
+        "在庫として登録するための提案。stockRelevant が false の行はすべて null",
+    );
+
 export const receiptOcrLineSchema = z.object({
     name: z
         .string()
@@ -29,7 +100,7 @@ export const receiptOcrLineSchema = z.object({
         .int()
         .min(1)
         .describe(
-            "在庫へ加える数量。suggestedBaseUnit で表した合計量とし、内容量や入り数が読み取れる商品は「1 パックの内容量（入り数）× 購入パック数」を入れる（例: 1kg の小麦粉 1 袋は suggestedBaseUnit が g で 1000、500ml の牛乳 2 本は ml で 1000、10 個入の卵 2 パックは 個 で 20）。内容量も入り数も読み取れない行と stockRelevant が false の行は購入個数を入れ、表記がない行は 1。内容量を読み取れない商品は重さや容量へ換算しない",
+            "在庫へ加える数量。stocking.baseUnit で表した合計量とし、内容量や入り数が読み取れる商品は「1 パックの内容量（入り数）× 購入パック数」を入れる（例: 1kg の小麦粉 1 袋は stocking.baseUnit が g で 1000、500ml の牛乳 2 本は ml で 1000、10 個入の卵 2 パックは 個 で 20）。内容量も入り数も読み取れない行と stockRelevant が false の行は購入個数を入れ、表記がない行は 1。内容量を読み取れない商品は重さや容量へ換算しない",
         ),
     price: z
         .int()
@@ -44,62 +115,13 @@ export const receiptOcrLineSchema = z.object({
         .describe(
             "その行に適用される消費税率。※印や「軽」印が付く軽減税率の商品は 8、それ以外は 10。判断できない場合は null",
         ),
-    printedExpiryDate: z.iso
-        .date()
-        .nullable()
-        .describe(
-            "レシートに消費期限・賞味期限が印字されている稀なケースでのその値（タイムゾーンなしの ISO 8601 日付、例: 2026-04-15）。印字を読み取れた場合だけ設定し、推測値をここへ入れない。印字がなければ null",
-        ),
-    estimatedExpiryDate: z.iso
-        .date()
-        .nullable()
-        .describe(
-            "印字がない食品について、購入日と商品種別から推測した期限（タイムゾーンなしの ISO 8601 日付）。印字がある場合は null。目安は葉物野菜・刺身・精肉が 1〜3 日、惣菜・弁当・パンが 2〜3 日、牛乳・豆腐・ヨーグルトが 1 週間前後、卵が 2 週間、冷蔵の加工品が 2 週間〜1 か月、冷凍食品が数か月、乾麺・缶詰・調味料などの常温加工品が 6〜12 か月。非食品や期限の概念がない品は null。推測値は確認画面でユーザーが必ず修正・削除できる前提の参考値であり、商品名から種別を絞れない場合は必ず null とし、値を捏造しない",
-        ),
-    expirySource: z
-        .enum(["printed", "estimated", "unknown"])
-        .describe(
-            "期限の由来。印字を読み取れた場合は printed、推測した場合は estimated、どちらもできない場合は unknown。unknown のときは printedExpiryDate と estimatedExpiryDate の両方を null にする",
-        ),
-    expiryConfidence: z
-        .enum(["high", "medium", "low"])
-        .nullable()
-        .describe(
-            "推測の確度。商品種別が明確で一般的な保存期間が定まるなら high、種別の推定に幅があるなら medium、商品名から種別をほとんど絞れないなら low。expirySource が printed または unknown のときは推測がないため null",
-        ),
-    expiryEstimateReason: z
-        .string()
-        .min(1)
-        .nullable()
-        .describe(
-            "推測根拠の短い日本語（例: 「常温の小麦粉は購入から約 12 か月」）。expirySource が estimated のときだけ設定し、それ以外は null",
-        ),
     stockRelevant: z
         .boolean()
         .describe(
             "在庫として管理する品物の行なら true。食品・日用品・書籍などの商品は true。レジ袋、割り箸、送料、手数料、包装代、預り金の調整のような、在庫に置かないものは false",
         ),
-    suggestedCategoryName: z
-        .string()
-        .min(1)
-        .max(200)
-        .nullable()
-        .describe(
-            "この品物を登録するカテゴリ名。カテゴリ一覧を取得する tool が提供されている場合は既存のカテゴリを調べ、当てはまるものがあればその名前をそのまま入れる。tool が無い場合や当てはまるものが無い場合は「食料品」「日用品」のような一般的な分類名でよい。判断できない場合と stockRelevant が false の場合は null",
-        ),
-    suggestedBaseUnit: z
-        .string()
-        .min(1)
-        .max(50)
-        .nullable()
-        .describe(
-            "在庫を数える単位の表記（例: 個、本、袋、g、ml）。商品名や内容量から判断する。内容量が重さや容量で表される商品（小麦粉、砂糖、精肉、牛乳、洗剤など）は、内容量の違う同じ商品を同じ品目へ積めるよう最小単位の g または ml にし、kg は g、L は ml へ換算する（quantity が整数のため kg や L のままにしない）。個数で数える商品は、入り数の違うパックを同じ品目へ積めるよう、パック・箱・ケースのような包装ではなく中身を数える単位（個・本・枚）にする。suggestedBaseDimension と必ず対で設定し、片方だけにしない。判断できない場合と stockRelevant が false の場合は null",
-        ),
-    suggestedBaseDimension: receiptBaseDimensionSchema
-        .nullable()
-        .describe(
-            "suggestedBaseUnit が属する量の種類。g は mass、ml は volume、個・本・袋のように数えるものは count。suggestedBaseUnit と必ず対で設定する",
-        ),
+    expiry: receiptOcrLineExpirySchema,
+    stocking: receiptOcrLineStockingSchema,
 });
 
 export const receiptOcrResultSchema = z.object({
@@ -215,6 +237,47 @@ export const receiptMatchCandidateSchema = z
     })
     .strict();
 
+/**
+ * 行の期限。由来（source）が主張する側の日付だけが入り、`suggestedDate` は
+ * 確認画面の初期値として由来に沿って解決した値である。
+ */
+export const receiptLineExpiryDtoSchema = z
+    .object({
+        printedDate: z.iso.date().nullable(),
+        estimatedDate: z.iso.date().nullable(),
+        source: receiptExpirySourceSchema,
+        confidence: receiptExpiryConfidenceSchema.nullable(),
+        // 保存列は expiry_reason だが、OCR 契約と同じ意味のため公開名は揃える
+        estimateReason: z.string().nullable(),
+        // 確認画面の初期値。印字 → 推測の順で解決した日付
+        suggestedDate: z.iso.date().nullable(),
+    })
+    .strict();
+
+/** 品目を作るための提案。解析時に既存カテゴリへ解決できた場合だけ ID が入る。 */
+export const receiptLineSuggestionDtoSchema = z
+    .object({
+        // AI へ ID は生成させない。名前が既存カテゴリと一致したときだけ解決する
+        categoryId: z.string().min(1).nullable(),
+        // 解決できなかった場合に何を返したか追えるよう、AI の回答も残す
+        categoryName: z.string().min(1).nullable(),
+        baseUnit: z.string().min(1).nullable(),
+        baseDimension: receiptBaseDimensionSchema.nullable(),
+    })
+    .strict();
+
+/** 既存品目との照合結果。候補は保存せず読み取り時に計算する。 */
+export const receiptLineMatchDtoSchema = z
+    .object({
+        itemId: z.string().nullable(),
+        itemName: z.string().nullable(),
+        method: receiptMatchMethodSchema.nullable(),
+        score: z.int().min(0).max(100).nullable(),
+        // 類似度だけで確定させないため、確定済みの行では空配列になる
+        candidates: z.array(receiptMatchCandidateSchema),
+    })
+    .strict();
+
 export const receiptLineDtoSchema = z
     .object({
         id: z.string().min(1),
@@ -222,32 +285,14 @@ export const receiptLineDtoSchema = z
         rawName: z.string().min(1),
         // 印字が途切れていた場合の補完名。rawName と同じ値や空文字は保存しない
         completedName: z.string().min(1).nullable(),
-        // 在庫に置かない行（レジ袋・送料など）は確認画面の既定を「取り込まない」にする
-        stockRelevant: z.boolean(),
-        // 解析時に既存カテゴリへ解決できた場合だけ ID が入る。AI へ ID は生成させない
-        suggestedCategoryId: z.string().min(1).nullable(),
-        // 解決できなかった場合に何を返したか追えるよう、AI の回答も残す
-        suggestedCategoryName: z.string().min(1).nullable(),
-        suggestedBaseUnit: z.string().min(1).nullable(),
-        suggestedBaseDimension: receiptBaseDimensionSchema.nullable(),
         normalizedName: z.string(),
         quantity: z.int().min(1),
         price: z.int().min(0).nullable(),
-        printedExpiryDate: z.iso.date().nullable(),
-        estimatedExpiryDate: z.iso.date().nullable(),
-        expirySource: receiptExpirySourceSchema,
-        expiryConfidence: receiptExpiryConfidenceSchema.nullable(),
-        // 保存列は expiry_reason だが、OCR 契約と同じ意味のため公開名は揃える
-        expiryEstimateReason: z.string().nullable(),
-        // 確認画面の初期値。印字 → 推測の順で解決した日付
-        suggestedExpiryDate: z.iso.date().nullable(),
-        matchedItemId: z.string().nullable(),
-        matchedItemName: z.string().nullable(),
-        matchMethod: receiptMatchMethodSchema.nullable(),
-        matchScore: z.int().min(0).max(100).nullable(),
-        // 候補は保存せず読み取り時に計算する。類似度だけで確定させないため、
-        // 確定済みの行では空配列になる
-        candidates: z.array(receiptMatchCandidateSchema),
+        // 在庫に置かない行（レジ袋・送料など）は確認画面の既定を「取り込まない」にする
+        stockRelevant: z.boolean(),
+        expiry: receiptLineExpiryDtoSchema,
+        suggestion: receiptLineSuggestionDtoSchema,
+        match: receiptLineMatchDtoSchema,
     })
     .strict();
 
@@ -437,6 +482,11 @@ export type ReceiptMatchMethodValue = z.infer<typeof receiptMatchMethodSchema>;
 export type ReceiptBaseDimension = z.infer<typeof receiptBaseDimensionSchema>;
 export type ReceiptContentType = z.infer<typeof receiptContentTypeSchema>;
 export type ReceiptDto = z.infer<typeof receiptDtoSchema>;
+export type ReceiptLineExpiryDto = z.infer<typeof receiptLineExpiryDtoSchema>;
+export type ReceiptLineSuggestionDto = z.infer<
+    typeof receiptLineSuggestionDtoSchema
+>;
+export type ReceiptLineMatchDto = z.infer<typeof receiptLineMatchDtoSchema>;
 export type ReceiptLineDto = z.infer<typeof receiptLineDtoSchema>;
 export type ReceiptDetailDto = z.infer<typeof receiptDetailDtoSchema>;
 export type ReceiptListQuery = z.infer<typeof receiptListQuerySchema>;
@@ -469,18 +519,18 @@ export const receiptParseDefaultInstructions = [
     "在庫を検索する tool があれば既存の品目を調べ、同一と判断できるものはその品目名を completedName に入れてください。",
     "",
     "在庫として管理する品物は stockRelevant を true、レジ袋・箸・送料・手数料は false にしてください。",
-    "true の行では、カテゴリ一覧の tool を必ず使い、一覧にある名前だけを suggestedCategoryName に入れてください。一覧に無ければ null です。",
-    "数える単位は suggestedBaseUnit と suggestedBaseDimension を対で入れてください。",
-    "内容量が重さ・容量で表される商品は suggestedBaseUnit を g または ml にし、kg は g、L は ml へ換算してください。",
-    "個数で数える商品は、パックや箱ではなく中身を数える単位（個・本・枚）を suggestedBaseUnit にしてください。",
-    "quantity は suggestedBaseUnit で表した合計量（1 パックの内容量や入り数 × 購入パック数）です。10 個入の卵を 2 パックなら 個 で 20 になります。",
-    "例: 「エクリチュール (日清製粉) 1kg」を 1 袋なら、completedName は「エクリチュール」、suggestedBaseUnit は g、suggestedBaseDimension は mass、quantity は 1000 です。",
-    "内容量も入り数も読み取れない商品は推測せず、suggestedBaseUnit を 個 などにして quantity を購入個数にしてください。",
+    "true の行では、カテゴリ一覧の tool を必ず使い、一覧にある名前だけを stocking.categoryName に入れてください。一覧に無ければ null です。",
+    "数える単位は stocking.baseUnit と stocking.baseDimension を対で入れてください。",
+    "内容量が重さ・容量で表される商品は stocking.baseUnit を g または ml にし、kg は g、L は ml へ換算してください。",
+    "個数で数える商品は、パックや箱ではなく中身を数える単位（個・本・枚）を stocking.baseUnit にしてください。",
+    "quantity は stocking.baseUnit で表した合計量（1 パックの内容量や入り数 × 購入パック数）です。10 個入の卵を 2 パックなら 個 で 20 になります。",
+    "例: 「エクリチュール (日清製粉) 1kg」を 1 袋なら、completedName は「エクリチュール」、stocking.baseUnit は g、stocking.baseDimension は mass、quantity は 1000 です。",
+    "内容量も入り数も読み取れない商品は推測せず、stocking.baseUnit を 個 などにして quantity を購入個数にしてください。",
     "",
-    "期限は、その商品の行に印字されている場合だけ printedExpiryDate に入れてください。",
-    "印字が無い食品は購入日からの保存期間を estimatedExpiryDate に入れ、expirySource を estimated にしてください。",
+    "期限は、その商品の行に印字されている場合だけ expiry.printedDate に入れてください。",
+    "印字が無い食品は購入日からの保存期間を expiry.estimatedDate に入れ、expiry.source を estimated にしてください。",
     "目安は、葉物野菜・刺身・精肉が 1〜3 日、惣菜・弁当・パンが 2〜3 日、牛乳・豆腐が 1 週間、卵が 2 週間、冷蔵の加工品が 2 週間〜1 か月、冷凍食品が数か月、乾麺・缶詰・調味料が 6〜12 か月です。",
-    "非食品と、商品名から種別を絞れないものは null にし、expirySource を unknown にしてください。",
+    "非食品と、商品名から種別を絞れないものは null にし、expiry.source を unknown にしてください。",
 ].join("\n");
 
 /**
