@@ -9,6 +9,8 @@ import {
     storeListOutputSchema,
     storeUpdateInputSchema,
 } from "../../domain/store";
+import { EmbeddingServiceError } from "../../services/embeddingService";
+import { reindexAllStores } from "../../services/storeSearchService";
 import {
     createStore,
     deleteStore,
@@ -25,6 +27,10 @@ import type { ApiBindings } from "../bindings";
 type StoresContext = Context<ApiBindings>;
 
 export const storesApp = new OpenAPIHono<ApiBindings>();
+
+const storeReindexOutputSchema = z
+    .object({ indexed: z.int().min(0), failed: z.int().min(0) })
+    .strict();
 
 const storeErrorSchema = z
     .object({
@@ -290,6 +296,29 @@ storesApp.openAPIRegistry.registerPath({
     },
 });
 
+storesApp.openAPIRegistry.registerPath({
+    method: "post",
+    path: "/reindex",
+    tags: ["Stores"],
+    summary: "Rebuild the store name index",
+    operationId: "reindexStores",
+    description:
+        "Rebuilds the embedding index for every store. Side effects: an embedding is generated for each store name through the configured OpenRouter key and written to the vector index; no store, price or inventory data changes. Indexing otherwise runs best-effort when a store is created or renamed, so a store is missing from the index when the API key was not configured at that moment or the call failed — and a store that is missing is resolved as a new store the next time a receipt names it, which creates a duplicate. Run this once after the index is introduced and after restoring an API key. indexed and failed count the stores in each outcome.",
+    responses: {
+        200: {
+            description: "The number of stores indexed and failed.",
+            content: responseContent(storeReindexOutputSchema),
+        },
+        503: jsonError(
+            "EMBEDDING_NOT_CONFIGURED: no OpenRouter API key is stored, so no embedding could be generated. Save the key on the integrations settings page and retry.",
+        ),
+        502: jsonError(
+            "EMBEDDING_REQUEST_FAILED or EMBEDDING_INVALID_RESPONSE: the embedding provider could not be reached or answered unusably. Retry later.",
+        ),
+        ...serverErrorResponses,
+    },
+});
+
 const errorResponse = (c: StoresContext, error: unknown): Response => {
     if (error instanceof StoreServiceError) {
         return c.json(
@@ -310,6 +339,22 @@ const errorResponse = (c: StoresContext, error: unknown): Response => {
             },
         },
         500,
+    );
+};
+
+const embeddingErrorResponse = (
+    c: StoresContext,
+    error: EmbeddingServiceError,
+): Response => {
+    const status =
+        error.code === "EMBEDDING_INVALID_INPUT"
+            ? 400
+            : error.code === "EMBEDDING_NOT_CONFIGURED"
+              ? 503
+              : 502;
+    return c.json(
+        { error: { code: error.code, message: error.message } },
+        status,
     );
 };
 
@@ -431,8 +476,21 @@ storesApp.get("/", async (c) => {
 
 storesApp.post("/", async (c) => {
     try {
-        return c.json(await createStore(c.env.DB, await parseJson(c)), 201);
+        return c.json(await createStore(c.env, await parseJson(c)), 201);
     } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+// 全店舗の embedding を作り直す更新系エンドポイント。`/:id` より前に置かないと
+// reindex が店舗 ID として解釈される
+storesApp.post("/reindex", async (c) => {
+    try {
+        return c.json(await reindexAllStores(c.env), 200);
+    } catch (error) {
+        if (error instanceof EmbeddingServiceError) {
+            return embeddingErrorResponse(c, error);
+        }
         return errorResponse(c, error);
     }
 });
@@ -448,7 +506,7 @@ storesApp.get("/:id", async (c) => {
 storesApp.patch("/:id", async (c) => {
     try {
         return c.json(
-            await updateStore(c.env.DB, c.req.param("id"), await parseJson(c)),
+            await updateStore(c.env, c.req.param("id"), await parseJson(c)),
             200,
         );
     } catch (error) {

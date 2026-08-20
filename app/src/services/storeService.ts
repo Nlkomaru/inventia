@@ -2,6 +2,7 @@ import { newId } from "../domain/id";
 import {
     decodeStoreCursor,
     encodeStoreCursor,
+    normalizeStoreName,
     type StoreCreateInput,
     type StoreDto,
     type StoreId,
@@ -16,6 +17,7 @@ import {
     storeListInputSchema,
     storeNameMaxLength,
     storeUpdateInputSchema,
+    storeVectorMatchThreshold,
 } from "../domain/store";
 import {
     countPriceRecordsByStore,
@@ -24,10 +26,18 @@ import {
     findStoreByName,
     insertStore,
     listStores as listStoreRows,
+    listStoresForMatching,
     type StoreRow,
     updateStoreFavicon,
     updateStore as updateStoreRow,
 } from "../repositories/storeRepository";
+
+import {
+    indexStore,
+    removeStoreFromIndex,
+    type StoreSearchEnv,
+    searchStoresByVector,
+} from "./storeSearchService";
 
 export type StoreServiceErrorCode =
     | "STORE_INVALID_INPUT"
@@ -77,6 +87,9 @@ export interface StoreEnv {
     DB: D1Database;
     RECEIPTS: R2Bucket;
 }
+
+/** 店名の索引を触る経路が要求する binding。`Env` はこの形へ代入できる。 */
+export type StoreWriteEnv = StoreEnv & StoreSearchEnv;
 
 const invalidInput = (message: string): StoreServiceError =>
     new StoreServiceError("STORE_INVALID_INPUT", message);
@@ -188,67 +201,74 @@ export const getStore = async (
 ): Promise<StoreDto> => toDto(await requireStore(db, parseStoreId(id)));
 
 export const createStore = async (
-    db: D1Database,
+    env: StoreWriteEnv,
     input: unknown,
 ): Promise<StoreDto> => {
     const parsed = parseCreateInput(input);
-    if (await findStoreByName(db, parsed.name)) {
+    if (await findStoreByName(env.DB, parsed.name)) {
         throw nameConflict();
     }
     const now = new Date().toISOString();
+    let row: StoreRow;
     try {
-        return toDto(
-            await insertStore(db, {
-                id: newId(),
-                name: parsed.name,
-                url: parsed.url,
-                createdAt: now,
-                updatedAt: now,
-            }),
-        );
+        row = await insertStore(env.DB, {
+            id: newId(),
+            name: parsed.name,
+            url: parsed.url,
+            createdAt: now,
+            updatedAt: now,
+        });
     } catch (error) {
         if (isConstraintViolation(error)) {
             throw nameConflict();
         }
         throw error;
     }
+    // 索引は検索用の副産物。失敗しても店舗の登録は成立させる
+    await indexStore(env, row.id);
+    return toDto(row);
 };
 
 export const updateStore = async (
-    db: D1Database,
+    env: StoreWriteEnv,
     id: unknown,
     input: unknown,
 ): Promise<StoreDto> => {
     const storeId = parseStoreId(id);
     const parsed = parseUpdateInput(input);
-    await requireStore(db, storeId);
+    const before = await requireStore(env.DB, storeId);
     if (parsed.name !== undefined) {
-        const duplicate = await findStoreByName(db, parsed.name);
+        const duplicate = await findStoreByName(env.DB, parsed.name);
         if (duplicate && duplicate.id !== storeId) {
             throw nameConflict();
         }
     }
+    let row: StoreRow | null;
     try {
-        const row = await updateStoreRow(
-            db,
+        row = await updateStoreRow(
+            env.DB,
             storeId,
             parsed,
             new Date().toISOString(),
         );
-        if (!row) {
-            throw notFound();
-        }
-        return toDto(row);
     } catch (error) {
         if (isConstraintViolation(error)) {
             throw nameConflict();
         }
         throw error;
     }
+    if (!row) {
+        throw notFound();
+    }
+    // 索引は店名だけを埋め込むため、改名したときだけ作り直す
+    if (row.name !== before.name) {
+        await indexStore(env, row.id);
+    }
+    return toDto(row);
 };
 
 export const deleteStore = async (
-    env: StoreEnv,
+    env: StoreWriteEnv,
     id: unknown,
 ): Promise<void> => {
     const storeId = parseStoreId(id);
@@ -279,14 +299,70 @@ export const deleteStore = async (
             () => undefined,
         );
     }
+    await removeStoreFromIndex(env, storeId);
+};
+
+/**
+ * 正規化した名前が一致する店舗を探す。レシートの店名は半角カナや空白の有無が
+ * 揺れるため、完全一致だけでは同じ店舗を取り逃がして重複が増える。
+ */
+const findStoreByNormalizedName = async (
+    db: D1Database,
+    name: string,
+): Promise<StoreRow | null> => {
+    const target = normalizeStoreName(name);
+    if (target.length === 0) {
+        return null;
+    }
+    const rows = await listStoresForMatching(db);
+    return rows.find((row) => normalizeStoreName(row.name) === target) ?? null;
+};
+
+/**
+ * 類似検索で同じ店舗を探す。しきい値を超えた最上位だけを採用し、超えなければ
+ * null を返して新規作成へ落とす。判断の根拠は後から見直せるよう必ず記録する。
+ *
+ * best-effort: API key 未設定や Vectorize の失敗はここで飲み込む。レシート反映は
+ * 埋め込みを必要としない処理なので、索引の都合で反映を失敗させない。
+ */
+const findStoreByVector = async (
+    env: StoreSearchEnv,
+    name: string,
+): Promise<StoreRow | null> => {
+    let top: { store: StoreRow; score: number } | undefined;
+    try {
+        [top] = await searchStoresByVector(env, name, { topK: 3 });
+    } catch (error) {
+        console.error("[storeService] store vector match failed", {
+            errorName: error instanceof Error ? error.name : typeof error,
+        });
+        return null;
+    }
+    if (!top) {
+        return null;
+    }
+    const matched = top.score >= storeVectorMatchThreshold;
+    // 実際のレシートでしか妥当なしきい値は決められないため、採用・不採用の
+    // どちらも記録する。店名は利用者の入力だが秘密情報ではない
+    console.info("[storeService] store vector match", {
+        query: name,
+        candidate: top.store.name,
+        score: top.score,
+        matched,
+    });
+    return matched ? top.store : null;
 };
 
 /**
  * 店名から店舗を引き、無ければ作る。レシート反映のように利用者が店舗を
  * 選んでいない経路から使うため、名前以外の入力は取らない。
+ *
+ * 完全一致 → 正規化一致 → 類似検索 の順で既存の店舗を探し、どれにも当たらない
+ * ときだけ新規作成する。類似検索を最後に置くのは、同じチェーンの別支店を
+ * 取り違えて統合するより、分かれて登録される方が店舗マスタで直せるためである。
  */
-export const findOrCreateStoreByName = async (
-    db: D1Database,
+export const resolveStoreByName = async (
+    env: StoreSearchEnv,
     name: string,
 ): Promise<StoreRow> => {
     // 読み取った店名が上限より長くても反映を止めない。ここで入力エラーにすると、
@@ -295,13 +371,17 @@ export const findOrCreateStoreByName = async (
     if (normalized.length === 0) {
         throw invalidInput("店名を確認してください");
     }
-    const existing = await findStoreByName(db, normalized);
+    const existing =
+        (await findStoreByName(env.DB, normalized)) ??
+        (await findStoreByNormalizedName(env.DB, normalized)) ??
+        (await findStoreByVector(env, normalized));
     if (existing) {
         return existing;
     }
     const now = new Date().toISOString();
+    let row: StoreRow;
     try {
-        return await insertStore(db, {
+        row = await insertStore(env.DB, {
             id: newId(),
             name: normalized,
             url: null,
@@ -313,12 +393,15 @@ export const findOrCreateStoreByName = async (
             throw error;
         }
         // 同時実行が先に同じ名前を作った場合は、その行へ収束させる
-        const concurrent = await findStoreByName(db, normalized);
+        const concurrent = await findStoreByName(env.DB, normalized);
         if (!concurrent) {
             throw error;
         }
         return concurrent;
     }
+    // 索引に入れないと、次のレシートで同じ店舗がもう一度作られる
+    await indexStore(env, row.id);
+    return row;
 };
 
 export const uploadStoreFavicon = async (
