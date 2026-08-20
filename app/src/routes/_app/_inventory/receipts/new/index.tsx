@@ -741,7 +741,7 @@ function ReceiptIntakePage() {
                                 // biome-ignore lint/a11y/useAnchorContent: Base UI forwards Button children to this anchor.
                                 <a
                                     aria-label="在庫一覧を見る"
-                                    href="/inventory"
+                                    href="/inventory/items"
                                 />
                             }
                         >

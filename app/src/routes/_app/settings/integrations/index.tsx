@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_app/settings/integrations/")({
         context.queryClient.ensureQueryData(openRouterStatusQueryOptions()),
     staticData: {
         breadcrumbs: [
-            { label: "Inventia", to: "/inventory" },
+            { label: "Inventia", to: "/inventory/items" },
             { label: "設定" },
             { label: "AI・ベクトル検索" },
         ],

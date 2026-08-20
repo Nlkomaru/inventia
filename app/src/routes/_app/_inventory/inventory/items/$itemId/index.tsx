@@ -604,7 +604,7 @@ function ItemDetailError({ error, reset }: ErrorComponentProps) {
                     </Button>
                     <Button
                         nativeButton={false}
-                        render={<Link to="/inventory" />}
+                        render={<Link to="/inventory/items" />}
                         size="sm"
                         variant="outline"
                     >
