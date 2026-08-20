@@ -47,8 +47,15 @@ The MCP server exposes these tools through the same services as the HTTP API:
 | Area | Tools |
 | --- | --- |
 | System | `get_health` |
-| Inventory | `search_inventory`, `get_inventory_item` |
-| Locations | `list_locations`, `get_location`, `create_location`, `update_location`, `delete_location` |
+| Inventory (read) | `search_inventory`, `search_inventory_semantic`, `resolve_inventory_items`, `get_inventory_items`, `list_expiring_inventory`, `list_stale_stocktake_items`, `list_book_reading_status` |
+| Inventory (write) | `create_inventory_item`, `update_inventory_item`, `adjust_inventory_stock`, `stocktake_inventory_item`, `correct_inventory_lot_expiry`, `set_book_reading_status` |
+| Prices | `get_price_history`, `get_price_histories`, `compare_unit_prices`, `compare_unit_prices_across_items` |
+| Categories | `list_categories`, `list_category_tree`, `get_category` |
+| Locations | `list_locations`, `list_location_tree`, `get_location` |
+
+Items and prices are read in batches: `get_inventory_items`, `get_price_histories` and
+`compare_unit_prices_across_items` take a list of ids, so reading one item means passing a
+single-element list rather than calling a separate per-item tool.
 
 ## Verification
 
