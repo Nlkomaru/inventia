@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import {
     createColumnHelper,
     tableFeatures,
@@ -85,12 +86,13 @@ export function ItemTable({
                     // 品目名から在庫・価格・履歴を見る詳細へ入れるようにする。
                     // マスタの編集はこの行の操作メニューに残す
                     cell: ({ getValue, row }) => (
-                        <a
+                        <Link
                             className="font-medium underline-offset-4 hover:underline"
-                            href={`/inventory/items/${encodeURIComponent(row.original.id)}`}
+                            params={{ itemId: row.original.id }}
+                            to="/inventory/items/$itemId"
                         >
                             {getValue()}
-                        </a>
+                        </Link>
                     ),
                 }),
                 columnHelper.display({
