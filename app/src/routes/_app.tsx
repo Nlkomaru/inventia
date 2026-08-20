@@ -15,6 +15,7 @@ import {
     SidebarProvider,
     SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { breadcrumbsFromLoaderData } from "@/lib/breadcrumbs";
 
 export const Route = createFileRoute("/_app")({ component: AppLayout });
 
@@ -38,9 +39,16 @@ function AppLayout() {
 }
 
 function AppBreadcrumb() {
+    // 階層は一致した route の並びがそのまま表す。各 route は自分の段だけを
+    // 名乗り、loader が段を返した場合はそちらを使う（品目名や場所の祖先など）
     const breadcrumbs = useMatches({
         select: (matches) =>
-            matches.flatMap((match) => match.staticData.breadcrumbs ?? []),
+            matches.flatMap(
+                (match) =>
+                    breadcrumbsFromLoaderData(match.loaderData) ??
+                    match.staticData.breadcrumbs ??
+                    [],
+            ),
     });
 
     return (
