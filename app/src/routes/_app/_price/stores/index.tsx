@@ -6,7 +6,7 @@ import {
 import { storeListQueryOptions } from "./-api/store-queries";
 import { StoreMasterPage } from "./-components/store-master-page";
 
-export const Route = createFileRoute("/_app/_master/stores/")({
+export const Route = createFileRoute("/_app/_price/stores/")({
     loader: ({ context }) =>
         context.queryClient.ensureQueryData(storeListQueryOptions()),
     staticData: {

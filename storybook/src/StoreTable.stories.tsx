@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { StoreTable } from "../../app/src/routes/_app/_master/stores/-components/store-table";
+import { StoreTable } from "../../app/src/routes/_app/_price/stores/-components/store-table";
 
 const stores = [
 	{

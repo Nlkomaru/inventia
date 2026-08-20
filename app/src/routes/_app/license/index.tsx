@@ -12,10 +12,8 @@ import licenseGroups from "./-data.json";
 
 export const Route = createFileRoute("/_app/license/")({
     staticData: {
-        breadcrumbs: [
-            { label: "Inventia", to: "/inventory/items" },
-            { label: "ライセンス" },
-        ],
+        // サイドバーの区分に属さない補足のページなので、段は自分だけにする
+        breadcrumbs: [{ label: "OSS ライセンス" }],
     },
     component: LicensePage,
 });
