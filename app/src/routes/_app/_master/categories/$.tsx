@@ -234,18 +234,13 @@ function CategoryDetailPage() {
                                 {items.map((item) => (
                                     <TableRow key={item.id}>
                                         <TableCell>
-                                            <span className="inline-flex items-center gap-1.5">
-                                                {item.emoji}
-                                                <Link
-                                                    className="underline underline-offset-4"
-                                                    params={{
-                                                        itemId: item.id,
-                                                    }}
-                                                    to="/items/$itemId"
-                                                >
-                                                    {item.name}
-                                                </Link>
-                                            </span>
+                                            <Link
+                                                className="underline underline-offset-4"
+                                                params={{ itemId: item.id }}
+                                                to="/items/$itemId"
+                                            >
+                                                {item.name}
+                                            </Link>
                                         </TableCell>
                                         <TableCell className="text-right font-mono whitespace-nowrap tabular-nums">
                                             {item.currentQuantity.toLocaleString(

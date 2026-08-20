@@ -85,7 +85,7 @@ function ItemMasterDetailPage() {
                 {/* 絵文字は品目の一部なので、名前と同じ見出しの中に置く。
                     絵文字そのものの編集は在庫詳細に置いてあるため重ねない */}
                 <h1 className="mt-1 text-2xl font-bold break-words">
-                    {item.emoji} {item.name}
+                    {item.name}
                 </h1>
                 <p className="mt-2 text-sm text-muted-foreground">
                     {categoryLabel} / {locationLabel}

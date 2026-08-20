@@ -132,7 +132,6 @@ const toDto = (
 const toAllDto = (row: AllPriceRecordRow): AllPriceRecordDto => ({
     ...toDto(row),
     itemName: row.itemName,
-    itemEmoji: row.itemEmoji,
 });
 
 export type PriceRecordListResponse = {

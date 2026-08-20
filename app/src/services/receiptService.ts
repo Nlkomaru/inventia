@@ -2,7 +2,6 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText, Output, stepCountIs, type ToolSet } from "ai";
 import type { CategoryDto } from "../domain/category";
 import { newId } from "../domain/id";
-import { defaultItemEmoji } from "../domain/item";
 import { normalizeContentAmount } from "../domain/price";
 import {
     decodeReceiptCursor,
@@ -1174,15 +1173,9 @@ export const applyReceipt = async (
                     itemId = reservedItemId;
                     pricing = reserved;
                 } else {
-                    // 絵文字は既定値で作る。ここで AI に任せると明細 1 件ごとに
-                    // OpenRouter を直列で叩き、反映の応答時間が明細数に比例して
-                    // 伸びる（索引更新をループの後へ出したのと同じ理由）。
-                    // 作成後の絵文字は品目ページの再生成から直せる
-                    const created = await createItem(
-                        searchEnv,
-                        { ...lineInput.newItem, emoji: defaultItemEmoji },
-                        { id: reservedItemId },
-                    );
+                    const created = await createItem(db, lineInput.newItem, {
+                        id: reservedItemId,
+                    });
                     itemId = created.id;
                     itemCreated = true;
                     pricing = {

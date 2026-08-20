@@ -8,37 +8,9 @@ import { readingStateDtoSchema, readingStatusSchema } from "./reading";
 
 export const itemBaseDimensionSchema = z.enum(["mass", "volume", "count"]);
 
-/** 絵文字が決まっていない品目のプレースホルダ。AI 生成に失敗してもこの値で成立させる。 */
-export const defaultItemEmoji = "📦";
-
-/**
- * 絵文字 1 個だけを許す。文字数では判定できない（👩‍🍳 は 3 code point、
- * 🇯🇵 は 2 code point ある）ため、絵文字の並びとして受け付ける形を直接書く。
- *
- * - 国旗（Regional_Indicator 2 個）
- * - 絵文字 + 肌色修飾（\p{Emoji_Modifier}）
- * - 絵文字 + 異体字セレクタ（U+FE0F）
- * - ZWJ（U+200D）で連結した絵文字列（家族、レインボーフラッグなど）
- *
- * 数字のキーキャップ（1️⃣）のように絵文字以外から始まる並びは通さない。
- * DB は ALTER ADD COLUMN で CHECK を足せないため、この検証だけが妥当性の担保になる
- */
-const itemEmojiPattern =
-    /^(?:\p{RI}\p{RI}|\p{Extended_Pictographic}(?:\p{Emoji_Modifier}|\uFE0F|\u200D(?:\p{Extended_Pictographic}|\p{RI}\p{RI}))*)$/u;
-
-export const itemEmojiSchema = z
-    .string()
-    .trim()
-    .min(1, "絵文字を入力してください")
-    // ZWJ で連結した家族絵文字は 11 code unit になるため、1 個分の上限として 16 を取る
-    .max(16, "絵文字は1文字だけ入力してください")
-    .regex(itemEmojiPattern, "絵文字を1個だけ入力してください");
-
 export const itemDtoSchema = z.object({
     id: z.string().min(1),
     name: z.string(),
-    // 一覧で品目を見分けるための絵文字 1 個。未生成の品目は既定の 📦 が入る
-    emoji: z.string(),
     categoryId: z.string(),
     locationId: z.string(),
     baseUnit: z.string(),
@@ -99,8 +71,6 @@ export const itemCreateSchema = z
         expiryDate: itemFields.expiryDate.optional(),
         lowStockThreshold: itemFields.lowStockThreshold.optional(),
         memo: itemFields.memo.optional(),
-        // 省略時は品目名から AI が生成する。生成に失敗しても品目作成は成立させる
-        emoji: itemEmojiSchema.optional(),
     })
     .strict()
     .refine(
@@ -126,7 +96,6 @@ export const itemUpdateSchema = z
         baseDimension: itemFields.baseDimension.optional(),
         lowStockThreshold: itemFields.lowStockThreshold.optional(),
         memo: itemFields.memo.optional(),
-        emoji: itemEmojiSchema.optional(),
     })
     .strict()
     .refine((value) => Object.keys(value).length > 0, {

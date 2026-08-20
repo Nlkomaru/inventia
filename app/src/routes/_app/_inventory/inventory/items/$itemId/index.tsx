@@ -9,10 +9,7 @@ import {
     useRouter,
 } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import {
-    readingStatusLabels,
-    resolveExpirySignal,
-} from "@/components/InventoryTable";
+import { resolveExpirySignal } from "@/components/InventoryTable";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -48,7 +45,6 @@ import {
     itemStockHistoryQueryOptions,
     locationDetailQueryOptions,
 } from "./-api/item-detail-queries";
-import { ItemEmojiForm } from "./-components/item-emoji-form";
 import { ItemLotExpiryForm } from "./-components/item-lot-expiry-form";
 import { ItemPriceForm } from "./-components/item-price-form";
 import { ItemReceiveForm } from "./-components/item-receive-form";
@@ -152,9 +148,8 @@ function ItemDetailPage() {
                 <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
                     Inventory
                 </p>
-                {/* 絵文字は品目の一部なので、名前と同じ見出しの中に置く */}
                 <h1 className="mt-1 text-2xl font-bold break-words">
-                    {item.emoji} {item.name}
+                    {item.name}
                 </h1>
                 <p className="mt-2 text-sm text-muted-foreground">
                     {category.name} / {location.name}
@@ -186,25 +181,6 @@ function ItemDetailPage() {
                             <dd className="mt-1 text-sm">
                                 {item.baseUnit}（
                                 {dimensionLabels[item.baseDimension]}）
-                            </dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm text-muted-foreground">
-                                読書状態
-                            </dt>
-                            <dd className="mt-1 text-sm">
-                                {formatReadingState(item)}
-                            </dd>
-                        </div>
-                        <div className="sm:col-span-2">
-                            <dt className="text-sm text-muted-foreground">
-                                絵文字
-                            </dt>
-                            <dd className="mt-1">
-                                <ItemEmojiForm
-                                    emoji={item.emoji}
-                                    itemId={item.id}
-                                />
                             </dd>
                         </div>
                         <div className="sm:col-span-2">
@@ -699,16 +675,3 @@ const formatPrice = (price: number): string =>
 // 比較単位そのものを表示する
 const formatUnitPrice = (record: PriceRecordDto): string =>
     `${record.unitPrice.toFixed(2)} 円 / ${priceComparisonBasis(record.baseDimension)} ${priceComparisonUnit(record.baseDimension, record.baseUnit)}`;
-
-/** 読書状態は書籍カテゴリーの品目だけが持つ。未設定は「—」で示す。 */
-const formatReadingState = (item: ItemDetailDto): string => {
-    if (item.readingStatus === null) return "—";
-    const label = readingStatusLabels[item.readingStatus];
-    const startedAt = item.readingState?.startedAt ?? null;
-    const finishedAt = item.readingState?.finishedAt ?? null;
-    const dates = [
-        startedAt === null ? null : `開始 ${formatDisplayDate(startedAt)}`,
-        finishedAt === null ? null : `読了 ${formatDisplayDate(finishedAt)}`,
-    ].filter((value): value is string => value !== null);
-    return dates.length === 0 ? label : `${label}（${dates.join(" / ")}）`;
-};

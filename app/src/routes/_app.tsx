@@ -24,7 +24,12 @@ function AppLayout() {
         <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
-                <header className="sticky top-0 flex h-16 shrink-0 items-center border-b bg-background px-4">
+                {/*
+                 * z-index が無いと、後ろに来るページ内容（カード、表、影を持つ
+                 * 要素）が重なり順で勝ち、スクロール中にヘッダーの上へ出てしまう。
+                 * サイドバー（z-10）より上、Sheet や Popover（z-50）より下に置く
+                 */}
+                <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center border-b bg-background px-4">
                     <SidebarTrigger />
                     <Separator
                         orientation="vertical"

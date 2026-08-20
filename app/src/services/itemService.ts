@@ -15,7 +15,6 @@ import {
 } from "../domain/lot";
 import { getPriceUnitDefinition } from "../domain/price";
 import { type ReadingStatus, toReadingStateDto } from "../domain/reading";
-import { findCategoryById } from "../repositories/categoryRepository";
 import {
     categoryExists,
     countItemsByLocation as countItemRecordsByLocation,
@@ -41,12 +40,6 @@ import {
     listReadingStatesByItemIds,
     type ReadingStateRow,
 } from "../repositories/readingRepository";
-import {
-    generateItemEmoji,
-    type ItemEmojiEnv,
-    type ItemEmojiSource,
-    requestItemEmoji,
-} from "./itemEmojiService";
 
 export class ItemServiceError extends Error {
     readonly status: 400 | 404 | 409 | 502 | 503;
@@ -106,7 +99,6 @@ export const toItemDto = (
 ): ItemDto => ({
     id: row.id,
     name: row.name,
-    emoji: row.emoji,
     categoryId: row.categoryId,
     locationId: row.locationId,
     baseUnit: row.baseUnit,
@@ -255,30 +247,15 @@ export const getItems = async (
 };
 
 /**
- * 絵文字の生成に渡す手掛かりを揃える。カテゴリ名は選定の手掛かりとして強いため
- * 1 件だけ読む。絵文字を生成しない経路ではこの読み取り自体を行わない。
- */
-const buildEmojiSource = async (
-    db: D1Database,
-    input: { name: string; categoryId: string; memo: string | null },
-): Promise<ItemEmojiSource> => ({
-    name: input.name,
-    categoryName: (await findCategoryById(db, input.categoryId))?.name ?? null,
-    memo: input.memo,
-});
-
-/**
  * 品目を作る。`options.id` は再実行で同じ品目へ収束させたい呼び出し元
  * （レシート反映など）が採番済みの ID を渡すためだけにあり、
  * 公開入力スキーマ（`itemCreateSchema`）には含めない。
- * 絵文字を省略した場合は AI で生成するが、生成できなくても既定の絵文字で作成を続ける。
  */
 export const createItem = async (
-    env: ItemEmojiEnv,
+    db: D1Database,
     input: unknown,
     options: { id?: string } = {},
 ): Promise<ItemDto> => {
-    const db = env.DB;
     const parsed = parseOrThrow(itemCreateSchema.safeParse(input));
     if (!(await categoryExists(db, parsed.categoryId))) {
         throw new ItemServiceError(
@@ -307,16 +284,6 @@ export const createItem = async (
         );
     }
     const currentQuantity = parsed.currentQuantity ?? (isDocument ? 1 : 0);
-    const emoji =
-        parsed.emoji ??
-        (await generateItemEmoji(
-            env,
-            await buildEmojiSource(db, {
-                name: parsed.name,
-                categoryId: parsed.categoryId,
-                memo: parsed.memo ?? null,
-            }),
-        ));
     const row = await createItemRecord(
         db,
         {
@@ -324,7 +291,6 @@ export const createItem = async (
             baseUnit,
             baseDimension,
             currentQuantity,
-            emoji,
         },
         options,
     );
@@ -444,48 +410,6 @@ export const updateItem = async (
     // baseUnit / baseDimension を含めて items の 1 行だけを書き換える。
     // 数量を持つテーブルへの換算処理は意図的に行わない
     const row = await updateItemRecord(db, id, parsed);
-    if (!row) {
-        throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
-    }
-    const reading = await getReadingStateRecord(db, id);
-    return toItemDto(row, reading?.status ?? null);
-};
-
-/**
- * 既存品目の絵文字を AI で作り直す。生成できなかった場合は保存済みの絵文字を
- * そのまま残して失敗を返し、利用者が絵文字を直接入力して直せるようにする。
- * 文言は API 利用者だけでなく画面にもそのまま出るため、次に取れる行動を日本語で書く。
- */
-export const regenerateItemEmoji = async (
-    env: ItemEmojiEnv,
-    id: string,
-): Promise<ItemDto> => {
-    const db = env.DB;
-    if (id.trim().length === 0) {
-        throw new ItemServiceError(400, "INVALID_ID", "id must not be empty");
-    }
-    const existing = await getItemRecord(db, id);
-    if (!existing) {
-        throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
-    }
-    const generated = await requestItemEmoji(
-        env,
-        await buildEmojiSource(db, existing),
-    );
-    if (!generated.ok) {
-        throw generated.reason === "not_configured"
-            ? new ItemServiceError(
-                  503,
-                  "ITEM_EMOJI_NOT_CONFIGURED",
-                  "OpenRouter API key を連携設定から保存してください。",
-              )
-            : new ItemServiceError(
-                  502,
-                  "ITEM_EMOJI_UNAVAILABLE",
-                  "絵文字を生成できませんでした。時間をおいて再試行するか、絵文字を直接入力してください。",
-              );
-    }
-    const row = await updateItemRecord(db, id, { emoji: generated.emoji });
     if (!row) {
         throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
     }

@@ -88,18 +88,13 @@ export function ItemTable({
                     // 品目名からはマスタの品目ページへ入る。単位や次元の
                     // つけ替えなど、この一覧が扱う登録内容の変更先に揃える
                     cell: ({ getValue, row }) => (
-                        // 絵文字は品目の一部なので隠さず名前と併記する。
-                        // リンクの読み上げを名前だけに保つため外に置く
-                        <span className="inline-flex items-center gap-1.5">
-                            {row.original.emoji}
-                            <Link
-                                className="font-medium underline-offset-4 hover:underline"
-                                params={{ itemId: row.original.id }}
-                                to="/items/$itemId"
-                            >
-                                {getValue()}
-                            </Link>
-                        </span>
+                        <Link
+                            className="font-medium underline-offset-4 hover:underline"
+                            params={{ itemId: row.original.id }}
+                            to="/items/$itemId"
+                        >
+                            {getValue()}
+                        </Link>
                     ),
                 }),
                 columnHelper.display({
