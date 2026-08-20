@@ -29,9 +29,6 @@ export const Route = createFileRoute("/_app/_master/items/")({
             context.queryClient.ensureQueryData(categoryListQueryOptions()),
             context.queryClient.ensureQueryData(locationListQueryOptions()),
         ]),
-    staticData: {
-        breadcrumbs: [{ label: "品目" }],
-    },
     component: ItemsPage,
     pendingComponent: ItemsPending,
     errorComponent: ItemsError,

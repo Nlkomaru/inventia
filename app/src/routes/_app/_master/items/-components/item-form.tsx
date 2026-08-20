@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -559,17 +560,30 @@ export function ItemForm({
                         <FieldGroup>
                             <Field data-disabled>
                                 <FieldLabel htmlFor="item-base-unit-readonly">
-                                    基準単位（変更不可）
+                                    基準単位
                                 </FieldLabel>
                                 <Input
                                     disabled
                                     id="item-base-unit-readonly"
                                     value={form.baseUnit}
                                 />
+                                {/* 単位と次元は品目ページで変更できる。ここは
+                                    保存済みの値の確認だけに留め、送信もしない */}
+                                <FieldDescription>
+                                    このダイアログでは変更しません。変更は
+                                    <Link
+                                        className="underline underline-offset-4"
+                                        params={{ itemId: item.id }}
+                                        to="/items/$itemId"
+                                    >
+                                        品目ページ
+                                    </Link>
+                                    から行います。
+                                </FieldDescription>
                             </Field>
                             <Field data-disabled>
                                 <FieldLabel htmlFor="item-base-dimension-readonly">
-                                    次元（変更不可）
+                                    次元
                                 </FieldLabel>
                                 <Input
                                     disabled
@@ -582,6 +596,9 @@ export function ItemForm({
                                             : ""
                                     }
                                 />
+                                <FieldDescription>
+                                    次元も品目ページで基準単位と合わせて変更します。
+                                </FieldDescription>
                             </Field>
                             <Field data-disabled>
                                 <FieldLabel htmlFor="item-current-quantity-readonly">

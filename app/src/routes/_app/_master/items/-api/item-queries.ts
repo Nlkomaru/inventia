@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import {
     getItemDetail,
+    getItemRelabelImpact,
     listAllItems,
     listCategoryTree,
     listLocationTree,
@@ -12,6 +13,10 @@ export const itemKeys = {
     all: ["items"] as const,
     list: () => [...itemKeys.all, "list"] as const,
     detail: (itemId: string) => [...itemKeys.all, "detail", itemId] as const,
+    // 入出庫履歴・価格記録の有無。読み取り先は別の名前空間だが、品目ページの
+    // 警告にしか使わないため品目の無効化（["items"]）へ相乗りさせる
+    relabelImpact: (itemId: string) =>
+        [...itemKeys.all, "relabel-impact", itemId] as const,
 };
 
 export const categoryKeys = {
@@ -40,6 +45,12 @@ export const itemDetailQueryOptions = (itemId: string) =>
     queryOptions({
         queryKey: itemKeys.detail(itemId),
         queryFn: () => getItemDetail({ data: { itemId } }),
+    });
+
+export const itemRelabelImpactQueryOptions = (itemId: string) =>
+    queryOptions({
+        queryKey: itemKeys.relabelImpact(itemId),
+        queryFn: () => getItemRelabelImpact({ data: { itemId } }),
     });
 
 export const categoryListQueryOptions = () =>
