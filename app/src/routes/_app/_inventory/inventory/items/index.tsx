@@ -14,7 +14,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import {
     InventoryTable,
-    readingStatusLabels,
     resolveExpirySignal,
 } from "@/components/InventoryTable";
 import { Button } from "@/components/ui/button";
@@ -29,7 +28,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import type { ItemDto } from "@/domain/item";
-import { readingStatuses } from "@/domain/reading";
 import type { InventoryItemFilters } from "./-api/inventory-api";
 import {
     categoryKeys,
@@ -56,20 +54,6 @@ const expiryFilterItems: { label: string; value: ExpiryFilter }[] = [
 const isExpiryFilter = (value: string): value is ExpiryFilter =>
     expiryFilterItems.some((option) => option.value === value);
 
-// 読書状態は書籍カテゴリーの品目だけが持つ。`none` は書籍以外と未設定をまとめた選択肢
-type ReadingFilter = "all" | (typeof readingStatuses)[number] | "none";
-
-const readingFilterItems: { label: string; value: ReadingFilter }[] = [
-    { label: "すべての読書状態", value: "all" },
-    { label: readingStatusLabels.unread, value: "unread" },
-    { label: readingStatusLabels.reading, value: "reading" },
-    { label: readingStatusLabels.finished, value: "finished" },
-    { label: "読書状態なし", value: "none" },
-];
-
-const isReadingFilter = (value: string): value is ReadingFilter =>
-    readingFilterItems.some((option) => option.value === value);
-
 // 絞り込みは URL の search params に持たせて共有・事前読み込みできるようにする。
 // 既定値は「絞り込みなし」を意味する未指定とし、不正値は catch で未指定へ寄せる
 const inventorySearchSchema = z.object({
@@ -81,18 +65,14 @@ const inventorySearchSchema = z.object({
         .enum(["attention", "expired", "none"])
         .optional()
         .catch(undefined),
-    reading: z
-        .enum([...readingStatuses, "none"])
-        .optional()
-        .catch(undefined),
 });
 
 type InventorySearch = z.infer<typeof inventorySearchSchema>;
 
 /**
  * URL の絞り込みを service の一覧条件へ変換する。
- * 期限「なしのみ」と読書状態「なし」は service の条件で表現できないため
- * ここでは落とし、取得後の絞り込みで扱う。
+ * 期限「なしのみ」は service の条件で表現できないため、ここでは落として
+ * 取得後の絞り込みで扱う。
  */
 const toItemFilters = (search: InventorySearch): InventoryItemFilters => {
     const q = search.q?.trim();
@@ -108,10 +88,6 @@ const toItemFilters = (search: InventorySearch): InventoryItemFilters => {
                 : search.expiry === "expired"
                   ? 0
                   : undefined,
-        readingStatus:
-            search.reading && search.reading !== "none"
-                ? search.reading
-                : undefined,
     };
 };
 
@@ -220,13 +196,9 @@ function InventoryPage() {
 
     // service の条件で表現できない絞り込みだけを取得後に適用する
     const visibleItems = useMemo(() => {
-        if (search.expiry !== "none" && search.reading !== "none") return items;
+        if (search.expiry !== "none") return items;
         const now = Date.now();
         return items.filter((item) => {
-            if (search.reading === "none" && item.readingStatus !== null) {
-                return false;
-            }
-            if (search.expiry !== "none") return true;
             const { state } = resolveExpirySignal(
                 item.earliestExpiryDate,
                 now,
@@ -234,7 +206,7 @@ function InventoryPage() {
             );
             return state === "none";
         });
-    }, [items, search.expiry, search.reading]);
+    }, [items, search.expiry]);
 
     const reloading = itemsQuery.isFetching || lotsQuery.isFetching;
     const reload = () => {
@@ -346,47 +318,6 @@ function InventoryPage() {
                             <SelectContent>
                                 <SelectGroup>
                                     {expiryFilterItems.map((option) => (
-                                        <SelectItem
-                                            key={option.value}
-                                            value={option.value}
-                                        >
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectGroup>
-                            </SelectContent>
-                        </Select>
-                    </Field>
-                    <Field>
-                        <FieldLabel htmlFor="inventory-reading-filter">
-                            読書状態
-                        </FieldLabel>
-                        <Select
-                            items={readingFilterItems}
-                            value={search.reading ?? "all"}
-                            onValueChange={(value) => {
-                                const next =
-                                    value && isReadingFilter(value)
-                                        ? value
-                                        : "all";
-                                void navigate({
-                                    search: (prev) => ({
-                                        ...prev,
-                                        reading:
-                                            next === "all" ? undefined : next,
-                                    }),
-                                });
-                            }}
-                        >
-                            <SelectTrigger
-                                className="w-full"
-                                id="inventory-reading-filter"
-                            >
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectGroup>
-                                    {readingFilterItems.map((option) => (
                                         <SelectItem
                                             key={option.value}
                                             value={option.value}

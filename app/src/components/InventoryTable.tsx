@@ -7,7 +7,6 @@ import {
 } from "@tanstack/react-table";
 import {
     ArrowUpDown,
-    BookOpen,
     ChevronDown,
     Clock,
     MapPin,
@@ -27,7 +26,6 @@ import {
 } from "@/components/ui/table";
 import type { ItemDto } from "@/domain/item";
 import { type ItemLotDto, sortLotsFefo } from "@/domain/lot";
-import type { ReadingStatus } from "@/domain/reading";
 import { formatDisplayDate } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
@@ -50,32 +48,7 @@ const columnLabels: Record<string, string> = {
     currentQuantity: "現在庫（合計）",
     earliestExpiryDate: "最短期限",
     lots: "ロット内訳",
-    readingStatus: "読書状態",
 };
-
-/**
- * 読書状態の表示ラベル。一覧の絞り込みでも同じ文言を使う。
- * 品目マスタ側は route 配下に同じ対応を持つ（共有コンポーネントは route 配下を参照しない）。
- */
-export const readingStatusLabels: Record<ReadingStatus, string> = {
-    unread: "未読",
-    reading: "読書中",
-    finished: "読了",
-};
-
-// 未設定を末尾に置く。並べ替えでは読み始める順に並ぶ方が使いやすい
-const readingStatusRank: Record<ReadingStatus, number> = {
-    unread: 0,
-    reading: 1,
-    finished: 2,
-};
-
-const compareReadingStatus = (
-    left: ReadingStatus | null,
-    right: ReadingStatus | null,
-): number =>
-    (left === null ? 3 : readingStatusRank[left]) -
-    (right === null ? 3 : readingStatusRank[right]);
 
 export type ExpiryState = "expired" | "soon" | "scheduled" | "none";
 
@@ -161,27 +134,6 @@ function ExpiryCell({ signal }: { signal: ExpirySignal }) {
                     {signal.date}
                 </span>
             ) : null}
-        </span>
-    );
-}
-
-// 状態はラベルで伝わるため、色は補助に留める。
-// primary 系は読書中だけに使い、視線が今読んでいる本へ向くようにする
-const readingStatusClassName: Record<ReadingStatus, string> = {
-    unread: "border-border bg-card text-foreground",
-    reading: "border-primary/30 bg-primary/10 text-primary",
-    finished: "border-border bg-muted text-muted-foreground",
-};
-
-function ReadingStatusCell({ status }: { status: ReadingStatus | null }) {
-    // 書籍カテゴリー以外と未設定はどちらも値を持たない
-    if (status === null) {
-        return <span className="text-sm text-muted-foreground">—</span>;
-    }
-    return (
-        <span className={cn(badgeClassName, readingStatusClassName[status])}>
-            <BookOpen aria-hidden="true" className="size-3.5" />
-            {readingStatusLabels[status]}
         </span>
     );
 }
@@ -320,11 +272,6 @@ export function InventoryTable({
                     cell: ({ getValue, row }) => (
                         <div className="min-w-48 max-w-72">
                             <p className="font-semibold break-words">
-                                {/* 絵文字は品目の一部なので隠さず名前と併記する。
-                                    リンクの読み上げを名前だけに保つため外に置く */}
-                                <span className="mr-1.5">
-                                    {row.original.emoji}
-                                </span>
                                 {renderItemName
                                     ? renderItemName(row.original, getValue())
                                     : getValue()}
@@ -414,17 +361,6 @@ export function InventoryTable({
                             now={now}
                             soonWithinDays={soonWithinDays}
                         />
-                    ),
-                }),
-                columnHelper.accessor("readingStatus", {
-                    header: columnLabels.readingStatus,
-                    sortFn: (rowA, rowB) =>
-                        compareReadingStatus(
-                            rowA.original.readingStatus,
-                            rowB.original.readingStatus,
-                        ),
-                    cell: ({ getValue }) => (
-                        <ReadingStatusCell status={getValue()} />
                     ),
                 }),
             ]),
