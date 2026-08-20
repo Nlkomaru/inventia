@@ -242,6 +242,38 @@ export const itemReadingStates = sqliteTable(
     ],
 );
 
+// 価格を記録した購入元の店舗。price_records.source（自由記述）を将来的に
+// 置き換える正規化された参照先で、ファビコン画像は R2 に置きキーだけを持つ
+export const stores = sqliteTable(
+    "stores",
+    {
+        id: text("id").primaryKey(),
+        name: text("name").notNull(),
+        // 店舗サイトなどの URL。任意
+        url: text("url"),
+        // R2（RECEIPTS binding）のオブジェクトキー。未アップロードなら null
+        faviconObjectKey: text("favicon_object_key"),
+        faviconContentType: text("favicon_content_type"),
+        faviconByteSize: integer("favicon_byte_size"),
+        createdAt: text("created_at").notNull(),
+        updatedAt: text("updated_at").notNull(),
+    },
+    (t) => [
+        uniqueIndex("uq_stores_name").on(t.name),
+        check("ck_stores_name_not_empty", sql`length(${t.name}) > 0`),
+        check(
+            "ck_stores_favicon_byte_size_positive",
+            sql`${t.faviconByteSize} is null or ${t.faviconByteSize} > 0`,
+        ),
+        // 画像の 3 列は「全て null」か「全て非 null」のどちらかしか取らない
+        check(
+            "ck_stores_favicon_columns_consistent",
+            sql`(${t.faviconObjectKey} is null and ${t.faviconContentType} is null and ${t.faviconByteSize} is null)
+                or (${t.faviconObjectKey} is not null and ${t.faviconContentType} is not null and ${t.faviconByteSize} is not null)`,
+        ),
+    ],
+);
+
 // 購入イベント。stock_movements（在庫増）と price_records（価格明細）を 1 つの
 // 購入行為として束ね、コメントとレシートの結び付け先になる。
 // 合計金額は明細から導出するため持たない。レシートとの結び付けは receipts.purchase_id
@@ -446,6 +478,11 @@ export const priceRecords = sqliteTable(
         price: integer("price").notNull(),
         // Amazon、スーパーA などの取得元
         source: text("source").notNull(),
+        // 購入元の店舗。既存行は null。source は表示互換のため残し、
+        // storeId がある行では店舗名を転記した値になる
+        storeId: text("store_id").references(() => stores.id, {
+            onDelete: "restrict",
+        }),
         url: text("url"),
         // 購入日時または価格取得日時（ISO 8601 UTC）
         recordedAt: text("recorded_at").notNull(),
@@ -460,6 +497,8 @@ export const priceRecords = sqliteTable(
         index("idx_price_records_source").on(t.source),
         // 購入 → 明細の逆引き用
         index("idx_price_records_purchase").on(t.purchaseId),
+        // 店舗 → 価格の逆引きと参照中判定用
+        index("idx_price_records_store").on(t.storeId),
         check(
             "ck_price_records_content_amount_positive",
             sql`${t.contentAmount} > 0`,

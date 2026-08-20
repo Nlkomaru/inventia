@@ -39,6 +39,7 @@ TanStack Start forwards `/api/*` to the Hono app in `app/src/api/app.ts`.
 | `/api/openapi` | OpenAPI 3.1 document |
 | `/api/scalar` | Scalar API reference |
 | `/api/mcp` | Stateless MCP Streamable HTTP endpoint |
+| `/api/stores` | Store master data and favicon images |
 | `/api/settings/integrations/openrouter` | OpenRouter integration status and encrypted API key configuration |
 
 The MCP server exposes these tools through the same services as the HTTP API:

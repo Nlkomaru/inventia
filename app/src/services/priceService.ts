@@ -14,6 +14,7 @@ import {
     priceRecordCreateInputSchema,
     priceRecordListInputSchema,
 } from "../domain/price";
+import { storeFaviconPath } from "../domain/store";
 import {
     findItemPricingContext,
     insertPriceRecord,
@@ -22,16 +23,19 @@ import {
     type PriceComparisonRecordRow,
     type PriceRecordRow,
 } from "../repositories/priceRepository";
+import { findStoreById } from "../repositories/storeRepository";
 
 export type PriceServiceErrorCode =
     | "PRICE_INVALID_INPUT"
     | "PRICE_INVALID_CURSOR"
-    | "PRICE_ITEM_NOT_FOUND";
+    | "PRICE_ITEM_NOT_FOUND"
+    | "PRICE_STORE_NOT_FOUND";
 
 const statusByCode: Record<PriceServiceErrorCode, 400 | 404> = {
     PRICE_INVALID_INPUT: 400,
     PRICE_INVALID_CURSOR: 400,
     PRICE_ITEM_NOT_FOUND: 404,
+    PRICE_STORE_NOT_FOUND: 404,
 };
 
 export class PriceServiceError extends Error {
@@ -94,6 +98,12 @@ const toDto = (
     packaging: row.packaging,
     price: row.price,
     source: row.source,
+    storeId: row.storeId,
+    storeName: row.storeName,
+    storeFaviconUrl:
+        row.storeId !== null && row.storeFaviconObjectKey !== null
+            ? storeFaviconPath(row.storeId)
+            : null,
     url: row.url,
     recordedAt: canonicalUtcDateTime(row.recordedAt),
     createdAt: canonicalUtcDateTime(row.createdAt),
@@ -130,11 +140,30 @@ export const createPriceRecord = async (
             "内容量単位が商品の基準単位と互換性がないか、整数へ変換できません",
         );
     }
+    // 店舗を指定した行では店名を source へ転記し、価格比較を 1 テーブルで完結させる
+    const store =
+        parsed.storeId === undefined || parsed.storeId === null
+            ? null
+            : await findStoreById(db, parsed.storeId);
+    if (parsed.storeId && !store) {
+        throw new PriceServiceError(
+            "PRICE_STORE_NOT_FOUND",
+            "指定された店舗が見つかりません",
+        );
+    }
+    const source = parsed.source ?? store?.name;
+    if (source === undefined) {
+        throw invalidInput(
+            "店舗（storeId）か取得元（source）を指定してください",
+        );
+    }
     const { contentUnit: _contentUnit, ...normalizedInput } = parsed;
     return toDto(
         await insertPriceRecord(db, {
             ...normalizedInput,
             contentAmount: normalizedContentAmount,
+            source,
+            storeId: store?.id ?? null,
         }),
     );
 };
@@ -165,7 +194,9 @@ export const listPriceRecords = async (
         limit: parsed.limit,
         cursor,
     });
-    const items = page.rows.map(toDto);
+    // toDto の第 2 引数は既定値で単価を計算する。map をそのまま渡すと
+    // 配列の index が単価として入ってしまうため、1 引数で呼ぶ
+    const items = page.rows.map((row) => toDto(row));
     const last = items.at(-1);
     return {
         items,

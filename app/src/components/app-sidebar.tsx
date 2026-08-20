@@ -41,6 +41,10 @@ const data: {
             ],
         },
         {
+            title: "価格",
+            items: [{ title: "店舗", url: "/stores" }],
+        },
+        {
             title: "マスタ",
             items: [
                 { title: "品目", url: "/items" },
@@ -68,10 +72,7 @@ const data: {
             title: "GitHub",
             url: "https://github.com/Nlkomaru/inventia",
         },
-        {
-            title: "Storybook",
-            url: "https://storybook.inventia.nikomaru.dev",
-        },
+        { title: "Storybook", url: "/storybook", opensInNewTab: true },
     ],
 };
 

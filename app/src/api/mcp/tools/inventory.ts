@@ -250,7 +250,7 @@ export const registerInventoryTools = (
         {
             title: "Get price history",
             description:
-                "Get an inventory item's price history in reverse chronological order with cursor pagination.",
+                "Get an inventory item's price history in reverse chronological order with cursor pagination. Each record also carries the store it was bought from as storeId, storeName and storeFaviconUrl, which are null for records recorded before a store was linked.",
             inputSchema: priceRecordListInputSchema,
             outputSchema: priceRecordListOutputSchema,
         },
@@ -268,7 +268,7 @@ export const registerInventoryTools = (
         {
             title: "Compare unit prices",
             description:
-                "Get up to 100 price records for one item and base dimension, sorted by unit price in ascending order. Pass nextCursor as cursor to continue when more records are available.",
+                "Get up to 100 price records for one item and base dimension, sorted by unit price in ascending order. Pass nextCursor as cursor to continue when more records are available. Each record also carries the store it was bought from as storeId, storeName and storeFaviconUrl, which are null for records recorded before a store was linked.",
             inputSchema: priceComparisonListInputSchema,
             outputSchema: priceRecordListOutputSchema,
         },

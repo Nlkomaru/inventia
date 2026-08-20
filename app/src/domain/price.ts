@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { storeIdSchema } from "./store";
 
 export const priceRecordDimensions = ["mass", "volume", "count"] as const;
 export const priceRecordDimensionSchema = z.enum(priceRecordDimensions);
@@ -38,7 +39,11 @@ export const priceRecordCreateInputSchema = z
         setCount: positiveIntegerSchema.default(1),
         packaging: z.string().trim().max(200).nullable().optional(),
         price: nonNegativeIntegerSchema,
-        source: z.string().trim().min(1).max(200),
+        // 店舗マスタを指す場合は省略でき、service が店名を source へ転記する。
+        // 「source と storeId の少なくとも一方が必要」は service 層で検証する
+        // （ここで .refine() を足すと prices.ts の .omit() が壊れる）
+        source: z.string().trim().min(1).max(200).optional(),
+        storeId: storeIdSchema.nullable().optional(),
         url: z.url().max(2048).nullable().optional(),
         recordedAt: utcDateTimeSchema,
     })
@@ -86,6 +91,10 @@ export const priceRecordDtoSchema = z
         packaging: z.string().nullable(),
         price: nonNegativeIntegerSchema,
         source: z.string().min(1),
+        storeId: priceRecordIdSchema.nullable(),
+        storeName: z.string().nullable(),
+        // ファビコンを持つ店舗の行だけ /api/stores/{id}/favicon を返す
+        storeFaviconUrl: z.string().nullable(),
         url: z.url().nullable(),
         recordedAt: utcDateTimeSchema,
         createdAt: utcDateTimeSchema,
@@ -209,6 +218,23 @@ const toSmallestUnitAmount = (
 export const priceComparisonBasis = (
     dimension: PriceRecordDimension,
 ): 100 | 1 => (dimension === "count" ? 1 : 100);
+
+/**
+ * 単価は最小単位（質量は g、体積は mL）を基準に計算するため、表示する単位も
+ * 品目の基準単位ではなく次元から導く。個数は基準単位がそのまま最小単位になる。
+ */
+export const priceComparisonUnit = (
+    dimension: PriceRecordDimension,
+    baseUnit: string,
+): string => {
+    if (dimension === "mass") {
+        return "g";
+    }
+    if (dimension === "volume") {
+        return "mL";
+    }
+    return baseUnit;
+};
 
 /**
  * Computes a price for one comparison unit. The result is intentionally not
