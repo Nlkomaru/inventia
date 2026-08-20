@@ -27,7 +27,7 @@ import {
 import type { CategoryDto } from "@/domain/category";
 import type { ItemDto } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
-import { buildHierarchyLabels } from "@/lib/hierarchy";
+import { buildAncestrySplat } from "@/lib/hierarchy";
 
 const features = tableFeatures({});
 const columnHelper = createColumnHelper<typeof features, ItemDto>();
@@ -70,12 +70,14 @@ export function ItemTable({
         },
         [announce],
     );
-    const categoryNames = useMemo(
-        () => buildHierarchyLabels(categories),
+    // 表では末端の名前だけを出す。祖先まで並べると行が読みにくくなるため、
+    // 階層はリンク先のカテゴリ・保管場所のページで辿ってもらう
+    const categoryById = useMemo(
+        () => new Map(categories.map((category) => [category.id, category])),
         [categories],
     );
-    const locationNames = useMemo(
-        () => buildHierarchyLabels(locations),
+    const locationById = useMemo(
+        () => new Map(locations.map((location) => [location.id, location])),
         [locations],
     );
     const columns = useMemo(
@@ -103,14 +105,50 @@ export function ItemTable({
                 columnHelper.display({
                     id: "category",
                     header: "カテゴリ",
-                    cell: ({ row }) =>
-                        categoryNames.get(row.original.categoryId) ?? "—",
+                    cell: ({ row }) => {
+                        const category = categoryById.get(
+                            row.original.categoryId,
+                        );
+                        if (!category) return "—";
+                        return (
+                            <Link
+                                className="underline-offset-4 hover:underline"
+                                params={{
+                                    _splat: buildAncestrySplat(
+                                        categories,
+                                        category.id,
+                                    ),
+                                }}
+                                to="/categories/$"
+                            >
+                                {category.name}
+                            </Link>
+                        );
+                    },
                 }),
                 columnHelper.display({
                     id: "location",
                     header: "保管場所",
-                    cell: ({ row }) =>
-                        locationNames.get(row.original.locationId) ?? "—",
+                    cell: ({ row }) => {
+                        const location = locationById.get(
+                            row.original.locationId,
+                        );
+                        if (!location) return "—";
+                        return (
+                            <Link
+                                className="underline-offset-4 hover:underline"
+                                params={{
+                                    _splat: buildAncestrySplat(
+                                        locations,
+                                        location.id,
+                                    ),
+                                }}
+                                to="/locations/$"
+                            >
+                                {location.name}
+                            </Link>
+                        );
+                    },
                 }),
                 columnHelper.accessor("baseUnit", {
                     header: "単位",
@@ -194,10 +232,12 @@ export function ItemTable({
                 }),
             ]),
         [
-            categoryNames,
+            categories,
+            categoryById,
             copyItemId,
             deletingId,
-            locationNames,
+            locationById,
+            locations,
             onDelete,
             onEdit,
         ],
