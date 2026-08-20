@@ -35,6 +35,7 @@ import {
     matchLine,
     normalizeReceiptName,
 } from "@/domain/receipt-match";
+import { inferBaseDimension } from "@/lib/base-unit";
 import { parsePositiveInteger, toIsoFromDate } from "@/lib/expiry-input";
 import {
     buildHierarchyLabels,
@@ -67,13 +68,6 @@ export const Route = createFileRoute("/_app/_inventory/inventory/receive/")({
 
 const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
 
-type ExpiryMode = "date" | "none";
-
-const expiryModeOptions: { label: string; value: ExpiryMode }[] = [
-    { label: "期限を指定する", value: "date" },
-    { label: "期限なし", value: "none" },
-];
-
 const dimensionOptions: { label: string; value: ItemBaseDimension }[] = [
     { label: "重量", value: "mass" },
     { label: "体積", value: "volume" },
@@ -86,6 +80,8 @@ const toDimension = (value: string | null): ItemBaseDimension | "" =>
 // エラーはコントロールから aria-describedby で辿れるようにする。
 // 入力欄ごとに id を組み立て、説明文がある欄では両方を並べる
 const errorId = (field: string): string => `receive-${field}-error`;
+
+const expiryDescriptionId = "receive-expiry-description";
 
 const describedBy = (
     hasError: boolean,
@@ -114,7 +110,6 @@ function ReceiveStockPage() {
         "",
     );
     const [quantity, setQuantity] = useState("1");
-    const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
     const [expiryInput, setExpiryInput] = useState("");
     const [memo, setMemo] = useState("");
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -215,11 +210,13 @@ function ReceiveStockPage() {
         if (unitRequired && baseDimension === "") {
             next.baseDimension = "数量の種類を選択してください";
         }
-        const expiryDate =
-            expiryMode === "none" ? null : toIsoFromDate(expiryInput);
-        if (expiryMode === "date" && expiryDate === null) {
+        // 期限は日付の有無がそのまま意味になる。空欄は期限なしのロットで、
+        // 書式として読めない文字列だけを入力の誤りとして返す
+        const expiryEntered = expiryInput.trim() !== "";
+        const expiryDate = expiryEntered ? toIsoFromDate(expiryInput) : null;
+        if (expiryEntered && expiryDate === null) {
             next.expiryDate =
-                "期限を 2020-01-01 の形式で入力するか、「期限なし」を選択してください";
+                "期限を 2020-01-01 の形式で入力するか、空にしてください";
         }
         setErrors(next);
         setSubmitError(null);
@@ -243,7 +240,6 @@ function ReceiveStockPage() {
             setBaseUnit("");
             setBaseDimension("");
             setQuantity("1");
-            setExpiryMode("none");
             setExpiryInput("");
             setMemo("");
         } catch (cause) {
@@ -502,7 +498,13 @@ function ReceiveStockPage() {
                                         id="receive-unit"
                                         maxLength={50}
                                         onChange={(event) => {
-                                            setBaseUnit(event.target.value);
+                                            const nextUnit = event.target.value;
+                                            setBaseUnit(nextUnit);
+                                            // 単位から読み取れる種類は自動で選ぶ。
+                                            // 表記が特殊な単位のために手動でも変えられる
+                                            setBaseDimension(
+                                                inferBaseDimension(nextUnit),
+                                            );
                                             resetFeedback();
                                         }}
                                         placeholder="個、袋、g、ml など"
@@ -601,69 +603,37 @@ function ReceiveStockPage() {
                             ) : null}
                         </Field>
 
-                        <Field>
-                            <FieldLabel htmlFor="receive-expiry-mode">
-                                期限の扱い
+                        <Field data-invalid={Boolean(errors.expiryDate)}>
+                            <FieldLabel htmlFor="receive-expiry-date">
+                                期限
                             </FieldLabel>
-                            <Select
+                            <DatePicker
+                                aria-describedby={describedBy(
+                                    Boolean(errors.expiryDate),
+                                    "expiry",
+                                    expiryDescriptionId,
+                                )}
+                                aria-invalid={Boolean(errors.expiryDate)}
+                                calendarLabel="期限をカレンダーから選ぶ"
+                                clearLabel="期限を空にする"
+                                clearable
                                 disabled={saving}
-                                items={expiryModeOptions}
+                                id="receive-expiry-date"
                                 onValueChange={(value) => {
-                                    setExpiryMode(
-                                        value === "date" ? "date" : "none",
-                                    );
+                                    setExpiryInput(value);
                                     resetFeedback();
                                 }}
-                                value={expiryMode}
-                            >
-                                <SelectTrigger
-                                    className="w-full"
-                                    id="receive-expiry-mode"
-                                >
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectGroup>
-                                        {expiryModeOptions.map((option) => (
-                                            <SelectItem
-                                                key={option.value}
-                                                value={option.value}
-                                            >
-                                                {option.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectGroup>
-                                </SelectContent>
-                            </Select>
+                                value={expiryInput}
+                            />
+                            <FieldDescription id={expiryDescriptionId}>
+                                空欄なら期限なしのロットとして登録します。
+                            </FieldDescription>
+                            {errors.expiryDate ? (
+                                <FieldError id={errorId("expiry")}>
+                                    {errors.expiryDate}
+                                </FieldError>
+                            ) : null}
                         </Field>
-
-                        {expiryMode === "date" ? (
-                            <Field data-invalid={Boolean(errors.expiryDate)}>
-                                <FieldLabel htmlFor="receive-expiry-date">
-                                    期限（日付）
-                                </FieldLabel>
-                                <DatePicker
-                                    aria-describedby={describedBy(
-                                        Boolean(errors.expiryDate),
-                                        "expiry",
-                                    )}
-                                    aria-invalid={Boolean(errors.expiryDate)}
-                                    calendarLabel="期限をカレンダーから選ぶ"
-                                    disabled={saving}
-                                    id="receive-expiry-date"
-                                    onValueChange={(value) => {
-                                        setExpiryInput(value);
-                                        resetFeedback();
-                                    }}
-                                    value={expiryInput}
-                                />
-                                {errors.expiryDate ? (
-                                    <FieldError id={errorId("expiry")}>
-                                        {errors.expiryDate}
-                                    </FieldError>
-                                ) : null}
-                            </Field>
-                        ) : null}
 
                         <Field>
                             <FieldLabel htmlFor="receive-memo">

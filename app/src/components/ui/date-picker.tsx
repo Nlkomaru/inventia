@@ -1,5 +1,5 @@
 import { ja } from "date-fns/locale";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -45,6 +45,13 @@ export type DatePickerProps = {
     "aria-invalid"?: boolean;
     /** カレンダーを開くボタンの読み上げ名。同じ画面に複数置くときに区別する。 */
     calendarLabel?: string;
+    /**
+     * 入力済みの日付を空へ戻すボタンをカレンダーの横に置く。日付の有無自体が
+     * 意味を持つ欄（空欄なら期限なし、など）で、消す操作を明示するために使う。
+     */
+    clearable?: boolean;
+    /** 日付を消すボタンの読み上げ名。同じ画面に複数置くときに区別する。 */
+    clearLabel?: string;
 };
 
 /**
@@ -61,6 +68,8 @@ export function DatePicker({
     "aria-invalid": invalid,
     "aria-label": label,
     calendarLabel = "カレンダーから日付を選ぶ",
+    clearable = false,
+    clearLabel = "日付を空にする",
 }: DatePickerProps) {
     const [open, setOpen] = useState(false);
     const selected = toDate(value);
@@ -108,6 +117,19 @@ export function DatePicker({
                     />
                 </PopoverContent>
             </Popover>
+            {clearable ? (
+                // 空欄でも位置を保つため、隠さず disabled にする
+                <Button
+                    aria-label={clearLabel}
+                    disabled={disabled || value === ""}
+                    onClick={() => onValueChange("")}
+                    size="icon"
+                    type="button"
+                    variant="outline"
+                >
+                    <XIcon />
+                </Button>
+            ) : null}
         </div>
     );
 }
