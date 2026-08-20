@@ -1,5 +1,6 @@
 import { newId } from "../domain/id";
 import type {
+    AllPriceRecordCursor,
     NormalizedPriceRecordCreateInput,
     PriceComparisonCursor,
     PriceRecordCursor,
@@ -35,6 +36,12 @@ export interface PriceComparisonRecordRow extends PriceRecordRow {
     unitPrice: number;
 }
 
+/** 全品目の一覧は品目ページの外で読むため、品目名と絵文字も一緒に引く。 */
+export interface AllPriceRecordRow extends PriceRecordRow {
+    itemName: string;
+    itemEmoji: string;
+}
+
 export interface PriceRecordListQuery {
     itemId: string;
     limit: number;
@@ -43,6 +50,16 @@ export interface PriceRecordListQuery {
 
 export interface PriceRecordListResult {
     rows: PriceRecordRow[];
+    hasMore: boolean;
+}
+
+export interface AllPriceRecordListQuery {
+    limit: number;
+    cursor: AllPriceRecordCursor | null;
+}
+
+export interface AllPriceRecordListResult {
+    rows: AllPriceRecordRow[];
     hasMore: boolean;
 }
 
@@ -78,13 +95,42 @@ const priceRecordSelect = `
     INNER JOIN items AS i ON i.id = p.item_id
     LEFT JOIN stores AS s ON s.id = p.store_id`;
 
+const allPriceRecordSelect = `
+    SELECT
+        p.id,
+        p.item_id AS itemId,
+        p.content_amount AS contentAmount,
+        p.set_count AS setCount,
+        p.packaging,
+        p.price,
+        p.source,
+        p.store_id AS storeId,
+        s.name AS storeName,
+        s.favicon_object_key AS storeFaviconObjectKey,
+        p.url,
+        p.recorded_at AS recordedAt,
+        p.created_at AS createdAt,
+        i.base_unit AS baseUnit,
+        i.base_dimension AS baseDimension,
+        i.name AS itemName,
+        i.emoji AS itemEmoji
+    FROM price_records AS p
+    INNER JOIN items AS i ON i.id = p.item_id
+    LEFT JOIN stores AS s ON s.id = p.store_id`;
+
 // The comparison value is derived from persisted price/package fields. The
 // REAL cast avoids integer overflow while keeping the expression aligned with
-// calculateUnitPrice in the service layer.
+// calculateUnitPrice in the service layer. A count item's base unit is already
+// its smallest unit, so the kg/L factor must stay out of that dimension even
+// when the item happens to be labelled 'kg' or 'L'.
 const unitPriceExpression = `
     (CAST(p.price AS REAL) /
         (CAST(p.content_amount AS REAL) * CAST(p.set_count AS REAL) *
-            CASE WHEN i.base_unit IN ('kg', 'L') THEN 1000.0 ELSE 1.0 END)) *
+            CASE
+                WHEN i.base_dimension != 'count' AND i.base_unit IN ('kg', 'L')
+                THEN 1000.0
+                ELSE 1.0
+            END)) *
     CASE WHEN i.base_dimension = 'count' THEN 1.0 ELSE 100.0 END`;
 
 const priceRecordComparisonSelect = `
@@ -120,6 +166,24 @@ export const findItemPricingContext = async (
         )
         .bind(itemId)
         .first<ItemPricingContext>();
+
+/**
+ * Whether the item holds at least one price record. Only the existence matters
+ * to the callers, so the row itself is never read.
+ */
+export const itemHasPriceRecords = async (
+    db: D1Database,
+    itemId: string,
+): Promise<boolean> => {
+    const row = await db
+        .prepare(
+            `SELECT EXISTS (SELECT 1 FROM price_records WHERE item_id = ?1)
+             AS present`,
+        )
+        .bind(itemId)
+        .first<{ present: number }>();
+    return (row?.present ?? 0) === 1;
+};
 
 export const findPriceRecordById = async (
     db: D1Database,
@@ -161,6 +225,38 @@ export const listPriceRecords = async (
               )
               .bind(query.itemId, query.limit + 1);
     const result = await statement.all<PriceRecordRow>();
+    const rows = result.results;
+    return {
+        rows: rows.slice(0, query.limit),
+        hasMore: rows.length > query.limit,
+    };
+};
+
+/**
+ * 品目を跨いだ価格記録の一覧。並びは記録日時の新しい順で、
+ * idx_price_records_recorded_at(recorded_at, id) がそのまま cursor の key になる。
+ */
+export const listAllPriceRecords = async (
+    db: D1Database,
+    query: AllPriceRecordListQuery,
+): Promise<AllPriceRecordListResult> => {
+    const statement = query.cursor
+        ? db
+              .prepare(
+                  `${allPriceRecordSelect}
+                   WHERE (p.recorded_at < ?1 OR (p.recorded_at = ?1 AND p.id < ?2))
+                   ORDER BY p.recorded_at DESC, p.id DESC
+                   LIMIT ?3`,
+              )
+              .bind(query.cursor.recordedAt, query.cursor.id, query.limit + 1)
+        : db
+              .prepare(
+                  `${allPriceRecordSelect}
+                   ORDER BY p.recorded_at DESC, p.id DESC
+                   LIMIT ?1`,
+              )
+              .bind(query.limit + 1);
+    const result = await statement.all<AllPriceRecordRow>();
     const rows = result.results;
     return {
         rows: rows.slice(0, query.limit),

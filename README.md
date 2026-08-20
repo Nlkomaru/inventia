@@ -40,6 +40,8 @@ TanStack Start forwards `/api/*` to the Hono app in `app/src/api/app.ts`.
 | `/api/scalar` | Scalar API reference |
 | `/api/mcp` | Stateless MCP Streamable HTTP endpoint |
 | `/api/stores` | Store master data, favicon images, and the store name index |
+| `/api/prices` | Price observations across every item, newest first |
+| `/api/providers` | External provider master data used as the destination of stock issues |
 | `/api/settings/integrations/openrouter` | OpenRouter integration status and encrypted API key configuration |
 
 The MCP server exposes these tools through the same services as the HTTP API:
@@ -52,6 +54,7 @@ The MCP server exposes these tools through the same services as the HTTP API:
 | Prices | `get_price_history`, `get_price_histories`, `compare_unit_prices`, `compare_unit_prices_across_items` |
 | Categories | `list_categories`, `list_category_tree`, `get_category` |
 | Locations | `list_locations`, `list_location_tree`, `get_location` |
+| External providers | `list_external_providers`, `create_external_provider`, `update_external_provider`, `delete_external_provider` |
 
 Items and prices are read in batches: `get_inventory_items`, `get_price_histories` and
 `compare_unit_prices_across_items` take a list of ids, so reading one item means passing a

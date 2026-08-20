@@ -66,9 +66,27 @@ export const priceComparisonCursorSchema = z
     })
     .strict();
 
+/**
+ * 全品目を横断する一覧の cursor。品目で絞らないため、並びの key は
+ * 記録日時と id だけになる（品目ごとの cursor とは互換性がない）。
+ */
+export const allPriceRecordCursorSchema = z
+    .object({
+        recordedAt: utcDateTimeSchema,
+        id: priceRecordIdSchema,
+    })
+    .strict();
+
 export const priceRecordListInputSchema = z
     .object({
         itemId: priceRecordIdSchema,
+        limit: z.coerce.number().int().min(1).max(100).default(50),
+        cursor: z.string().trim().min(1).max(512).optional(),
+    })
+    .strict();
+
+export const allPriceRecordListInputSchema = z
+    .object({
         limit: z.coerce.number().int().min(1).max(100).default(50),
         cursor: z.string().trim().min(1).max(512).optional(),
     })
@@ -108,6 +126,20 @@ export const priceRecordDtoSchema = z
 export const priceRecordListOutputSchema = z
     .object({
         items: z.array(priceRecordDtoSchema),
+        nextCursor: z.string().nullable(),
+    })
+    .strict();
+
+// 全品目の一覧は品目ページの外で読むため、どの品目の価格かを行だけで示せるよう
+// 品目名と絵文字を添える
+export const allPriceRecordDtoSchema = priceRecordDtoSchema.extend({
+    itemName: z.string().min(1),
+    itemEmoji: z.string().min(1),
+});
+
+export const allPriceRecordListOutputSchema = z
+    .object({
+        items: z.array(allPriceRecordDtoSchema),
         nextCursor: z.string().nullable(),
     })
     .strict();
@@ -165,6 +197,11 @@ export type PriceComparisonListInput = z.infer<
     typeof priceComparisonListInputSchema
 >;
 export type PriceRecordDto = z.infer<typeof priceRecordDtoSchema>;
+export type AllPriceRecordCursor = z.infer<typeof allPriceRecordCursorSchema>;
+export type AllPriceRecordListInput = z.infer<
+    typeof allPriceRecordListInputSchema
+>;
+export type AllPriceRecordDto = z.infer<typeof allPriceRecordDtoSchema>;
 
 export type PriceUnitDefinition = {
     dimension: PriceRecordDimension;
@@ -343,6 +380,28 @@ export const decodePriceComparisonCursor = (
         const decoded = decodeURIComponent(fromBase64Url(cursor));
         const parsed: unknown = JSON.parse(decoded);
         const result = priceComparisonCursorSchema.safeParse(parsed);
+        return result.success ? result.data : null;
+    } catch {
+        return null;
+    }
+};
+
+export const encodeAllPriceRecordCursor = (
+    cursor: AllPriceRecordCursor,
+): string =>
+    toBase64Url(
+        encodeURIComponent(
+            JSON.stringify(allPriceRecordCursorSchema.parse(cursor)),
+        ),
+    );
+
+export const decodeAllPriceRecordCursor = (
+    cursor: string,
+): AllPriceRecordCursor | null => {
+    try {
+        const decoded = decodeURIComponent(fromBase64Url(cursor));
+        const parsed: unknown = JSON.parse(decoded);
+        const result = allPriceRecordCursorSchema.safeParse(parsed);
         return result.success ? result.data : null;
     } catch {
         return null;

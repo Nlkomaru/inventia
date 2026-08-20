@@ -1,8 +1,13 @@
 import {
+    type AllPriceRecordDto,
+    type AllPriceRecordListInput,
+    allPriceRecordListInputSchema,
     calculateUnitPrice,
     canonicalUtcDateTime,
+    decodeAllPriceRecordCursor,
     decodePriceComparisonCursor,
     decodePriceRecordCursor,
+    encodeAllPriceRecordCursor,
     encodePriceComparisonCursor,
     encodePriceRecordCursor,
     normalizeContentAmount,
@@ -18,8 +23,10 @@ import {
 } from "../domain/price";
 import { storeFaviconPath } from "../domain/store";
 import {
+    type AllPriceRecordRow,
     findItemPricingContext,
     insertPriceRecord,
+    listAllPriceRecords as listAllPriceRecordRows,
     listPriceRecords as listPriceRecordRows,
     listPriceRecordsByUnitPrice,
     type PriceComparisonRecordRow,
@@ -75,6 +82,14 @@ const parseListInput = (input: unknown): PriceRecordListInput => {
     return result.data;
 };
 
+const parseAllListInput = (input: unknown): AllPriceRecordListInput => {
+    const result = allPriceRecordListInputSchema.safeParse(input);
+    if (!result.success) {
+        throw invalidInput("limit、cursorを確認してください");
+    }
+    return result.data;
+};
+
 const parseComparisonInput = (input: unknown): PriceComparisonListInput => {
     const result = priceComparisonListInputSchema.safeParse(input);
     if (!result.success) {
@@ -114,8 +129,19 @@ const toDto = (
     unitPrice,
 });
 
+const toAllDto = (row: AllPriceRecordRow): AllPriceRecordDto => ({
+    ...toDto(row),
+    itemName: row.itemName,
+    itemEmoji: row.itemEmoji,
+});
+
 export type PriceRecordListResponse = {
     items: PriceRecordDto[];
+    nextCursor: string | null;
+};
+
+export type AllPriceRecordListResponse = {
+    items: AllPriceRecordDto[];
     nextCursor: string | null;
 };
 
@@ -206,6 +232,42 @@ export const listPriceRecords = async (
             page.hasMore && last
                 ? encodePriceRecordCursor({
                       itemId: parsed.itemId,
+                      recordedAt: last.recordedAt,
+                      id: last.id,
+                  })
+                : null,
+    };
+};
+
+/**
+ * 品目を跨いだ価格記録の一覧。品目で絞らないため cursor は記録日時と id だけを
+ * 持ち、品目ごとの価格履歴の cursor とは互換性がない。
+ */
+export const listAllPriceRecords = async (
+    db: D1Database,
+    input: unknown,
+): Promise<AllPriceRecordListResponse> => {
+    const parsed = parseAllListInput(input);
+    const cursor = parsed.cursor
+        ? decodeAllPriceRecordCursor(parsed.cursor)
+        : null;
+    if (parsed.cursor && !cursor) {
+        throw new PriceServiceError(
+            "PRICE_INVALID_CURSOR",
+            "価格一覧のcursorが不正です",
+        );
+    }
+    const page = await listAllPriceRecordRows(db, {
+        limit: parsed.limit,
+        cursor,
+    });
+    const items = page.rows.map(toAllDto);
+    const last = items.at(-1);
+    return {
+        items,
+        nextCursor:
+            page.hasMore && last
+                ? encodeAllPriceRecordCursor({
                       recordedAt: last.recordedAt,
                       id: last.id,
                   })

@@ -1,6 +1,8 @@
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import {
+    allPriceRecordListInputSchema,
+    allPriceRecordListOutputSchema,
     priceRecordCreateInputSchema,
     priceRecordDtoSchema,
     priceRecordListInputSchema,
@@ -8,6 +10,7 @@ import {
 } from "../../domain/price";
 import {
     createPriceRecord,
+    listAllPriceRecords,
     listPriceRecords,
     PriceServiceError,
 } from "../../services/priceService";
@@ -16,6 +19,12 @@ import type { ApiBindings } from "../bindings";
 type PricesContext = Context<ApiBindings>;
 
 export const pricesApp = new OpenAPIHono<ApiBindings>();
+
+/**
+ * 品目に紐付かない価格の一覧。`pricesApp` は "/api/items" 配下に載るため、
+ * 全品目を横断するこの一覧だけ別の app にして "/api/prices" へ載せる。
+ */
+export const priceRecordsApp = new OpenAPIHono<ApiBindings>();
 
 const priceErrorSchema = z.object({
     error: z.object({ code: z.string(), message: z.string() }),
@@ -101,6 +110,26 @@ pricesApp.openAPIRegistry.registerPath({
     },
 });
 
+priceRecordsApp.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/",
+    tags: ["Prices"],
+    summary: "List price records across items",
+    description:
+        "Lists price observations for every item in reverse chronological order with cursor pagination. Each record carries the item it belongs to as itemId, itemName and itemEmoji, so the caller does not have to read the items separately. Cursors from an item's own price history are not accepted here.",
+    request: {
+        query: allPriceRecordListInputSchema,
+    },
+    responses: {
+        200: {
+            description: "A stable page of price observations.",
+            content: responseContent(allPriceRecordListOutputSchema),
+        },
+        400: errorResponses[400],
+        500: errorResponses[500],
+    },
+});
+
 const isConstraintViolation = (error: unknown): boolean =>
     error instanceof Error &&
     /constraint|unique|foreign key/i.test(error.message);
@@ -180,6 +209,14 @@ pricesApp.post("/:itemId/prices", async (c) => {
             ),
             201,
         );
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+priceRecordsApp.get("/", async (c) => {
+    try {
+        return c.json(await listAllPriceRecords(c.env.DB, c.req.query()), 200);
     } catch (error) {
         return errorResponse(c, error);
     }
