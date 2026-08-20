@@ -85,6 +85,13 @@
       "when": 1787036352933,
       "tag": "0011_receipt_line_suggested_category_name",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1787195337348,
+      "tag": "0012_stores",
+      "breakpoints": true
     }
   ]
 }
