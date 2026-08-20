@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { InventoryTable } from "@/components/InventoryTable";
-import type { ItemDto } from "@/domain/item";
+import { defaultItemEmoji, type ItemDto } from "@/domain/item";
 import type { ItemLotDto } from "@/domain/lot";
 
 const dayInMs = 86_400_000;
@@ -16,6 +16,8 @@ const timestamps = {
 const buildItem = (
     overrides: Partial<ItemDto> & Pick<ItemDto, "id" | "name">,
 ): ItemDto => ({
+    // 絵文字が未生成の品目は既定の 📦 のまま並ぶ
+    emoji: defaultItemEmoji,
     categoryId: "cat-food",
     locationId: "loc-pantry",
     baseUnit: "g",
@@ -74,6 +76,7 @@ const buildBook = (
 const flour = buildItem({
     id: "it-flour",
     name: "小麦",
+    emoji: "🌾",
     currentQuantity: 1200,
     earliestExpiryDate: isoInDays(45),
     lotCount: 2,
@@ -82,6 +85,7 @@ const flour = buildItem({
 const milk = buildItem({
     id: "it-milk",
     name: "牛乳",
+    emoji: "🥛",
     baseUnit: "mL",
     baseDimension: "volume",
     locationId: "loc-fridge",
@@ -94,6 +98,7 @@ const milk = buildItem({
 const yogurt = buildItem({
     id: "it-yogurt",
     name: "ヨーグルト",
+    emoji: "🥣",
     baseUnit: "個",
     baseDimension: "count",
     locationId: "loc-fridge",
@@ -105,6 +110,7 @@ const yogurt = buildItem({
 const tape = buildItem({
     id: "it-tape",
     name: "養生テープ",
+    emoji: "🩹",
     baseUnit: "個",
     baseDimension: "count",
     categoryId: "cat-supply",
@@ -116,6 +122,7 @@ const tape = buildItem({
 const rice = buildItem({
     id: "it-rice",
     name: "無洗米",
+    emoji: "🍚",
     currentQuantity: 15_000,
     earliestExpiryDate: isoInDays(400),
     lotCount: 1,
@@ -124,6 +131,7 @@ const rice = buildItem({
 const battery = buildItem({
     id: "it-battery",
     name: "単三電池",
+    emoji: "🔋",
     baseUnit: "本",
     baseDimension: "count",
     categoryId: "cat-supply",
@@ -239,9 +247,7 @@ export const MultipleLots: Story = {
 export const Expired: Story = {
     args: {
         items: [yogurt],
-        lotsByItemId: new Map([
-            [yogurt.id, lotsByItemId.get(yogurt.id) ?? []],
-        ]),
+        lotsByItemId: new Map([[yogurt.id, lotsByItemId.get(yogurt.id) ?? []]]),
     },
 };
 

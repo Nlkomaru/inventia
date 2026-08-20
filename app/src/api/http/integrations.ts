@@ -47,7 +47,7 @@ const getOpenRouterRoute = createRoute({
     summary: "Get OpenRouter integration status",
     operationId: "getOpenRouterIntegrationStatus",
     description:
-        "Returns the embedding model, the selected multimodal chat model, the instructions used to read receipts and whether the API key is stored. `chatModel` and `receiptPrompt` fall back to the built-in defaults while `chatModelConfigured` and `receiptPromptConfigured` are false, so `receiptPrompt` always holds the text that a parse would actually send. `receiptToolsEnabled` reports whether receipt parsing may call the read-only inventory tools. The API key is never returned.",
+        "Returns the embedding model, the selected multimodal chat model, the model that writes item emoji, the instructions used to read receipts and whether the API key is stored. `chatModel`, `emojiModel` and `receiptPrompt` fall back to the built-in defaults while `chatModelConfigured`, `emojiModelConfigured` and `receiptPromptConfigured` are false, so `receiptPrompt` always holds the text that a parse would actually send and `emojiModel` always holds the model an emoji generation would actually call. `emojiModelConfigured` reports whether the stored model differs from the built-in default. `receiptToolsEnabled` reports whether receipt parsing may call the read-only inventory tools. The API key is never returned.",
     responses: {
         200: {
             description:
@@ -93,7 +93,7 @@ const updateOpenRouterRoute = createRoute({
     summary: "Configure the OpenRouter integration",
     operationId: "updateOpenRouterIntegration",
     description:
-        "Stores the API key, the multimodal chat model, the receipt reading instructions and whether receipt parsing may call tools. Every field is optional and at least one is required, so any one of them can be saved on its own; the fields that are left out keep their stored values. Send `receiptPrompt` as null to go back to the built-in instructions, which is also what happens when the submitted text is only whitespace or matches the default. Only the API key needs server-side encryption, so the other fields can be saved while `SETTINGS_ENCRYPTION_KEY` is missing. The API key is encrypted server-side and never returned or logged. The embedding model is fixed and cannot be changed.",
+        "Stores the API key, the multimodal chat model, the model that writes item emoji (`emojiModel`), the receipt reading instructions and whether receipt parsing may call tools. Every field is optional and at least one is required, so any one of them can be saved on its own; the fields that are left out keep their stored values. Send `receiptPrompt` as null to go back to the built-in instructions, which is also what happens when the submitted text is only whitespace or matches the default. Only the API key needs server-side encryption, so the other fields can be saved while `SETTINGS_ENCRYPTION_KEY` is missing. The API key is encrypted server-side and never returned or logged. The embedding model is fixed and cannot be changed.",
     request: {
         body: {
             required: true,
@@ -107,7 +107,7 @@ const updateOpenRouterRoute = createRoute({
         },
         400: {
             description:
-                "The API key, the model id or the receipt instructions are invalid, or no field was provided.",
+                "The API key, one of the model ids or the receipt instructions are invalid, or no field was provided.",
             content: jsonContent(errorSchema),
         },
         503: {

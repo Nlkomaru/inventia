@@ -48,6 +48,7 @@ import {
     itemStockHistoryQueryOptions,
     locationDetailQueryOptions,
 } from "./-api/item-detail-queries";
+import { ItemEmojiForm } from "./-components/item-emoji-form";
 import { ItemLotExpiryForm } from "./-components/item-lot-expiry-form";
 import { ItemPriceForm } from "./-components/item-price-form";
 import { ItemReceiveForm } from "./-components/item-receive-form";
@@ -152,8 +153,9 @@ function ItemDetailPage() {
                 <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
                     Inventory
                 </p>
+                {/* 絵文字は品目の一部なので、名前と同じ見出しの中に置く */}
                 <h1 className="mt-1 text-2xl font-bold break-words">
-                    {item.name}
+                    {item.emoji} {item.name}
                 </h1>
                 <p className="mt-2 text-sm text-muted-foreground">
                     {category.name} / {location.name}
@@ -193,6 +195,17 @@ function ItemDetailPage() {
                             </dt>
                             <dd className="mt-1 text-sm">
                                 {formatReadingState(item)}
+                            </dd>
+                        </div>
+                        <div className="sm:col-span-2">
+                            <dt className="text-sm text-muted-foreground">
+                                絵文字
+                            </dt>
+                            <dd className="mt-1">
+                                <ItemEmojiForm
+                                    emoji={item.emoji}
+                                    itemId={item.id}
+                                />
                             </dd>
                         </div>
                         <div className="sm:col-span-2">

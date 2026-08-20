@@ -10,6 +10,12 @@ export const openRouterEmbeddingDimensions = 1536 as const;
 // GET https://openrouter.ai/api/v1/models で実在と画像入力対応を確認した ID のみを既定にできる。
 export const openRouterDefaultChatModel = "google/gemini-3.7-flash" as const;
 
+// 品目の絵文字を生成する LLM の既定値。chat model と同じく
+// GET https://openrouter.ai/api/v1/models で実在を確認した ID のみを既定にできる。
+// 絵文字 1 個を返すだけの短い生成のため、安価で速いモデルを既定にする
+export const openRouterDefaultEmojiModel =
+    "deepseek/deepseek-v4-flash-0731" as const;
+
 export const openRouterApiKeySchema = z
     .string()
     .min(1, "API key を入力してください。")
@@ -32,6 +38,8 @@ export const openRouterIntegrationUpdateSchema = z
     .object({
         apiKey: openRouterApiKeySchema.optional(),
         chatModel: openRouterChatModelSchema.optional(),
+        // 絵文字生成のモデル。書式は chat model と同じ provider/model
+        emojiModel: openRouterChatModelSchema.optional(),
         receiptPrompt: receiptParsePromptSchema.nullable().optional(),
     })
     .strict()
@@ -39,10 +47,11 @@ export const openRouterIntegrationUpdateSchema = z
         (value) =>
             value.apiKey !== undefined ||
             value.chatModel !== undefined ||
+            value.emojiModel !== undefined ||
             value.receiptPrompt !== undefined,
         {
             message:
-                "apiKey、chatModel、receiptPrompt のいずれかを指定してください。API key を入力しなくても他の設定だけ保存できます。",
+                "apiKey、chatModel、emojiModel、receiptPrompt のいずれかを指定してください。API key を入力しなくても他の設定だけ保存できます。",
         },
     );
 
@@ -54,6 +63,9 @@ export const openRouterIntegrationStatusSchema = z
         dimensions: z.literal(openRouterEmbeddingDimensions),
         chatModel: z.string(),
         chatModelConfigured: z.boolean(),
+        // 絵文字生成へ実際に渡るモデル。未設定なら既定の ID がそのまま入る
+        emojiModel: z.string(),
+        emojiModelConfigured: z.boolean(),
         // 解析へ実際に渡る指示。未設定なら既定の内容がそのまま入る
         receiptPrompt: z.string().min(1),
         receiptPromptConfigured: z.boolean(),

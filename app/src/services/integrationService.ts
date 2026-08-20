@@ -6,6 +6,7 @@ import {
     openRouterApiKeySchema,
     openRouterChatModelSchema,
     openRouterDefaultChatModel,
+    openRouterDefaultEmojiModel,
     openRouterEmbeddingDimensions,
     openRouterEmbeddingModel,
     openRouterIntegrationUpdateSchema,
@@ -150,6 +151,12 @@ const toStatus = (
     dimensions: openRouterEmbeddingDimensions,
     chatModel: settings?.chatModel ?? openRouterDefaultChatModel,
     chatModelConfigured: settings !== null,
+    // 絵文字生成へ渡る実効値。列に既定値があり「未保存」を NULL では表せないため、
+    // 既定と違う ID を選んでいるかどうかを設定済みとして返す
+    emojiModel: settings?.emojiModel ?? openRouterDefaultEmojiModel,
+    emojiModelConfigured:
+        settings !== null &&
+        settings.emojiModel !== openRouterDefaultEmojiModel,
     // 解析へ渡る実効値を返す。未設定なら既定の指示がそのまま入る
     receiptPrompt: settings?.receiptPrompt ?? receiptParseDefaultInstructions,
     receiptPromptConfigured: settings?.receiptPrompt != null,
@@ -193,7 +200,7 @@ export const updateOpenRouterIntegration = async (
             parsed.error.issues[0]?.message ?? "入力内容を確認してください。",
         );
     }
-    const { apiKey, chatModel, receiptPrompt } = parsed.data;
+    const { apiKey, chatModel, emojiModel, receiptPrompt } = parsed.data;
     // 暗号化を先に行い、鍵が無いときにモデルだけ保存された状態を作らない。
     const encrypted =
         apiKey === undefined
@@ -207,12 +214,18 @@ export const updateOpenRouterIntegration = async (
             updatedAt: now,
         });
     }
-    if (chatModel !== undefined || receiptPrompt !== undefined) {
+    if (
+        chatModel !== undefined ||
+        emojiModel !== undefined ||
+        receiptPrompt !== undefined
+    ) {
         // 1 行を丸ごと書き戻すため、渡されなかった項目は保存済みの値を引き継ぐ
         const current = await getOpenRouterSettings(db);
         await upsertOpenRouterSettings(db, {
             chatModel:
                 chatModel ?? current?.chatModel ?? openRouterDefaultChatModel,
+            // undefined のまま渡す。repository は保存済みの値（無ければ既定）を残す
+            emojiModel,
             receiptPrompt:
                 receiptPrompt === undefined
                     ? (current?.receiptPrompt ?? null)
