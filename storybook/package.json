@@ -12,6 +12,7 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@tanstack/react-router": "catalog:",
     "@storybook/addon-a11y": "^10.5.7",
     "@storybook/addon-docs": "^10.5.7",
     "@storybook/react-vite": "^10.5.7",
