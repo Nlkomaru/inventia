@@ -7,6 +7,7 @@ import {
     stockMovementReasons,
     stockOccurredAtSchema,
 } from "../domain/stock";
+import { findExternalProviderById } from "./externalProviderRepository";
 import { type ItemRow, itemColumns } from "./itemRepository";
 
 export interface StockMovementRow {
@@ -17,6 +18,16 @@ export interface StockMovementRow {
     occurredAt: string;
     idempotencyKey: string | null;
     createdAt: string;
+    // 用途の自由記述。記録していない履歴は null
+    note: string | null;
+    // 在庫の行き先になった外部アプリ。LEFT JOIN で解決するため、連携先を
+    // 持たない履歴は id を含めた 4 列すべてが null になる
+    externalProviderId: string | null;
+    externalProviderName: string | null;
+    externalProviderFaviconUrl: string | null;
+    externalProviderUrl: string | null;
+    // 連携先アプリ側の ID。Inventia は解釈せず、保存と表示だけを行う
+    externalId: string | null;
 }
 
 export interface StockLotAllocationRow {
@@ -91,6 +102,14 @@ export interface StockOperationRequest extends StockOperationIdentity {
      * stale read を検出する。交換可能な加減算では pin しないので null。
      */
     expectedQuantity: number | null;
+    /**
+     * 用途と外部連携先。stock_operations はこの 3 列を持たないため、
+     * movement の INSERT でリテラルとして束ねる。棚卸しは行き先を持たないので
+     * 常に null を渡す。
+     */
+    note: string | null;
+    externalProviderId: string | null;
+    externalId: string | null;
 }
 
 export interface StockWriteResult {
@@ -126,6 +145,13 @@ export class StockNegativeQuantityError extends Error {
     constructor() {
         super("stock quantity cannot become negative");
         this.name = "StockNegativeQuantityError";
+    }
+}
+
+export class StockExternalProviderNotFoundError extends Error {
+    constructor() {
+        super("external provider was not found");
+        this.name = "StockExternalProviderNotFoundError";
     }
 }
 
@@ -233,7 +259,7 @@ const isNegativeQuantityViolation = (error: unknown): boolean => {
 const isOperationPayloadViolation = (error: unknown): boolean =>
     errorMessage(error).includes("ck_stock_operations_payload");
 
-// ロット upsert の FK 失敗は item が消えた場合だけ起こる
+// FK 失敗は item が消えた場合と、指定した連携先が消えた場合に起こる
 const isForeignKeyViolation = (error: unknown): boolean =>
     /\bforeign key constraint failed\b|\bSQLITE_CONSTRAINT_FOREIGNKEY\b/i.test(
         errorMessage(error),
@@ -271,22 +297,32 @@ const getStockOperation = async (
     };
 };
 
+// 連携先は履歴行と同じクエリで解決する（行ごとに引くと一覧で N+1 になる）。
+// stock_movements と external_providers は id / name / url の列名が重なるため、
+// 呼び出し側の WHERE と ORDER BY も含めて必ず別名で修飾する
+const stockMovementSelect = `
+    SELECT m.id,
+           m.item_id AS itemId,
+           m.delta,
+           m.reason,
+           m.occurred_at AS occurredAt,
+           m.idempotency_key AS idempotencyKey,
+           m.created_at AS createdAt,
+           m.note,
+           m.external_provider_id AS externalProviderId,
+           p.name AS externalProviderName,
+           p.favicon_url AS externalProviderFaviconUrl,
+           p.url AS externalProviderUrl,
+           m.external_id AS externalId
+    FROM stock_movements m
+    LEFT JOIN external_providers p ON p.id = m.external_provider_id`;
+
 const getStockMovement = async (
     db: D1Database,
     id: string,
 ): Promise<StockMovementRow | null> =>
     db
-        .prepare(
-            `SELECT id,
-                    item_id AS itemId,
-                    delta,
-                    reason,
-                    occurred_at AS occurredAt,
-                    idempotency_key AS idempotencyKey,
-                    created_at AS createdAt
-             FROM stock_movements
-             WHERE id = ?`,
-        )
+        .prepare(`${stockMovementSelect} WHERE m.id = ?`)
         .bind(id)
         .first<StockMovementRow>();
 
@@ -586,18 +622,25 @@ export const appendStockOperation = async (
                  )`,
         )
         .bind(createdAt, request.itemId, request.idempotencyKey);
+    // 用途と連携先は stock_operations に列が無いため、リテラルとして SELECT に混ぜる
     const insertMovement = db
         .prepare(
             `INSERT INTO stock_movements
                 (id, item_id, delta, reason, purchase_id, occurred_at,
-                 idempotency_key, created_at)
+                 idempotency_key, created_at, note, external_provider_id,
+                 external_id)
              SELECT movement_id, item_id, delta, reason, NULL, occurred_at,
-                    idempotency_key, created_at
+                    idempotency_key, created_at, ?, ?, ?
              FROM stock_operations
              WHERE idempotency_key = ?
                AND movement_id IS NOT NULL`,
         )
-        .bind(request.idempotencyKey);
+        .bind(
+            request.note,
+            request.externalProviderId,
+            request.externalId,
+            request.idempotencyKey,
+        );
     // 差分 0 の計画（全数確定のために絶対値を書き込むだけの行）は allocation を作らない
     const allocationInserts = request.lotPlan
         .filter((entry) => entry.delta !== 0)
@@ -632,6 +675,17 @@ export const appendStockOperation = async (
             throw new StockLotConflictError();
         }
         if (isForeignKeyViolation(error)) {
+            // 参照が壊れたのが item か連携先かは例外から判別できない。
+            // 連携先を指定した書き込みのときだけ実在を確かめて理由を切り分ける
+            if (
+                request.externalProviderId !== null &&
+                !(await findExternalProviderById(
+                    db,
+                    request.externalProviderId,
+                ))
+            ) {
+                throw new StockExternalProviderNotFoundError();
+            }
             throw new StockItemNotFoundError();
         }
         throw error;
@@ -801,11 +855,11 @@ export const listStockMovements = async (
     const where: string[] = [];
     const bindings: unknown[] = [];
     if (query.itemId) {
-        where.push("item_id = ?");
+        where.push("m.item_id = ?");
         bindings.push(query.itemId);
     }
     if (query.reason) {
-        where.push("reason = ?");
+        where.push("m.reason = ?");
         bindings.push(query.reason);
     }
     if (query.cursor) {
@@ -815,21 +869,14 @@ export const listStockMovements = async (
         if (cursor.itemId !== itemScope || cursor.reason !== reasonScope) {
             throw new InvalidStockCursorError();
         }
-        where.push("(occurred_at < ? OR (occurred_at = ? AND id < ?))");
+        where.push("(m.occurred_at < ? OR (m.occurred_at = ? AND m.id < ?))");
         bindings.push(cursor.occurredAt, cursor.occurredAt, cursor.id);
     }
     const result = await db
         .prepare(
-            `SELECT id,
-                    item_id AS itemId,
-                    delta,
-                    reason,
-                    occurred_at AS occurredAt,
-                    idempotency_key AS idempotencyKey,
-                    created_at AS createdAt
-             FROM stock_movements
+            `${stockMovementSelect}
              ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
-             ORDER BY occurred_at DESC, id DESC
+             ORDER BY m.occurred_at DESC, m.id DESC
              LIMIT ?`,
         )
         .bind(...bindings, query.limit + 1)

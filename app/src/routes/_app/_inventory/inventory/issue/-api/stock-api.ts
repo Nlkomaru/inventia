@@ -81,6 +81,12 @@ export interface IssueStockInput {
     // 未指定なら API が FEFO で自動配分する
     lotId: string | null;
     reason: StockMovementReason;
+    // 用途の自由記述。未入力は記録しない
+    note: string | null;
+    // 在庫の行き先になった外部アプリ。未選択は記録しない
+    externalProviderId: string | null;
+    // 連携先アプリ側の ID。連携先が無ければ持てない
+    externalId: string | null;
     idempotencyKey: string;
 }
 
@@ -88,10 +94,16 @@ export const issueStock = (
     itemId: string,
     input: IssueStockInput,
 ): Promise<StockOperationResult> => {
+    // schema は strict で空文字を受け付けないため、未入力の項目はキーごと省く
     const body = stockAdjustmentSchema.parse({
         delta: -input.quantity,
         reason: input.reason,
         ...(input.lotId === null ? {} : { lotId: input.lotId }),
+        ...(input.note === null ? {} : { note: input.note }),
+        ...(input.externalProviderId === null
+            ? {}
+            : { externalProviderId: input.externalProviderId }),
+        ...(input.externalId === null ? {} : { externalId: input.externalId }),
         idempotencyKey: input.idempotencyKey,
     });
     return request(
