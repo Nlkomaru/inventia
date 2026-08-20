@@ -194,7 +194,9 @@ export const listPriceRecords = async (
         limit: parsed.limit,
         cursor,
     });
-    const items = page.rows.map(toDto);
+    // toDto の第 2 引数は既定値で単価を計算する。map をそのまま渡すと
+    // 配列の index が単価として入ってしまうため、1 引数で呼ぶ
+    const items = page.rows.map((row) => toDto(row));
     const last = items.at(-1);
     return {
         items,
