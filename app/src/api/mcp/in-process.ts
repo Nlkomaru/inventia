@@ -20,7 +20,8 @@ export const receiptParseToolAllowlist = [
     // 副作用が無く、解析はそもそも OpenRouter を呼ぶ経路なので API key 未設定
     // による失敗もこの経路では起きない
     "search_inventory_semantic",
-    "get_inventory_item",
+    // 品目の詳細も明細の行数ぶん引かれるため、id をまとめて受ける一括版だけを渡す
+    "get_inventory_items",
     "list_expiring_inventory",
     "get_price_history",
     "compare_unit_prices",

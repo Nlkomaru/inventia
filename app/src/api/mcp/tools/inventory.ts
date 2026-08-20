@@ -5,7 +5,6 @@ import {
     itemBatchIdsMax,
     itemBatchInputSchema,
     itemBatchOutputSchema,
-    itemDetailDtoSchema,
     itemDtoSchema,
     itemListQuerySchema,
     itemNameMatchInputSchema,
@@ -34,7 +33,6 @@ import {
     searchItemsByVector,
 } from "../../../services/itemSearchService";
 import {
-    getItem,
     getItems,
     ItemServiceError,
     listItems,
@@ -155,28 +153,10 @@ export const registerInventoryTools = (
     );
 
     server.registerTool(
-        "get_inventory_item",
-        {
-            title: "Get inventory item",
-            description:
-                "Get one inventory item by its system ID, including its base unit, total quantity, low-stock threshold, the expiry-lot breakdown, and its reading state. lots lists one entry per expiry date in FEFO order (earliest expiry first, the lot without an expiry date last); lots holding no stock are omitted, and currentQuantity is maintained as the sum of the item's lot quantities. readingStatus and readingState report the stored reading state, where readingState also carries startedAt and finishedAt; both are null when no reading state is stored for the item. The storage location is a property of the item, not of a lot.",
-            inputSchema: z.object({ id: z.string().min(1) }),
-            outputSchema: itemDetailDtoSchema,
-        },
-        async ({ id }) => {
-            try {
-                return mcpSuccess(await getItem(db, id));
-            } catch (error) {
-                return inventoryError(error, "inventory item lookup failed");
-            }
-        },
-    );
-
-    server.registerTool(
         "get_inventory_items",
         {
             title: "Get several inventory items",
-            description: `Read up to ${itemBatchIdsMax} items by id in one call, so a caller holding a page of search results does not have to call get_inventory_item once per row. items comes back in the order the ids were given, duplicates removed, and ids that do not exist are listed in notFound instead of failing the whole call. includeLots defaults to true and carries the per-expiry lot breakdown; set it to false when only the summary is needed — lots is then empty while lotCount and earliestExpiryDate still describe the lots that have stock. This tool only reads data.`,
+            description: `Read up to ${itemBatchIdsMax} items by id in one call, so a caller holding a page of search results does not have to spend one call per row; a single item is read by passing its id as the only element of ids. Each item carries its base unit, total quantity, low-stock threshold, the expiry-lot breakdown, its storage location and its reading state. items comes back in the order the ids were given, duplicates removed, and ids that do not exist are listed in notFound instead of failing the whole call. includeLots defaults to true and carries the per-expiry lot breakdown, one entry per expiry date in FEFO order (earliest expiry first, the lot without an expiry date last, lots holding no stock omitted); set it to false when only the summary is needed — lots is then empty while lotCount and earliestExpiryDate still describe the lots that have stock. This tool only reads data.`,
             inputSchema: itemBatchInputSchema,
             outputSchema: itemBatchOutputSchema,
         },
@@ -285,7 +265,7 @@ export const registerInventoryTools = (
         {
             title: "Get price history",
             description:
-                "Get an inventory item's price history in reverse chronological order with cursor pagination. Each record also carries the store it was bought from as storeId, storeName and storeFaviconUrl, which are null for records recorded before a store was linked.",
+                "Get an inventory item's price history in reverse chronological order with cursor pagination. Each record also carries the store it was bought from as storeId, storeName and storeFaviconUrl, which are null for records recorded before a store was linked. To read the recent records of several items at once use get_price_histories, which returns them in one call but without paging.",
             inputSchema: priceRecordListInputSchema,
             outputSchema: priceRecordListOutputSchema,
         },
