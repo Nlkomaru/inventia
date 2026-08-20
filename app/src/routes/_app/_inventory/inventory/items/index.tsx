@@ -126,9 +126,6 @@ export const Route = createFileRoute("/_app/_inventory/inventory/items/")({
             context.queryClient.ensureQueryData(categoryTreeQueryOptions()),
             context.queryClient.ensureQueryData(locationTreeQueryOptions()),
         ]),
-    staticData: {
-        breadcrumbs: [{ label: "在庫一覧" }],
-    },
     component: InventoryPage,
     pendingComponent: InventoryPending,
     errorComponent: InventoryError,
