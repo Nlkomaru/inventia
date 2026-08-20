@@ -161,6 +161,69 @@ function ItemDetailPage() {
 
             <Card>
                 <CardHeader>
+                    <CardTitle>品目の情報</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <dl className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <dt className="text-sm text-muted-foreground">
+                                カテゴリ
+                            </dt>
+                            <dd className="mt-1 text-sm">{category.name}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-sm text-muted-foreground">
+                                保管場所
+                            </dt>
+                            <dd className="mt-1 text-sm">{location.name}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-sm text-muted-foreground">
+                                基準単位
+                            </dt>
+                            <dd className="mt-1 text-sm">
+                                {item.baseUnit}（
+                                {dimensionLabels[item.baseDimension]}）
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-sm text-muted-foreground">
+                                読書状態
+                            </dt>
+                            <dd className="mt-1 text-sm">
+                                {formatReadingState(item)}
+                            </dd>
+                        </div>
+                        <div className="sm:col-span-2">
+                            <dt className="text-sm text-muted-foreground">
+                                メモ
+                            </dt>
+                            <dd className="mt-1 text-sm whitespace-pre-wrap">
+                                {item.memo ?? "—"}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-sm text-muted-foreground">
+                                登録日時
+                            </dt>
+                            <dd className="mt-1 text-sm">
+                                {formatDateTime(item.createdAt)}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-sm text-muted-foreground">
+                                最終更新
+                            </dt>
+                            <dd className="mt-1 text-sm">
+                                {formatDateTime(item.updatedAt)}
+                            </dd>
+                        </div>
+                    </dl>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
                     <CardTitle>在庫</CardTitle>
                     <CardDescription>
                         現在庫は数量が残っているロットの合計です。
@@ -303,69 +366,6 @@ function ItemDetailPage() {
                 </CardHeader>
                 <CardContent>
                     <ItemReceiveForm item={item} />
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>品目の情報</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <dl className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <dt className="text-sm text-muted-foreground">
-                                カテゴリ
-                            </dt>
-                            <dd className="mt-1 text-sm">{category.name}</dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm text-muted-foreground">
-                                保管場所
-                            </dt>
-                            <dd className="mt-1 text-sm">{location.name}</dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm text-muted-foreground">
-                                基準単位
-                            </dt>
-                            <dd className="mt-1 text-sm">
-                                {item.baseUnit}（
-                                {dimensionLabels[item.baseDimension]}）
-                            </dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm text-muted-foreground">
-                                読書状態
-                            </dt>
-                            <dd className="mt-1 text-sm">
-                                {formatReadingState(item)}
-                            </dd>
-                        </div>
-                        <div className="sm:col-span-2">
-                            <dt className="text-sm text-muted-foreground">
-                                メモ
-                            </dt>
-                            <dd className="mt-1 text-sm whitespace-pre-wrap">
-                                {item.memo ?? "—"}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm text-muted-foreground">
-                                登録日時
-                            </dt>
-                            <dd className="mt-1 text-sm">
-                                {formatDateTime(item.createdAt)}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm text-muted-foreground">
-                                最終更新
-                            </dt>
-                            <dd className="mt-1 text-sm">
-                                {formatDateTime(item.updatedAt)}
-                            </dd>
-                        </div>
-                    </dl>
                 </CardContent>
             </Card>
 
