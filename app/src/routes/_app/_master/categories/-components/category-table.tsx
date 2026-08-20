@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import {
     createColumnHelper,
     tableFeatures,
@@ -36,6 +37,7 @@ import {
 } from "@/components/ui/table";
 import type { CategoryDto } from "@/domain/category";
 import { cn } from "@/lib/utils";
+import { buildCategorySplat } from "../-functions/category-path";
 import {
     createCategoryKindIndex,
     type EffectiveCategoryKind,
@@ -54,6 +56,8 @@ import {
 // （FlexRender は cell 関数を component type として扱うため、関数の同一性が焦点を左右する）。
 type CategoryTableRow = {
     item: CategoryDto;
+    /** 個別ページの URL の余り。祖先を含むため行データとして持たせる。 */
+    splat: string;
     depth: number;
     canExpand: boolean;
     isExpanded: boolean;
@@ -96,7 +100,13 @@ const columns = columnHelper.columns([
                         // 子を持たない行も名前の開始位置を揃える
                         <span aria-hidden className="size-7" />
                     )}
-                    <span>{item.name}</span>
+                    <Link
+                        className="underline-offset-4 hover:underline"
+                        params={{ _splat: row.original.splat }}
+                        to="/categories/$"
+                    >
+                        {item.name}
+                    </Link>
                 </div>
             );
         },
@@ -231,6 +241,7 @@ export function CategoryTable({
             const hasChildren = parentIdsWithChildren.has(item.id);
             return {
                 item,
+                splat: buildCategorySplat(categories, item.id),
                 depth,
                 canExpand: hasChildren && !filtering,
                 isExpanded: !filtering && expanded.has(item.id),

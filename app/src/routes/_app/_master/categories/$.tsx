@@ -23,104 +23,124 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import type { LocationDto } from "@/domain/location";
 import type { BreadcrumbsLoaderData } from "@/lib/breadcrumbs";
 import { formatDisplayDate } from "@/lib/datetime";
+import { getEffectiveCategoryKind } from "@/lib/hierarchy";
 import {
-    locationItemsQueryOptions,
-    locationTreeQueryOptions,
-} from "./-api/location-queries";
+    categoryItemsQueryOptions,
+    categoryTreeQueryOptions,
+} from "./-api/category-queries";
 import {
-    buildLocationAncestry,
-    buildLocationDetailPath,
-    listLocationChildren,
-    locationDetailBasePath,
-    parseLocationPathIds,
-} from "./-functions/location-path";
+    buildCategoryAncestry,
+    buildCategoryDetailPath,
+    buildCategorySplat,
+    categoryDetailBasePath,
+    listCategoryChildren,
+    parseCategoryPathIds,
+} from "./-functions/category-path";
 
 // 幅は他の画面と揃える。ここだけ狭いと一覧から入ったときに幅が変わって見える
 const pageClassName = "flex w-full flex-col gap-6 p-4 sm:p-6 lg:p-8";
 
-/** 場所が見つからないことを errorComponent へ伝えるための型。 */
-class LocationNotFoundError extends Error {
+const kindLabels = {
+    daily_goods: "日用品",
+    food: "食料品",
+    book: "書籍",
+    document: "書類",
+} as const;
+
+/** カテゴリーが見つからないことを errorComponent へ伝えるための型。 */
+class CategoryNotFoundError extends Error {
     constructor(id: string) {
-        super(`保管場所が見つかりません（${id}）`);
-        this.name = "LocationNotFoundError";
+        super(`カテゴリが見つかりません（${id}）`);
+        this.name = "CategoryNotFoundError";
     }
 }
 
-export const Route = createFileRoute("/_app/_master/locations/$")({
+export const Route = createFileRoute("/_app/_master/categories/$")({
     // 祖先の並びは URL 自身が持つ情報なので、木を読んでから正しい URL へ
     // 揃える。別の親を書いた URL や id だけの URL でも同じ画面へ収束させる
     loader: async ({ context, params }) => {
-        const ids = parseLocationPathIds(params._splat);
+        const ids = parseCategoryPathIds(params._splat);
         const targetId = ids.at(-1);
         if (targetId === undefined) {
-            throw redirect({ to: locationDetailBasePath });
+            throw redirect({ to: categoryDetailBasePath });
         }
         const tree = await context.queryClient.ensureQueryData(
-            locationTreeQueryOptions(),
+            categoryTreeQueryOptions(),
         );
-        const ancestry = buildLocationAncestry(tree.locations, targetId);
+        const ancestry = buildCategoryAncestry(tree.items, targetId);
         if (ancestry.length === 0) {
-            throw new LocationNotFoundError(targetId);
+            throw new CategoryNotFoundError(targetId);
         }
-        const canonical = buildLocationDetailPath(tree.locations, targetId);
-        if (canonical !== `${locationDetailBasePath}/${ids.join("/")}`) {
+        const canonical = buildCategoryDetailPath(tree.items, targetId);
+        if (canonical !== `${categoryDetailBasePath}/${ids.join("/")}`) {
             throw redirect({ href: canonical, replace: true });
         }
         await context.queryClient.ensureQueryData(
-            locationItemsQueryOptions(targetId),
+            categoryItemsQueryOptions(targetId),
         );
         // 祖先はそのまま段になる。階層が深くなっても route を増やさずに済む
         return {
-            breadcrumbs: ancestry.map((location) => ({
-                label: location.name,
-                to: buildLocationDetailPath(tree.locations, location.id),
+            breadcrumbs: ancestry.map((category) => ({
+                label: category.name,
+                to: buildCategoryDetailPath(tree.items, category.id),
             })),
         } satisfies BreadcrumbsLoaderData;
     },
-    component: LocationDetailPage,
-    pendingComponent: LocationDetailPending,
-    errorComponent: LocationDetailError,
+    component: CategoryDetailPage,
+    pendingComponent: CategoryDetailPending,
+    errorComponent: CategoryDetailError,
 });
 
-function LocationDetailPage() {
+function CategoryDetailPage() {
     const params = Route.useParams();
-    const { data: tree } = useSuspenseQuery(locationTreeQueryOptions());
-    const targetId = parseLocationPathIds(params._splat).at(-1) ?? "";
+    const { data: tree } = useSuspenseQuery(categoryTreeQueryOptions());
+    const targetId = parseCategoryPathIds(params._splat).at(-1) ?? "";
     const ancestry = useMemo(
-        () => buildLocationAncestry(tree.locations, targetId),
-        [tree.locations, targetId],
+        () => buildCategoryAncestry(tree.items, targetId),
+        [tree.items, targetId],
     );
-    const location = ancestry.at(-1);
+    const category = ancestry.at(-1);
     const parents = ancestry.slice(0, -1);
     const children = useMemo(
-        () => listLocationChildren(tree.locations, targetId),
-        [tree.locations, targetId],
+        () => listCategoryChildren(tree.items, targetId),
+        [tree.items, targetId],
+    );
+    // 種別は祖先から継ぐため、自身に種別が無くても実効値を出す
+    const effectiveKind = useMemo(
+        () => getEffectiveCategoryKind(targetId || null, tree.items),
+        [tree.items, targetId],
     );
     const { data: items } = useSuspenseQuery(
-        locationItemsQueryOptions(targetId),
+        categoryItemsQueryOptions(targetId),
     );
 
-    if (!location) {
+    if (!category) {
         // loader が先に弾くため通常は起きない。型を絞るための分岐
-        return <LocationDetailPending />;
+        return <CategoryDetailPending />;
     }
 
     return (
         <main className={pageClassName}>
             <header>
                 <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                    Location
+                    Category
                 </p>
                 <h1 className="mt-1 text-2xl font-bold break-words">
-                    {location.name}
+                    {category.name}
                 </h1>
-                <nav aria-label="上位の保管場所" className="mt-2 text-sm">
+                <p className="mt-1 text-sm text-muted-foreground">
+                    {effectiveKind === null
+                        ? "種別なしの汎用カテゴリです。"
+                        : `種別: ${kindLabels[effectiveKind]}${
+                              category.kind === null ? "（上位から継承）" : ""
+                          }`}
+                </p>
+                <nav aria-label="上位のカテゴリ" className="mt-2 text-sm">
                     {parents.length === 0 ? (
                         <span className="text-muted-foreground">
-                            最上位の保管場所です。
+                            最上位のカテゴリです。
                         </span>
                     ) : (
                         <ol className="flex flex-wrap items-center gap-1 text-muted-foreground">
@@ -133,12 +153,12 @@ function LocationDetailPage() {
                                     <Link
                                         className="underline underline-offset-4"
                                         params={{
-                                            _splat: locationSplat(
-                                                tree.locations,
+                                            _splat: buildCategorySplat(
+                                                tree.items,
                                                 parent.id,
                                             ),
                                         }}
-                                        to="/locations/$"
+                                        to="/categories/$"
                                     >
                                         {parent.name}
                                     </Link>
@@ -151,15 +171,15 @@ function LocationDetailPage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>下位の保管場所</CardTitle>
+                    <CardTitle>下位のカテゴリ</CardTitle>
                     <CardDescription>
-                        この場所のすぐ下にある保管場所です。
+                        このカテゴリのすぐ下にあるカテゴリです。
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     {children.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                            下位の保管場所はありません。
+                            下位のカテゴリはありません。
                         </p>
                     ) : (
                         <ul className="flex flex-col gap-2">
@@ -168,20 +188,15 @@ function LocationDetailPage() {
                                     <Link
                                         className="text-sm underline underline-offset-4"
                                         params={{
-                                            _splat: locationSplat(
-                                                tree.locations,
+                                            _splat: buildCategorySplat(
+                                                tree.items,
                                                 child.id,
                                             ),
                                         }}
-                                        to="/locations/$"
+                                        to="/categories/$"
                                     >
                                         {child.name}
                                     </Link>
-                                    <span className="ml-2 text-xs text-muted-foreground">
-                                        {formatItemCount(
-                                            tree.itemCounts[child.id] ?? 0,
-                                        )}
-                                    </span>
                                 </li>
                             ))}
                         </ul>
@@ -191,9 +206,9 @@ function LocationDetailPage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>保管されている品目</CardTitle>
+                    <CardTitle>このカテゴリの品目</CardTitle>
                     <CardDescription>
-                        この場所に直接置かれている品目です。下位の保管場所の分は含みません。
+                        このカテゴリに直接紐づく品目です。下位カテゴリの分は含みません。
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -202,7 +217,7 @@ function LocationDetailPage() {
                             aria-live="polite"
                             className="text-sm text-muted-foreground"
                         >
-                            この場所に置かれている品目はありません。
+                            このカテゴリの品目はありません。
                         </p>
                     ) : (
                         <Table>
@@ -219,13 +234,18 @@ function LocationDetailPage() {
                                 {items.map((item) => (
                                     <TableRow key={item.id}>
                                         <TableCell>
-                                            <Link
-                                                className="underline underline-offset-4"
-                                                params={{ itemId: item.id }}
-                                                to="/inventory/items/$itemId"
-                                            >
-                                                {item.name}
-                                            </Link>
+                                            <span className="inline-flex items-center gap-1.5">
+                                                {item.emoji}
+                                                <Link
+                                                    className="underline underline-offset-4"
+                                                    params={{
+                                                        itemId: item.id,
+                                                    }}
+                                                    to="/items/$itemId"
+                                                >
+                                                    {item.name}
+                                                </Link>
+                                            </span>
                                         </TableCell>
                                         <TableCell className="text-right font-mono whitespace-nowrap tabular-nums">
                                             {item.currentQuantity.toLocaleString(
@@ -249,33 +269,21 @@ function LocationDetailPage() {
     );
 }
 
-/** `/locations/$` の余りに渡す、祖先を含む id の並び。 */
-const locationSplat = (
-    locations: readonly LocationDto[],
-    locationId: string,
-): string =>
-    buildLocationDetailPath(locations, locationId).slice(
-        `${locationDetailBasePath}/`.length,
-    );
-
-const formatItemCount = (count: number): string =>
-    count === 0 ? "品目なし" : `品目 ${count.toLocaleString("ja-JP")} 件`;
-
 /** 期限は保存値が UTC のため、表示だけ日本時間の日付へ寄せる。 */
 const formatEarliestExpiry = (value: string | null): string =>
     value === null ? "期限なし" : (formatDisplayDate(value) ?? value);
 
-function LocationDetailPending() {
+function CategoryDetailPending() {
     return (
         <main className={pageClassName}>
             <p className="text-sm text-muted-foreground">
-                保管場所を読み込んでいます…
+                カテゴリを読み込んでいます…
             </p>
         </main>
     );
 }
 
-function LocationDetailError({ error, reset }: ErrorComponentProps) {
+function CategoryDetailError({ error, reset }: ErrorComponentProps) {
     const router = useRouter();
     return (
         <main className={pageClassName}>
@@ -287,7 +295,7 @@ function LocationDetailError({ error, reset }: ErrorComponentProps) {
                 <span>
                     {error instanceof Error
                         ? error.message
-                        : "保管場所を読み込めませんでした"}
+                        : "カテゴリを読み込めませんでした"}
                 </span>
                 <div className="flex gap-2">
                     <Button
@@ -303,11 +311,11 @@ function LocationDetailError({ error, reset }: ErrorComponentProps) {
                     </Button>
                     <Button
                         nativeButton={false}
-                        render={<Link to="/locations" />}
+                        render={<Link to="/categories" />}
                         size="sm"
                         variant="outline"
                     >
-                        保管場所の一覧へ戻る
+                        カテゴリの一覧へ戻る
                     </Button>
                 </div>
             </div>

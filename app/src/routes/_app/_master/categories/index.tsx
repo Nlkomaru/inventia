@@ -9,9 +9,6 @@ import { CategoryMasterPage } from "./-components/category-master-page";
 export const Route = createFileRoute("/_app/_master/categories/")({
     loader: ({ context }) =>
         context.queryClient.ensureQueryData(categoryTreeQueryOptions()),
-    staticData: {
-        breadcrumbs: [{ label: "カテゴリ" }],
-    },
     component: CategoriesPage,
     pendingComponent: CategoriesPending,
     errorComponent: CategoriesError,

@@ -35,6 +35,37 @@ export const buildHierarchyLabels = <T extends HierarchyNode>(
     return labels;
 };
 
+/** 根から対象までの並び。循環していても止まる。対象が無ければ空配列。 */
+export const buildAncestry = <T extends HierarchyNode>(
+    nodes: readonly T[],
+    id: string,
+): T[] => {
+    const byId = new Map(nodes.map((node) => [node.id, node]));
+    const ancestry: T[] = [];
+    const visited = new Set<string>();
+    let current = byId.get(id);
+    while (current && !visited.has(current.id)) {
+        visited.add(current.id);
+        ancestry.unshift(current);
+        current =
+            current.parentId === null ? undefined : byId.get(current.parentId);
+    }
+    return ancestry;
+};
+
+/**
+ * 祖先を根から並べた URL の、基点より後ろの部分。カテゴリーと保管場所は
+ * どちらも `/{基点}/{祖先}/…/{対象}` の形で個別ページを持つ。
+ * 対象が見つからない場合は空文字。
+ */
+export const buildAncestrySplat = <T extends HierarchyNode>(
+    nodes: readonly T[],
+    id: string,
+): string =>
+    buildAncestry(nodes, id)
+        .map((node) => encodeURIComponent(node.id))
+        .join("/");
+
 /**
  * 実効的なカテゴリー種別。自分に種別が無ければ祖先から継承する。
  * service 側（repositories の getCategoryKind）と同じ規則で、
