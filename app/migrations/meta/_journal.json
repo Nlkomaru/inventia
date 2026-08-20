@@ -92,6 +92,13 @@
       "when": 1787195337348,
       "tag": "0012_stores",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1787198055213,
+      "tag": "0013_backfill_price_record_stores",
+      "breakpoints": true
     }
   ]
 }
