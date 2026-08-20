@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/table";
 import type { LocationDto } from "@/domain/location";
 import { cn } from "@/lib/utils";
+import { buildLocationDetailPath } from "../-functions/location-path";
 import {
     expandedLocationIdsAtom,
     locationQueryAtom,
@@ -191,7 +192,17 @@ export function LocationTable({
                                     // 子を持たない行も名前の開始位置を揃える
                                     <span aria-hidden className="size-7" />
                                 )}
-                                <span>{item.name}</span>
+                                {/* 表は Storybook でも描くため router に依存させず、
+                                    サイドバーと同じく素のリンクで移動する */}
+                                <a
+                                    className="underline-offset-4 hover:underline"
+                                    href={buildLocationDetailPath(
+                                        locations,
+                                        item.id,
+                                    )}
+                                >
+                                    {item.name}
+                                </a>
                             </div>
                         );
                     },
@@ -278,6 +289,7 @@ export function LocationTable({
         [
             copyLocationId,
             expanded,
+            locations,
             onDelete,
             query,
             setExpanded,
