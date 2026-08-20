@@ -82,8 +82,15 @@ export function ItemTable({
             columnHelper.columns([
                 columnHelper.accessor("name", {
                     header: "品目名",
-                    cell: ({ getValue }) => (
-                        <span className="font-medium">{getValue()}</span>
+                    // 品目名から在庫・価格・履歴を見る詳細へ入れるようにする。
+                    // マスタの編集はこの行の操作メニューに残す
+                    cell: ({ getValue, row }) => (
+                        <a
+                            className="font-medium underline-offset-4 hover:underline"
+                            href={`/inventory/items/${encodeURIComponent(row.original.id)}`}
+                        >
+                            {getValue()}
+                        </a>
                     ),
                 }),
                 columnHelper.display({
