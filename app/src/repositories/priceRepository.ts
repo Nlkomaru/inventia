@@ -39,7 +39,6 @@ export interface PriceComparisonRecordRow extends PriceRecordRow {
 /** 全品目の一覧は品目ページの外で読むため、品目名と絵文字も一緒に引く。 */
 export interface AllPriceRecordRow extends PriceRecordRow {
     itemName: string;
-    itemEmoji: string;
 }
 
 export interface PriceRecordListQuery {
@@ -112,8 +111,7 @@ const allPriceRecordSelect = `
         p.created_at AS createdAt,
         i.base_unit AS baseUnit,
         i.base_dimension AS baseDimension,
-        i.name AS itemName,
-        i.emoji AS itemEmoji
+        i.name AS itemName
     FROM price_records AS p
     INNER JOIN items AS i ON i.id = p.item_id
     LEFT JOIN stores AS s ON s.id = p.store_id`;

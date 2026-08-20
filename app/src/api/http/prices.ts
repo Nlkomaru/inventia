@@ -116,7 +116,7 @@ priceRecordsApp.openAPIRegistry.registerPath({
     tags: ["Prices"],
     summary: "List price records across items",
     description:
-        "Lists price observations for every item in reverse chronological order with cursor pagination. Each record carries the item it belongs to as itemId, itemName and itemEmoji, so the caller does not have to read the items separately. Cursors from an item's own price history are not accepted here.",
+        "Lists price observations for every item in reverse chronological order with cursor pagination. Each record carries the item it belongs to as itemId and itemName, so the caller does not have to read the items separately. Cursors from an item's own price history are not accepted here.",
     request: {
         query: allPriceRecordListInputSchema,
     },

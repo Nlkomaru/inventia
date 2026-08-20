@@ -30,7 +30,6 @@ import {
     type OpenRouterIntegrationUpdate,
     openRouterApiKeySchema,
     openRouterChatModelSchema,
-    openRouterDefaultEmojiModel,
     openRouterEmbeddingDimensions,
     openRouterEmbeddingModel,
 } from "@/domain/integration";
@@ -82,10 +81,6 @@ export function IntegrationsSettingsPage() {
     // 保存前の編集値だけをローカルに持ち、確定値は status クエリを唯一の情報源にする。
     const [chatModelDraft, setChatModelDraft] = useState<string | null>(null);
     const chatModel = chatModelDraft ?? status.chatModel;
-    // 絵文字生成のモデルも同じ扱い。一覧はレシート解析と共有するが、
-    // 絵文字は画像入力を使わないため既定値を必ず選択肢に残す
-    const [emojiModelDraft, setEmojiModelDraft] = useState<string | null>(null);
-    const emojiModel = emojiModelDraft ?? status.emojiModel;
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     // 解析設定も同じく編集値だけを持ち、確定値は status を情報源にする。
@@ -103,16 +98,10 @@ export function IntegrationsSettingsPage() {
             : receiptParsePromptSchema.safeParse(receiptPromptTrimmed);
     const validation = apiKey ? openRouterApiKeySchema.safeParse(apiKey) : null;
     const chatModelValidation = openRouterChatModelSchema.safeParse(chatModel);
-    const emojiModelValidation =
-        openRouterChatModelSchema.safeParse(emojiModel);
 
     const modelItems = useMemo(
         () => toModelItems(models, [chatModel]),
         [chatModel, models],
-    );
-    const emojiModelItems = useMemo(
-        () => toModelItems(models, [emojiModel, openRouterDefaultEmojiModel]),
-        [emojiModel, models],
     );
 
     const saveMutation = useMutation({
@@ -148,25 +137,16 @@ export function IntegrationsSettingsPage() {
             );
             return;
         }
-        if (!emojiModelValidation.success) {
-            setError(
-                emojiModelValidation.error.issues[0]?.message ??
-                    "絵文字生成モデルを確認してください。",
-            );
-            return;
-        }
         // API key を入力していなくてもモデルだけ保存できる。
         const payload = {
             ...(parsedApiKey ? { apiKey: parsedApiKey.data } : {}),
             chatModel: chatModelValidation.data,
-            emojiModel: emojiModelValidation.data,
         };
         try {
             // onSuccess の invalidate を待つため mutateAsync を使い、
             // 編集値を捨てた時点で再取得済みの状態が表示されるようにする。
             await saveMutation.mutateAsync(payload);
             setChatModelDraft(null);
-            setEmojiModelDraft(null);
             setApiKey("");
             setMessage(
                 parsedApiKey
@@ -339,68 +319,6 @@ export function IntegrationsSettingsPage() {
                             />
                         </Field>
 
-                        <Field
-                            data-invalid={
-                                emojiModelValidation.success === false
-                            }
-                        >
-                            <FieldLabel htmlFor="openrouter-emoji-model">
-                                品目の絵文字を作るモデル
-                            </FieldLabel>
-                            <Select
-                                items={emojiModelItems}
-                                value={emojiModel}
-                                onValueChange={(value) => {
-                                    if (value !== null) {
-                                        setEmojiModelDraft(value);
-                                    }
-                                }}
-                            >
-                                <SelectTrigger
-                                    aria-invalid={
-                                        emojiModelValidation.success === false
-                                    }
-                                    className="w-full"
-                                    disabled={modelsQuery.isPending}
-                                    id="openrouter-emoji-model"
-                                >
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectGroup>
-                                        {emojiModelItems.map((model) => (
-                                            <SelectItem
-                                                key={model.value}
-                                                value={model.value}
-                                            >
-                                                {model.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectGroup>
-                                </SelectContent>
-                            </Select>
-                            <FieldDescription>
-                                {modelsQuery.isPending
-                                    ? "モデル一覧を取得しています。"
-                                    : `選択中: ${emojiModel}`}
-                                {status.emojiModelConfigured
-                                    ? null
-                                    : "（既定値。まだ保存されていません）"}
-                            </FieldDescription>
-                            <FieldDescription>
-                                品目を作るときに絵文字を 1
-                                個だけ書かせます。生成できなかった品目は 📦
-                                のままになり、品目のページで作り直せます。
-                            </FieldDescription>
-                            <FieldError
-                                errors={
-                                    emojiModelValidation.success === false
-                                        ? emojiModelValidation.error.issues
-                                        : undefined
-                                }
-                            />
-                        </Field>
-
                         <Field data-disabled>
                             <FieldLabel htmlFor="vectorization-model">
                                 ベクトル化モデル（
@@ -424,9 +342,7 @@ export function IntegrationsSettingsPage() {
                     <div className="flex justify-end">
                         <Button
                             disabled={
-                                saving ||
-                                chatModelValidation.success === false ||
-                                emojiModelValidation.success === false
+                                saving || chatModelValidation.success === false
                             }
                             type="submit"
                         >

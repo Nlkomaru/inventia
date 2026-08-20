@@ -9,8 +9,6 @@ import type { BookReadingListQuery } from "../domain/reading";
 export interface ItemRow {
     id: string;
     name: string;
-    // 一覧で品目を見分けるための絵文字 1 個。未生成の品目は既定の 📦 が入る
-    emoji: string;
     categoryId: string;
     locationId: string;
     baseUnit: string;
@@ -34,13 +32,11 @@ export interface ItemListResult {
 export interface ResolvedItemCreateInput
     extends Omit<
         ItemCreateInput,
-        "baseUnit" | "baseDimension" | "currentQuantity" | "emoji"
+        "baseUnit" | "baseDimension" | "currentQuantity"
     > {
     baseUnit: string;
     baseDimension: "mass" | "volume" | "count";
     currentQuantity: number;
-    // 生成に失敗した場合も既定の絵文字を service が解決してから渡す
-    emoji: string;
 }
 
 export class InvalidItemCursorError extends Error {
@@ -108,7 +104,7 @@ const dayInMilliseconds = 24 * 60 * 60 * 1000;
 // 品目を返す他 repository の query（棚卸しが古い品目の一覧など）が同じ射影を
 // 重複定義しないよう export する。相関サブクエリは items を明示参照するため、
 // items へ別名を付けない query で使うこと
-export const itemColumns = `id, name, emoji, category_id AS categoryId, location_id AS locationId,
+export const itemColumns = `id, name, category_id AS categoryId, location_id AS locationId,
 		base_unit AS baseUnit, base_dimension AS baseDimension,
 		current_quantity AS currentQuantity,
 		(SELECT MIN(expiry_date) FROM item_lots
@@ -413,14 +409,13 @@ export const createItem = async (
     const itemStatement = db
         .prepare(
             `INSERT INTO items
-					(id, name, emoji, category_id, location_id, base_unit, base_dimension,
+					(id, name, category_id, location_id, base_unit, base_dimension,
 					 current_quantity, low_stock_threshold, memo, created_at, updated_at)
-				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
             id,
             input.name,
-            input.emoji,
             input.categoryId,
             input.locationId,
             input.baseUnit,
@@ -492,7 +487,6 @@ export const updateItem = async (
     const bindings: unknown[] = [];
     const fields: Array<[keyof typeof input, string]> = [
         ["name", "name"],
-        ["emoji", "emoji"],
         ["categoryId", "category_id"],
         ["locationId", "location_id"],
         // 基準単位・次元は換算せずに書き換える。数量を持つ列（current_quantity）や

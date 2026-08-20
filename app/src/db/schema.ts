@@ -147,13 +147,6 @@ export const items = sqliteTable(
         memo: text("memo"),
         createdAt: text("created_at").notNull(),
         updatedAt: text("updated_at").notNull(),
-        // 一覧で品目を見分けるための絵文字 1 個。AI 生成に失敗しても品目作成を
-        // 止めないため、既定のプレースホルダ '📦' を DEFAULT に持たせる。
-        // 「絵文字 1 個」の判定は CHECK では書けないため domain/item.ts の
-        // itemEmojiSchema で担保する（ALTER ADD COLUMN では table 制約を足せず、
-        // 足そうとするとテーブル再構築になり既存データを危険にさらす）。
-        // ALTER ADD COLUMN で末尾に追加されるため宣言順も末尾に合わせる
-        emoji: text("emoji").notNull().default("📦"),
     },
     (t) => [
         index("idx_items_location").on(t.locationId),
@@ -619,11 +612,6 @@ export const integrationSettings = sqliteTable(
             .default(0),
         createdAt: text("created_at").notNull(),
         updatedAt: text("updated_at").notNull(),
-        // 品目の絵文字を生成する LLM のモデル ID。ALTER ADD COLUMN で末尾に
-        // 追加されるため宣言順も末尾に合わせる
-        emojiModel: text("emoji_model")
-            .notNull()
-            .default("deepseek/deepseek-v4-flash-0731"),
     },
     (t) => [
         check(

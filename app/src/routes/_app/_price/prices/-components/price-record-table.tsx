@@ -59,13 +59,11 @@ const columns = columnHelper.columns([
         header: "品物",
         cell: ({ row }) => (
             <Link
-                className="flex items-center gap-2 underline-offset-4 hover:underline"
+                className="underline-offset-4 hover:underline"
                 params={{ itemId: row.original.itemId }}
                 to="/inventory/items/$itemId"
             >
-                {/* 絵文字は品目名の飾りなので読み上げから外す */}
-                <span aria-hidden="true">{row.original.itemEmoji}</span>
-                <span>{row.original.itemName}</span>
+                {row.original.itemName}
             </Link>
         ),
     }),

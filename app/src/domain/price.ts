@@ -134,7 +134,6 @@ export const priceRecordListOutputSchema = z
 // 品目名と絵文字を添える
 export const allPriceRecordDtoSchema = priceRecordDtoSchema.extend({
     itemName: z.string().min(1),
-    itemEmoji: z.string().min(1),
 });
 
 export const allPriceRecordListOutputSchema = z
