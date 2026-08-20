@@ -57,8 +57,7 @@ import { ItemReceiveForm } from "./-components/item-receive-form";
 const soonWithinDays = 7;
 
 // 幅は他の画面と揃える。ここだけ狭いと一覧から入ったときに幅が変わって見える
-const pageClassName =
-    "mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "flex w-full flex-col gap-6 p-4 sm:p-6 lg:p-8";
 
 const dimensionLabels: Record<ItemDetailDto["baseDimension"], string> = {
     mass: "重量",

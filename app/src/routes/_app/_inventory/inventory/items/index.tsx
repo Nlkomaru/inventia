@@ -244,7 +244,7 @@ function InventoryPage() {
     };
 
     return (
-        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+        <main className="w-full space-y-6 p-4 sm:p-6 lg:p-8">
             <header className="flex items-center justify-between gap-4">
                 <h1 className="mt-1 text-2xl font-bold">在庫一覧</h1>
                 <Button
@@ -416,7 +416,7 @@ function InventoryPage() {
 
 function InventoryPending() {
     return (
-        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+        <main className="w-full space-y-6 p-4 sm:p-6 lg:p-8">
             <p className="text-sm text-muted-foreground">
                 在庫を読み込んでいます…
             </p>
@@ -427,7 +427,7 @@ function InventoryPending() {
 function InventoryError({ error }: ErrorComponentProps) {
     const router = useRouter();
     return (
-        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+        <main className="w-full space-y-6 p-4 sm:p-6 lg:p-8">
             <div
                 aria-live="polite"
                 className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"

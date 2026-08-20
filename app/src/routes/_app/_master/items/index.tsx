@@ -71,7 +71,7 @@ function ItemsPage() {
 
 function ItemsPending() {
     return (
-        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+        <main className="w-full space-y-6 p-4 sm:p-6 lg:p-8">
             <p className="text-sm text-muted-foreground">
                 品目を読み込んでいます…
             </p>
@@ -81,7 +81,7 @@ function ItemsPending() {
 
 function ItemsError({ error }: ErrorComponentProps) {
     return (
-        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+        <main className="w-full space-y-6 p-4 sm:p-6 lg:p-8">
             <p
                 role="alert"
                 className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"

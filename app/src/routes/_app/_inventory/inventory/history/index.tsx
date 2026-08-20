@@ -79,7 +79,7 @@ export const Route = createFileRoute("/_app/_inventory/inventory/history/")({
     errorComponent: StockHistoryError,
 });
 
-const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "w-full space-y-6 p-4 sm:p-6 lg:p-8";
 
 const reasonLabels: Record<StockMovementReason, string> = {
     purchase: "購入",

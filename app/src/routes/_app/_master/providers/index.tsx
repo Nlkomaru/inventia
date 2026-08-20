@@ -24,7 +24,7 @@ function ProvidersPage() {
 
 function ProvidersPending() {
     return (
-        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+        <main className="w-full space-y-6 p-4 sm:p-6 lg:p-8">
             <p className="text-sm text-muted-foreground">
                 外部連携先を読み込んでいます…
             </p>
@@ -34,7 +34,7 @@ function ProvidersPending() {
 
 function ProvidersError({ error }: ErrorComponentProps) {
     return (
-        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+        <main className="w-full space-y-6 p-4 sm:p-6 lg:p-8">
             <p
                 role="alert"
                 className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"

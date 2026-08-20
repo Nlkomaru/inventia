@@ -32,8 +32,7 @@ import {
 } from "../-functions/receipt-format";
 
 // 幅は他の画面と揃える。ここだけ狭いと一覧から入ったときに幅が変わって見える
-const pageClassName =
-    "mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "flex w-full flex-col gap-6 p-4 sm:p-6 lg:p-8";
 
 /** 画像は API から配信する。R2 のオブジェクトキーは公開しない。 */
 const receiptImageSrc = (receiptId: string): string =>

@@ -268,7 +268,7 @@ export function ItemMasterPage({
             : null);
 
     return (
-        <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+        <main className="w-full space-y-6 p-4 sm:p-6 lg:p-8">
             <header className="flex items-center justify-between gap-4">
                 <h1 className="mt-1 text-2xl font-bold">品目マスタ</h1>
                 <Button onClick={openCreate} type="button">
