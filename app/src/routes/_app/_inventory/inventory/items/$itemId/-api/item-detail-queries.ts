@@ -3,6 +3,7 @@ import {
     fetchCategory,
     fetchItemDetail,
     fetchLocation,
+    listItemPriceRecords,
     listItemStockHistory,
 } from "./item-detail-api";
 
@@ -31,6 +32,13 @@ export const itemStockHistoryKeys = {
     all: ["stock-history"] as const,
     item: (itemId: string) =>
         [...itemStockHistoryKeys.all, "item", itemId] as const,
+};
+
+// 価格はレシート反映でも増えるため、品目ごとの履歴を `prices` 名前空間の配下へ置く
+export const itemPriceRecordKeys = {
+    all: ["prices"] as const,
+    item: (itemId: string) =>
+        [...itemPriceRecordKeys.all, "item", itemId] as const,
 };
 
 // 在庫の変更は在庫一覧の集計にも効くため、入庫の後にまとめて無効化する
@@ -64,6 +72,22 @@ export const itemStockHistoryQueryOptions = (itemId: string) =>
         queryKey: itemStockHistoryKeys.item(itemId),
         queryFn: ({ pageParam }) =>
             listItemStockHistory({
+                data: {
+                    itemId,
+                    ...(pageParam === null ? {} : { cursor: pageParam }),
+                    limit: itemHistoryPageSize,
+                },
+            }),
+        initialPageParam: null as string | null,
+        getNextPageParam: (lastPage) => lastPage.nextCursor,
+    });
+
+/** 価格履歴も cursor ページング。並びは記録日時の新しい順。 */
+export const itemPriceRecordsQueryOptions = (itemId: string) =>
+    infiniteQueryOptions({
+        queryKey: itemPriceRecordKeys.item(itemId),
+        queryFn: ({ pageParam }) =>
+            listItemPriceRecords({
                 data: {
                     itemId,
                     ...(pageParam === null ? {} : { cursor: pageParam }),
