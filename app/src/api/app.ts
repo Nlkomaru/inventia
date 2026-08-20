@@ -11,6 +11,7 @@ import { pricesApp } from "./http/prices";
 import { readingApp } from "./http/reading";
 import { receiptsApp } from "./http/receipts";
 import { stockInventoryApp, stockItemsApp } from "./http/stock";
+import { storesApp } from "./http/stores";
 import { handleMcpRequest } from "./mcp/handler";
 
 export const apiApp = new OpenAPIHono<ApiBindings>();
@@ -26,6 +27,7 @@ apiApp.route("/api/items", readingApp);
 apiApp.route("/api/inventory", stockInventoryApp);
 apiApp.route("/api/settings/integrations", integrationsApp);
 apiApp.route("/api/receipts", receiptsApp);
+apiApp.route("/api/stores", storesApp);
 
 apiApp.doc31("/api/openapi", {
     openapi: "3.1.0",
