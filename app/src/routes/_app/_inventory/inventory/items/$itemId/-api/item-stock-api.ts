@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type ItemLotDto, itemLotDtoSchema } from "@/domain/lot";
+import { type ItemLotListDto, itemLotListDtoSchema } from "@/domain/lot";
 import { type PriceRecordDto, priceRecordDtoSchema } from "@/domain/price";
 import {
     type StockMovementReason,
@@ -69,15 +69,19 @@ export const receiveStock = (
     );
 };
 
-/** 既存ロットの期限だけを直す。数量は動かないため在庫履歴は増えない。 */
+/**
+ * 既存ロットの期限だけを直す。数量は動かないため在庫履歴は増えない。
+ * 応答は直したロット 1 件ではなく、訂正後の在庫ありロット全件（FEFO 順）。
+ * 期限をまとめると 2 つのロットが 1 つになるため、1 件では表せない。
+ */
 export const updateLotExpiry = (
     itemId: string,
     lotId: string,
     expiryDate: string | null,
-): Promise<ItemLotDto> =>
+): Promise<ItemLotListDto> =>
     request(
         `/api/items/${encodeURIComponent(itemId)}/lots/${encodeURIComponent(lotId)}`,
-        itemLotDtoSchema,
+        itemLotListDtoSchema,
         "期限を変更できませんでした",
         {
             method: "PATCH",
