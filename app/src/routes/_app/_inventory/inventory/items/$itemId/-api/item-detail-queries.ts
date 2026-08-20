@@ -5,6 +5,7 @@ import {
     fetchLocation,
     listItemPriceRecords,
     listItemStockHistory,
+    listStoreOptions,
 } from "./item-detail-api";
 
 // 品目の詳細は在庫操作の後に無効化したいため、在庫関連ルートと同じ `items` 名前空間へ入れる
@@ -96,4 +97,17 @@ export const itemPriceRecordsQueryOptions = (itemId: string) =>
             }),
         initialPageParam: null as string | null,
         getNextPageParam: (lastPage) => lastPage.nextCursor,
+    });
+
+// 店舗マスタと同じ名前空間を共有し、マスタ側の invalidateQueries(["stores"]) を波及させる
+export const storeKeys = {
+    all: ["stores"] as const,
+    options: () => [...storeKeys.all, "options"] as const,
+};
+
+/** 価格フォームの店舗選択肢。 */
+export const storeOptionsQueryOptions = () =>
+    queryOptions({
+        queryKey: storeKeys.options(),
+        queryFn: () => listStoreOptions(),
     });

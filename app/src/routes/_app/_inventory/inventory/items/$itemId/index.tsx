@@ -8,7 +8,7 @@ import {
     Link,
     useRouter,
 } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
     readingStatusLabels,
     resolveExpirySignal,
@@ -47,6 +47,8 @@ import {
     itemStockHistoryQueryOptions,
     locationDetailQueryOptions,
 } from "./-api/item-detail-queries";
+import { ItemLotExpiryForm } from "./-components/item-lot-expiry-form";
+import { ItemPriceForm } from "./-components/item-price-form";
 import { ItemReceiveForm } from "./-components/item-receive-form";
 
 // 期限が近いと見なす日数。在庫一覧の色分けと同じ値を使う
@@ -127,6 +129,8 @@ function ItemDetailPage() {
         () => priceQuery.data.pages.flatMap((page) => page.items),
         [priceQuery.data],
     );
+    // 期限を編集中のロット。1 度に 1 行だけ開く
+    const [editingLotId, setEditingLotId] = useState<string | null>(null);
     // 期限判定の基準時刻。1 回の描画で共通の基準を使う
     const now = useMemo(() => Date.now(), []);
     const lots = useMemo(() => sortLotsFefo(item.lots), [item.lots]);
@@ -216,6 +220,9 @@ function ItemDetailPage() {
                                         数量
                                     </TableHead>
                                     <TableHead>状態</TableHead>
+                                    <TableHead className="text-right">
+                                        操作
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -225,12 +232,25 @@ function ItemDetailPage() {
                                         now,
                                         soonWithinDays,
                                     );
+                                    const editing = editingLotId === lot.id;
                                     return (
                                         <TableRow key={lot.id}>
-                                            <TableCell className="whitespace-nowrap">
-                                                {signal.date ?? "期限なし"}
+                                            <TableCell className="whitespace-nowrap align-top">
+                                                {editing ? (
+                                                    <ItemLotExpiryForm
+                                                        itemId={item.id}
+                                                        lot={lot}
+                                                        onClose={() =>
+                                                            setEditingLotId(
+                                                                null,
+                                                            )
+                                                        }
+                                                    />
+                                                ) : (
+                                                    (signal.date ?? "期限なし")
+                                                )}
                                             </TableCell>
-                                            <TableCell className="text-right font-mono whitespace-nowrap tabular-nums">
+                                            <TableCell className="text-right align-top font-mono whitespace-nowrap tabular-nums">
                                                 {formatQuantity(
                                                     lot.quantity,
                                                     item.baseUnit,
@@ -238,7 +258,7 @@ function ItemDetailPage() {
                                             </TableCell>
                                             <TableCell
                                                 className={cn(
-                                                    "whitespace-nowrap text-sm text-muted-foreground",
+                                                    "align-top whitespace-nowrap text-sm text-muted-foreground",
                                                     signal.state ===
                                                         "expired" &&
                                                         "font-semibold text-destructive",
@@ -250,6 +270,20 @@ function ItemDetailPage() {
                                                 signal.state === "soon"
                                                     ? signal.label
                                                     : "—"}
+                                            </TableCell>
+                                            <TableCell className="text-right align-top">
+                                                <Button
+                                                    aria-label={`${signal.date ?? "期限なし"}のロットの期限を変更`}
+                                                    disabled={editing}
+                                                    onClick={() =>
+                                                        setEditingLotId(lot.id)
+                                                    }
+                                                    size="sm"
+                                                    type="button"
+                                                    variant="outline"
+                                                >
+                                                    期限を変更
+                                                </Button>
                                             </TableCell>
                                         </TableRow>
                                     );
@@ -342,7 +376,9 @@ function ItemDetailPage() {
                         この品目の価格記録を新しい順に表示します。単価は内容量で割った比較用の値です。
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-col gap-4">
+                <CardContent className="flex flex-col gap-6">
+                    <ItemPriceForm item={item} />
+
                     {priceError ? (
                         <div
                             aria-live="assertive"
