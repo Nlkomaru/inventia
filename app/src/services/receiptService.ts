@@ -72,7 +72,8 @@ import {
 import { type ItemSearchEnv, indexItems } from "./itemSearchService";
 import { createItem, ItemServiceError } from "./itemService";
 import { adjustStock, StockServiceError } from "./stockService";
-import { findOrCreateStoreByName } from "./storeService";
+import type { StoreSearchEnv } from "./storeSearchService";
+import { resolveStoreByName } from "./storeService";
 
 export type ReceiptServiceErrorCode =
     | "RECEIPT_INVALID_INPUT"
@@ -1036,8 +1037,8 @@ export const applyReceipt = async (
     db: D1Database,
     receiptId: string,
     input: unknown,
-    // 新規作成した品目の索引更新に使う binding
-    searchEnv: ItemSearchEnv,
+    // 新規作成した品目と、購入元の店舗の索引更新に使う binding
+    searchEnv: ItemSearchEnv & StoreSearchEnv,
 ): Promise<ReceiptApplyResult> => {
     const validated = receiptApplyInputSchema.safeParse(input);
     if (!validated.success) {
@@ -1080,8 +1081,9 @@ export const applyReceipt = async (
     }
     const purchase = await resolveReceiptPurchase(db, receipt, parsed);
     // 価格履歴を店舗マスタへ結び付ける。購入元は購入 1 件につき 1 つなので、
-    // 明細ごとではなくここで 1 回だけ解決する
-    const store = await findOrCreateStoreByName(db, purchase.source);
+    // 明細ごとではなくここで 1 回だけ解決する。同じ店舗の表記揺れを新規作成
+    // させないため、完全一致・正規化一致・店名の類似検索の順で既存を探す
+    const store = await resolveStoreByName(searchEnv, purchase.source);
     // 反映の同一性はレシート自身が持つ購入で決まる。利用者が画面を触って
     // 別の key を送っても、最初の適用と同じ key・同じ購入日時へ収束させる
     const applyKey = purchase.idempotencyKey ?? `receipt:${receipt.id}`;

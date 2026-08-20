@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeReceiptName } from "./receipt-match";
 
 /** The identifier format used by stores. */
 export const storeIdSchema = z.string().trim().min(1).max(128);
@@ -145,3 +146,21 @@ export const decodeStoreCursor = (cursor: string): StoreCursor | null => {
         return null;
     }
 };
+
+/**
+ * 照合用に店名を均す。表記辞書と同じ規則（NFKC、小文字化、空白と記号の除去）を
+ * わざと共有する。レシートの店名は半角カナや空白の有無が揺れるため、同じ揺れを
+ * 同じ規則で吸収しないと品目と店舗で結果が食い違う。
+ */
+export const normalizeStoreName = (raw: string): string =>
+    normalizeReceiptName(raw);
+
+/**
+ * 類似検索で「同じ店舗」と見なす cosine 類似度の下限。
+ *
+ * 同じチェーンの別支店（「富澤商店 ミッドランドスクエア店」と
+ * 「富澤商店 名古屋店」）は埋め込みが非常に近くなるため、しきい値を下げると
+ * 別々の店舗が黙って 1 つに統合され、価格の帰属が壊れる。取り違えて統合するより
+ * 分かれて登録される方が店舗マスタで直せるので、意図的に高くしている。
+ */
+export const storeVectorMatchThreshold = 0.95;

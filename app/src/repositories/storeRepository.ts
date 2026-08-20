@@ -106,6 +106,21 @@ export const listStores = async (
 };
 
 /** 価格一覧の N+1 を避けるため、必要な店舗をまとめて 1 クエリで読む。 */
+/**
+ * 正規化した名前で突き合わせるための一覧。店舗は品目と違い数が限られるため
+ * 全件をメモリへ載せる。上限は暴走しないための保険で、超えた分は照合対象外になる。
+ */
+export const listStoresForMatching = async (
+    db: D1Database,
+    limit = 1_000,
+): Promise<StoreRow[]> => {
+    const result = await db
+        .prepare(`${storeSelect} ORDER BY name ASC, id ASC LIMIT ?1`)
+        .bind(limit)
+        .all<StoreRow>();
+    return result.results;
+};
+
 export const listStoresByIds = async (
     db: D1Database,
     ids: readonly string[],
@@ -236,6 +251,7 @@ export const storeRepository = {
     findStoreByName,
     listStores,
     listStoresByIds,
+    listStoresForMatching,
     insertStore,
     updateStore,
     updateStoreFavicon,

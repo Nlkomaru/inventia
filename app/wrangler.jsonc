@@ -50,6 +50,15 @@
 			"binding": "VECTORIZE",
 			"index_name": "inventia-items",
 			"remote": true
+		},
+		/**
+		 * 店名の埋め込み索引。品目とは別の索引にする。同じ索引へ混ぜると
+		 * 品目検索が店舗のベクトルを「D1 に無い stale な品目」とみなして削除する。
+		 */
+		{
+			"binding": "VECTORIZE_STORES",
+			"index_name": "inventia-stores",
+			"remote": true
 		}
 	],
 	"secrets": {

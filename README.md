@@ -39,7 +39,7 @@ TanStack Start forwards `/api/*` to the Hono app in `app/src/api/app.ts`.
 | `/api/openapi` | OpenAPI 3.1 document |
 | `/api/scalar` | Scalar API reference |
 | `/api/mcp` | Stateless MCP Streamable HTTP endpoint |
-| `/api/stores` | Store master data and favicon images |
+| `/api/stores` | Store master data, favicon images, and the store name index |
 | `/api/settings/integrations/openrouter` | OpenRouter integration status and encrypted API key configuration |
 
 The MCP server exposes these tools through the same services as the HTTP API:
@@ -66,8 +66,9 @@ pnpm build
 
 ### Bindings during development
 
-`app/wrangler.jsonc` binds the deployed D1 database, R2 bucket and Vectorize
-index, and `dev`, `build` and `preview` all connect to them. There is no local
+`app/wrangler.jsonc` binds the deployed D1 database, R2 bucket and the two
+Vectorize indexes (`inventia-items` for item names, `inventia-stores` for store
+names), and `dev`, `build` and `preview` all connect to them. There is no local
 emulation, so **`dev` and `preview` read and write production data**.
 
 The deployed Worker sits behind Cloudflare Access, so the remote bindings need
