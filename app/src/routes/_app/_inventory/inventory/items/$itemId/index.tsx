@@ -32,12 +32,18 @@ import {
 } from "@/components/ui/table";
 import type { ItemDetailDto } from "@/domain/item";
 import { sortLotsFefo } from "@/domain/lot";
+import {
+    type PriceRecordDto,
+    priceComparisonBasis,
+    priceComparisonUnit,
+} from "@/domain/price";
 import type { StockMovementReason } from "@/domain/stock";
 import { formatDisplayDate, formatDisplayDateTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import {
     categoryDetailQueryOptions,
     itemDetailQueryOptions,
+    itemPriceRecordsQueryOptions,
     itemStockHistoryQueryOptions,
     locationDetailQueryOptions,
 } from "./-api/item-detail-queries";
@@ -84,6 +90,9 @@ export const Route = createFileRoute(
             context.queryClient.ensureInfiniteQueryData(
                 itemStockHistoryQueryOptions(params.itemId),
             ),
+            context.queryClient.ensureInfiniteQueryData(
+                itemPriceRecordsQueryOptions(params.itemId),
+            ),
         ]);
     },
     staticData: {
@@ -111,11 +120,21 @@ function ItemDetailPage() {
         () => historyQuery.data.pages.flatMap((page) => page.movements),
         [historyQuery.data],
     );
+    const priceQuery = useSuspenseInfiniteQuery(
+        itemPriceRecordsQueryOptions(itemId),
+    );
+    const priceRecords = useMemo(
+        () => priceQuery.data.pages.flatMap((page) => page.items),
+        [priceQuery.data],
+    );
     // 期限判定の基準時刻。1 回の描画で共通の基準を使う
     const now = useMemo(() => Date.now(), []);
     const lots = useMemo(() => sortLotsFefo(item.lots), [item.lots]);
     const historyError = historyQuery.error
         ? errorMessage(historyQuery.error, "在庫履歴を読み込めませんでした")
+        : null;
+    const priceError = priceQuery.error
+        ? errorMessage(priceQuery.error, "価格を読み込めませんでした")
         : null;
     const lowStock =
         item.currentQuantity === 0 ||
@@ -318,6 +337,121 @@ function ItemDetailPage() {
 
             <Card>
                 <CardHeader>
+                    <CardTitle>価格</CardTitle>
+                    <CardDescription>
+                        この品目の価格記録を新しい順に表示します。単価は内容量で割った比較用の値です。
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                    {priceError ? (
+                        <div
+                            aria-live="assertive"
+                            className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+                            role="alert"
+                        >
+                            <span>{priceError}</span>
+                            <Button
+                                onClick={() => void priceQuery.refetch()}
+                                size="sm"
+                                type="button"
+                                variant="outline"
+                            >
+                                再読み込み
+                            </Button>
+                        </div>
+                    ) : null}
+
+                    {priceRecords.length === 0 ? (
+                        <p
+                            aria-live="polite"
+                            className="text-sm text-muted-foreground"
+                        >
+                            価格の記録がありません。レシートを反映するか価格 API
+                            で記録すると表示されます。
+                        </p>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>店舗</TableHead>
+                                    <TableHead>内容量</TableHead>
+                                    <TableHead className="text-right">
+                                        価格
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        単価
+                                    </TableHead>
+                                    <TableHead>記録日時</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {priceRecords.map((record) => (
+                                    <TableRow key={record.id}>
+                                        <TableCell className="align-top">
+                                            <span className="flex items-center gap-2">
+                                                {record.storeFaviconUrl ===
+                                                null ? null : (
+                                                    <img
+                                                        alt=""
+                                                        className="size-4 rounded-sm"
+                                                        src={
+                                                            record.storeFaviconUrl
+                                                        }
+                                                    />
+                                                )}
+                                                {record.url === null ? (
+                                                    formatStoreLabel(record)
+                                                ) : (
+                                                    <a
+                                                        className="underline underline-offset-4"
+                                                        href={record.url}
+                                                        rel="noreferrer"
+                                                        target="_blank"
+                                                    >
+                                                        {formatStoreLabel(
+                                                            record,
+                                                        )}
+                                                    </a>
+                                                )}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell className="align-top">
+                                            {formatContent(record)}
+                                        </TableCell>
+                                        <TableCell className="text-right align-top font-mono whitespace-nowrap tabular-nums">
+                                            {formatPrice(record.price)}
+                                        </TableCell>
+                                        <TableCell className="text-right align-top whitespace-nowrap">
+                                            {formatUnitPrice(record)}
+                                        </TableCell>
+                                        <TableCell className="align-top whitespace-nowrap">
+                                            {formatDateTime(record.recordedAt)}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                </CardContent>
+                <CardFooter className="justify-end">
+                    <Button
+                        disabled={
+                            !priceQuery.hasNextPage ||
+                            priceQuery.isFetchingNextPage
+                        }
+                        onClick={() => void priceQuery.fetchNextPage()}
+                        type="button"
+                        variant="outline"
+                    >
+                        {priceQuery.isFetchingNextPage
+                            ? "読み込み中…"
+                            : "続きを読み込む"}
+                    </Button>
+                </CardFooter>
+            </Card>
+
+            <Card>
+                <CardHeader>
                     <CardTitle>在庫履歴</CardTitle>
                     <CardDescription>
                         この品目の入出庫と棚卸・調整を新しい順に表示します。
@@ -496,6 +630,26 @@ const formatDateTime = (value: string): string =>
 
 const formatExpiryDate = (value: string | null): string =>
     (value === null ? null : formatDisplayDate(value)) ?? "期限なし";
+
+/** 店舗マスタを持たない古い行は自由記述の source をそのまま出す。 */
+const formatStoreLabel = (record: PriceRecordDto): string =>
+    record.storeName ?? record.source;
+
+/** 内容量は 1 個あたり × 個数で示し、包装があれば併記する。 */
+const formatContent = (record: PriceRecordDto): string => {
+    const amount = `${record.contentAmount.toLocaleString("ja-JP")} × ${record.setCount} ${record.baseUnit}`;
+    return record.packaging === null
+        ? amount
+        : `${amount}（${record.packaging}）`;
+};
+
+const formatPrice = (price: number): string =>
+    `¥${price.toLocaleString("ja-JP")}`;
+
+// 単価は 100 g / 100 mL あたりの値なので、kg や L を基準単位にした品目でも
+// 比較単位そのものを表示する
+const formatUnitPrice = (record: PriceRecordDto): string =>
+    `${record.unitPrice.toFixed(2)} 円 / ${priceComparisonBasis(record.baseDimension)} ${priceComparisonUnit(record.baseDimension, record.baseUnit)}`;
 
 /** 読書状態は書籍カテゴリーの品目だけが持つ。未設定は「—」で示す。 */
 const formatReadingState = (item: ItemDetailDto): string => {

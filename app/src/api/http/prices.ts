@@ -44,7 +44,8 @@ const errorResponses = {
         content: responseContent(priceErrorSchema),
     },
     404: {
-        description: "The requested item does not exist.",
+        description:
+            "The referenced record does not exist. Codes: PRICE_ITEM_NOT_FOUND (the item does not exist), PRICE_STORE_NOT_FOUND (storeId does not match any store; create the store first).",
         content: responseContent(priceErrorSchema),
     },
     409: {
@@ -83,7 +84,7 @@ pricesApp.openAPIRegistry.registerPath({
     tags: ["Prices"],
     summary: "Record an item price",
     description:
-        "Adds a price observation. Unit price is calculated when the record is read and is not stored.",
+        "Adds a price observation. Unit price is calculated when the record is read and is not stored. Send storeId to link the record to a store, source to name the origin as free text, or both; when only storeId is sent the store name is copied into source. Omitting both is refused.",
     request: {
         params: z.object({ itemId: itemIdParameter }),
         body: {

@@ -21,6 +21,9 @@ export interface PriceRecordRow {
     packaging: string | null;
     price: number;
     source: string;
+    storeId: string | null;
+    storeName: string | null;
+    storeFaviconObjectKey: string | null;
     url: string | null;
     recordedAt: string;
     createdAt: string;
@@ -63,13 +66,17 @@ const priceRecordSelect = `
         p.packaging,
         p.price,
         p.source,
+        p.store_id AS storeId,
+        s.name AS storeName,
+        s.favicon_object_key AS storeFaviconObjectKey,
         p.url,
         p.recorded_at AS recordedAt,
         p.created_at AS createdAt,
         i.base_unit AS baseUnit,
         i.base_dimension AS baseDimension
     FROM price_records AS p
-    INNER JOIN items AS i ON i.id = p.item_id`;
+    INNER JOIN items AS i ON i.id = p.item_id
+    LEFT JOIN stores AS s ON s.id = p.store_id`;
 
 // The comparison value is derived from persisted price/package fields. The
 // REAL cast avoids integer overflow while keeping the expression aligned with
@@ -89,6 +96,9 @@ const priceRecordComparisonSelect = `
         p.packaging,
         p.price,
         p.source,
+        p.store_id AS storeId,
+        s.name AS storeName,
+        s.favicon_object_key AS storeFaviconObjectKey,
         p.url,
         p.recorded_at AS recordedAt,
         p.created_at AS createdAt,
@@ -96,7 +106,8 @@ const priceRecordComparisonSelect = `
         i.base_dimension AS baseDimension,
         ${unitPriceExpression} AS unitPrice
     FROM price_records AS p
-    INNER JOIN items AS i ON i.id = p.item_id`;
+    INNER JOIN items AS i ON i.id = p.item_id
+    LEFT JOIN stores AS s ON s.id = p.store_id`;
 
 export const findItemPricingContext = async (
     db: D1Database,
@@ -202,7 +213,10 @@ export const listPriceRecordsByUnitPrice = async (
  */
 export const insertPriceRecord = async (
     db: D1Database,
-    input: NormalizedPriceRecordCreateInput & { purchaseId?: string | null },
+    input: NormalizedPriceRecordCreateInput & {
+        purchaseId?: string | null;
+        source: string;
+    },
 ): Promise<PriceRecordRow> => {
     const id = newId();
     const createdAt = new Date().toISOString();
@@ -210,8 +224,8 @@ export const insertPriceRecord = async (
         .prepare(
             `INSERT INTO price_records
                 (id, item_id, purchase_id, content_amount, set_count, packaging, price,
-                 source, url, recorded_at, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)`,
+                 source, store_id, url, recorded_at, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
         )
         .bind(
             id,
@@ -222,6 +236,7 @@ export const insertPriceRecord = async (
             input.packaging ?? null,
             input.price,
             input.source,
+            input.storeId ?? null,
             input.url ?? null,
             input.recordedAt,
             createdAt,

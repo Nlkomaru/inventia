@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { CategoryDto } from "@/domain/category";
 import type { ItemDetailDto } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
+import type { PriceRecordDto } from "@/domain/price";
 import type { StockHistoryResult } from "@/domain/stock";
 
 // 読み取りは server function から service を直接呼ぶ。SSR から自分の公開 URL を
@@ -81,3 +82,26 @@ export const listItemStockHistory = createServerFn({ method: "GET" })
         ]);
         return listStockHistory(env.DB, data);
     });
+
+/**
+ * この品目の価格記録。cursor の扱いは在庫履歴と同じで、未指定はキーごと省略する。
+ */
+const itemPriceRecordsInputSchema = z.object({
+    itemId: z.string().trim().min(1),
+    cursor: z.string().min(1).optional(),
+    limit: z.number().int().min(1).max(100),
+});
+
+export const listItemPriceRecords = createServerFn({ method: "GET" })
+    .validator(itemPriceRecordsInputSchema)
+    .handler(
+        async ({
+            data,
+        }): Promise<{ items: PriceRecordDto[]; nextCursor: string | null }> => {
+            const [{ env }, { listPriceRecords }] = await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/priceService"),
+            ]);
+            return listPriceRecords(env.DB, data);
+        },
+    );
