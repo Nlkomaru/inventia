@@ -130,9 +130,12 @@ export const items = sqliteTable(
         locationId: text("location_id")
             .notNull()
             .references(() => storageLocations.id, { onDelete: "restrict" }),
-        // 在庫集計の基準単位（g / mL / ロール / 冊 / 件 など）。商品作成後は変更不可
+        // 在庫集計の基準単位（g / mL / ロール / 冊 / 件 など）。作成後も変更できるが、
+        // 変更は換算を伴わないつけ替えで、保存済みの数量（current_quantity、
+        // item_lots、stock_movements、価格の内容量）はどれも書き換えない
         baseUnit: text("base_unit").notNull(),
-        // 異なるディメンション間の換算・比較は行わない
+        // 異なるディメンション間の換算・比較は行わない。base_unit と同様に後から
+        // 変更できるが、既存の数量はその数値のまま残り、表す意味だけが変わる
         baseDimension: text("base_dimension", {
             enum: unitDimensions,
         }).notNull(),
@@ -144,6 +147,13 @@ export const items = sqliteTable(
         memo: text("memo"),
         createdAt: text("created_at").notNull(),
         updatedAt: text("updated_at").notNull(),
+        // 一覧で品目を見分けるための絵文字 1 個。AI 生成に失敗しても品目作成を
+        // 止めないため、既定のプレースホルダ '📦' を DEFAULT に持たせる。
+        // 「絵文字 1 個」の判定は CHECK では書けないため domain/item.ts の
+        // itemEmojiSchema で担保する（ALTER ADD COLUMN では table 制約を足せず、
+        // 足そうとするとテーブル再構築になり既存データを危険にさらす）。
+        // ALTER ADD COLUMN で末尾に追加されるため宣言順も末尾に合わせる
+        emoji: text("emoji").notNull().default("📦"),
     },
     (t) => [
         index("idx_items_location").on(t.locationId),
@@ -274,6 +284,30 @@ export const stores = sqliteTable(
     ],
 );
 
+// 外部アプリ（料理アプリ等）への連携先。stock_movements から参照し、
+// 在庫を何に使ったかの行き先を表す。ファビコンは URL 文字列で持ち、
+// stores と違い画像そのものは保管しない
+export const externalProviders = sqliteTable(
+    "external_providers",
+    {
+        id: text("id").primaryKey(),
+        name: text("name").notNull(),
+        // 連携先のファビコン画像の URL。任意
+        faviconUrl: text("favicon_url"),
+        // 連携先サイトの URL。任意
+        url: text("url"),
+        createdAt: text("created_at").notNull(),
+        updatedAt: text("updated_at").notNull(),
+    },
+    (t) => [
+        uniqueIndex("uq_external_providers_name").on(t.name),
+        check(
+            "ck_external_providers_name_not_empty",
+            sql`length(${t.name}) > 0`,
+        ),
+    ],
+);
+
 // 購入イベント。stock_movements（在庫増）と price_records（価格明細）を 1 つの
 // 購入行為として束ね、コメントとレシートの結び付け先になる。
 // 合計金額は明細から導出するため持たない。レシートとの結び付けは receipts.purchase_id
@@ -321,6 +355,19 @@ export const stockMovements = sqliteTable(
         idempotencyKey: text("idempotency_key"),
         // 履歴は不変のため updated_at を持たない
         createdAt: text("created_at").notNull(),
+        // 以下 3 列は ALTER ADD COLUMN で末尾に追加されるため宣言順も末尾に合わせる。
+        // 用途の自由記述。reason（enum）では表せない「食べ物作成」などを記録する
+        note: text("note"),
+        // 在庫の行き先になった外部アプリ。参照されている連携先の削除は restrict で禁止する
+        externalProviderId: text("external_provider_id").references(
+            () => externalProviders.id,
+            { onDelete: "restrict" },
+        ),
+        // 連携先アプリ側の ID。Inventia は解釈せず、保存と表示だけを行う。
+        // 「external_id は external_provider_id が無いと持てない」制約は
+        // ALTER ADD COLUMN では足せない（table 制約の追加はテーブル再構築を招く）ため、
+        // services/stockService.ts で検証する
+        externalId: text("external_id"),
     },
     (t) => [
         uniqueIndex("uq_stock_movements_idempotency_key").on(t.idempotencyKey),
@@ -339,6 +386,11 @@ export const stockMovements = sqliteTable(
         ),
         // 全商品の履歴一覧の cursor paging 用
         index("idx_stock_movements_occurred").on(t.occurredAt, t.id),
+        // 連携先 → 履歴の逆引きと、連携先が参照中かどうかの判定用
+        index("idx_stock_movements_external").on(
+            t.externalProviderId,
+            t.externalId,
+        ),
         // 期限ごとの棚卸しでは合計差分 0 でロット内訳だけが変わる正当な操作があるため、
         // reason = 'stocktake' に限り delta 0 を許可する
         check(
@@ -499,6 +551,8 @@ export const priceRecords = sqliteTable(
         index("idx_price_records_purchase").on(t.purchaseId),
         // 店舗 → 価格の逆引きと参照中判定用
         index("idx_price_records_store").on(t.storeId),
+        // 品目で絞らない価格一覧の cursor paging 用。(recorded_at, id) で順序を一意に安定させる
+        index("idx_price_records_recorded_at").on(t.recordedAt, t.id),
         check(
             "ck_price_records_content_amount_positive",
             sql`${t.contentAmount} > 0`,
@@ -565,6 +619,11 @@ export const integrationSettings = sqliteTable(
             .default(0),
         createdAt: text("created_at").notNull(),
         updatedAt: text("updated_at").notNull(),
+        // 品目の絵文字を生成する LLM のモデル ID。ALTER ADD COLUMN で末尾に
+        // 追加されるため宣言順も末尾に合わせる
+        emojiModel: text("emoji_model")
+            .notNull()
+            .default("deepseek/deepseek-v4-flash-0731"),
     },
     (t) => [
         check(
