@@ -24,6 +24,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import type { LocationDto } from "@/domain/location";
+import type { BreadcrumbsLoaderData } from "@/lib/breadcrumbs";
 import {
     locationItemsQueryOptions,
     locationTreeQueryOptions,
@@ -71,10 +72,13 @@ export const Route = createFileRoute("/_app/_master/locations/$")({
         await context.queryClient.ensureQueryData(
             locationItemsQueryOptions(targetId),
         );
-    },
-    staticData: {
-        // パンくずは静的なため場所名は入れず、見出しと祖先の並びで示す
-        breadcrumbs: [{ label: "保管場所", to: "/locations" }],
+        // 祖先はそのまま段になる。階層が深くなっても route を増やさずに済む
+        return {
+            breadcrumbs: ancestry.map((location) => ({
+                label: location.name,
+                to: buildLocationDetailPath(tree.locations, location.id),
+            })),
+        } satisfies BreadcrumbsLoaderData;
     },
     component: LocationDetailPage,
     pendingComponent: LocationDetailPending,

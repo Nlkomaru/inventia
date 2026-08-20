@@ -14,11 +14,7 @@ import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/_app/settings/mcp/")({
     staticData: {
-        breadcrumbs: [
-            { label: "Inventia", to: "/inventory/items" },
-            { label: "設定" },
-            { label: "MCP エンドポイント" },
-        ],
+        breadcrumbs: [{ label: "MCP エンドポイント" }],
     },
     component: McpSettingsPage,
 });

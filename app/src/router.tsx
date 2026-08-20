@@ -1,6 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
+import type { Breadcrumb } from "./lib/breadcrumbs";
 import { routeTree } from "./routeTree.gen";
 
 export function getRouter() {
@@ -37,9 +38,8 @@ declare module "@tanstack/react-router" {
     }
 
     interface StaticDataRouteOption {
-        breadcrumbs?: ReadonlyArray<{
-            label: string;
-            to?: string;
-        }>;
+        // 名前が固定の段。読み込んでみないと決まらない段は loader の戻り値へ
+        // `breadcrumbs` を含める（lib/breadcrumbs.ts を参照）
+        breadcrumbs?: ReadonlyArray<Breadcrumb>;
     }
 }

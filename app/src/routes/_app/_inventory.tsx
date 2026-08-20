@@ -1,8 +1,9 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { groupBreadcrumb } from "@/lib/navigation";
 
 export const Route = createFileRoute("/_app/_inventory")({
     staticData: {
-        breadcrumbs: [{ label: "在庫管理", to: "/inventory/items" }],
+        breadcrumbs: [groupBreadcrumb("在庫管理")],
     },
     component: InventoryLayout,
 });

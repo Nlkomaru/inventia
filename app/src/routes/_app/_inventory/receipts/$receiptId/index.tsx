@@ -21,6 +21,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import type { BreadcrumbsLoaderData } from "@/lib/breadcrumbs";
 import { receiptDetailQueryOptions } from "../-api/receipt-queries";
 import {
     formatDateTimeOrDash,
@@ -41,16 +42,14 @@ const receiptImageSrc = (receiptId: string): string =>
 const resumeSearch = (receiptId: string) => ({ receiptId }) as const;
 
 export const Route = createFileRoute("/_app/_inventory/receipts/$receiptId/")({
-    loader: ({ context, params }) =>
-        context.queryClient.ensureQueryData(
+    loader: async ({ context, params }) => {
+        const receipt = await context.queryClient.ensureQueryData(
             receiptDetailQueryOptions(params.receiptId),
-        ),
-    staticData: {
-        // パンくずは静的なため店舗名は入れず、見出しで示す
-        breadcrumbs: [
-            { label: "レシート取込", to: "/receipts" },
-            { label: "取込の内容" },
-        ],
+        );
+        // 末尾の段は読み取れた店名。読み取れないレシートもあるため既定を持つ
+        return {
+            breadcrumbs: [{ label: receipt.storeName ?? "取込の内容" }],
+        } satisfies BreadcrumbsLoaderData;
     },
     component: ReceiptDetailPage,
     pendingComponent: ReceiptDetailPending,

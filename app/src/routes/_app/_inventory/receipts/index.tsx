@@ -72,9 +72,6 @@ export const Route = createFileRoute("/_app/_inventory/receipts/")({
         context.queryClient.ensureInfiniteQueryData(
             receiptListQueryOptions(deps),
         ),
-    staticData: {
-        breadcrumbs: [{ label: "レシート取込" }],
-    },
     component: ReceiptListPage,
     pendingComponent: ReceiptListPending,
     errorComponent: ReceiptListError,

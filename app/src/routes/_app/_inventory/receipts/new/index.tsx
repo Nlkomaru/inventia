@@ -94,10 +94,7 @@ export const Route = createFileRoute("/_app/_inventory/receipts/new/")({
         }
     },
     staticData: {
-        breadcrumbs: [
-            { label: "レシート取込", to: "/receipts" },
-            { label: "新規取込" },
-        ],
+        breadcrumbs: [{ label: "新規取込" }],
     },
     component: ReceiptIntakePage,
     pendingComponent: ReceiptIntakePending,

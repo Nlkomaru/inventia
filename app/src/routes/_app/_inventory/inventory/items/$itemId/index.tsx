@@ -38,6 +38,7 @@ import {
     priceComparisonUnit,
 } from "@/domain/price";
 import type { StockMovementReason } from "@/domain/stock";
+import type { BreadcrumbsLoaderData } from "@/lib/breadcrumbs";
 import { formatDisplayDate, formatDisplayDateTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import {
@@ -96,10 +97,10 @@ export const Route = createFileRoute(
                 itemPriceRecordsQueryOptions(params.itemId),
             ),
         ]);
-    },
-    staticData: {
-        // パンくずは静的なため品目名は入れず、見出しで示す
-        breadcrumbs: [{ label: "品目" }],
+        // 末尾の段は品目名。親の「在庫一覧」はレイアウトの route が名乗る
+        return {
+            breadcrumbs: [{ label: item.name }],
+        } satisfies BreadcrumbsLoaderData;
     },
     component: ItemDetailPage,
     pendingComponent: ItemDetailPending,

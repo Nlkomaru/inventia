@@ -13,16 +13,21 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppInventoryRouteImport } from './routes/_app/_inventory'
 import { Route as AppMasterRouteImport } from './routes/_app/_master'
+import { Route as AppPriceRouteImport } from './routes/_app/_price'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
+import { Route as AppInventoryReceiptsRouteImport } from './routes/_app/_inventory/receipts'
+import { Route as AppMasterLocationsRouteImport } from './routes/_app/_master/locations'
 import { Route as AppLicenseIndexRouteImport } from './routes/_app/license/index'
 import { Route as AppInventoryInventoryIndexRouteImport } from './routes/_app/_inventory/inventory/index'
+import { Route as AppInventoryInventoryItemsRouteImport } from './routes/_app/_inventory/inventory/items'
 import { Route as AppInventoryReceiptsIndexRouteImport } from './routes/_app/_inventory/receipts/index'
 import { Route as AppMasterCategoriesIndexRouteImport } from './routes/_app/_master/categories/index'
 import { Route as AppMasterItemsIndexRouteImport } from './routes/_app/_master/items/index'
 import { Route as AppMasterLocationsIndexRouteImport } from './routes/_app/_master/locations/index'
 import { Route as AppMasterLocationsSplatRouteImport } from './routes/_app/_master/locations/$'
 import { Route as AppMasterReferencesIndexRouteImport } from './routes/_app/_master/references/index'
-import { Route as AppMasterStoresIndexRouteImport } from './routes/_app/_master/stores/index'
+import { Route as AppPriceStoresIndexRouteImport } from './routes/_app/_price/stores/index'
 import { Route as AppSettingsIntegrationsIndexRouteImport } from './routes/_app/settings/integrations/index'
 import { Route as AppSettingsMcpIndexRouteImport } from './routes/_app/settings/mcp/index'
 import { Route as AppInventoryInventoryHistoryIndexRouteImport } from './routes/_app/_inventory/inventory/history/index'
@@ -51,10 +56,29 @@ const AppMasterRoute = AppMasterRouteImport.update({
   id: '/_master',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPriceRoute = AppPriceRouteImport.update({
+  id: '/_price',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiSplatRoute = ApiSplatRouteImport.update({
   id: '/api/$',
   path: '/api/$',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppInventoryReceiptsRoute = AppInventoryReceiptsRouteImport.update({
+  id: '/receipts',
+  path: '/receipts',
+  getParentRoute: () => AppInventoryRoute,
+} as any)
+const AppMasterLocationsRoute = AppMasterLocationsRouteImport.update({
+  id: '/locations',
+  path: '/locations',
+  getParentRoute: () => AppMasterRoute,
 } as any)
 const AppLicenseIndexRoute = AppLicenseIndexRouteImport.update({
   id: '/license/',
@@ -67,11 +91,17 @@ const AppInventoryInventoryIndexRoute =
     path: '/inventory/',
     getParentRoute: () => AppInventoryRoute,
   } as any)
+const AppInventoryInventoryItemsRoute =
+  AppInventoryInventoryItemsRouteImport.update({
+    id: '/inventory/items',
+    path: '/inventory/items',
+    getParentRoute: () => AppInventoryRoute,
+  } as any)
 const AppInventoryReceiptsIndexRoute =
   AppInventoryReceiptsIndexRouteImport.update({
-    id: '/receipts/',
-    path: '/receipts/',
-    getParentRoute: () => AppInventoryRoute,
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppInventoryReceiptsRoute,
   } as any)
 const AppMasterCategoriesIndexRoute =
   AppMasterCategoriesIndexRouteImport.update({
@@ -85,14 +115,14 @@ const AppMasterItemsIndexRoute = AppMasterItemsIndexRouteImport.update({
   getParentRoute: () => AppMasterRoute,
 } as any)
 const AppMasterLocationsIndexRoute = AppMasterLocationsIndexRouteImport.update({
-  id: '/locations/',
-  path: '/locations/',
-  getParentRoute: () => AppMasterRoute,
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppMasterLocationsRoute,
 } as any)
 const AppMasterLocationsSplatRoute = AppMasterLocationsSplatRouteImport.update({
-  id: '/locations/$',
-  path: '/locations/$',
-  getParentRoute: () => AppMasterRoute,
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => AppMasterLocationsRoute,
 } as any)
 const AppMasterReferencesIndexRoute =
   AppMasterReferencesIndexRouteImport.update({
@@ -100,21 +130,21 @@ const AppMasterReferencesIndexRoute =
     path: '/references/',
     getParentRoute: () => AppMasterRoute,
   } as any)
-const AppMasterStoresIndexRoute = AppMasterStoresIndexRouteImport.update({
+const AppPriceStoresIndexRoute = AppPriceStoresIndexRouteImport.update({
   id: '/stores/',
   path: '/stores/',
-  getParentRoute: () => AppMasterRoute,
+  getParentRoute: () => AppPriceRoute,
 } as any)
 const AppSettingsIntegrationsIndexRoute =
   AppSettingsIntegrationsIndexRouteImport.update({
-    id: '/settings/integrations/',
-    path: '/settings/integrations/',
-    getParentRoute: () => AppRoute,
+    id: '/integrations/',
+    path: '/integrations/',
+    getParentRoute: () => AppSettingsRoute,
   } as any)
 const AppSettingsMcpIndexRoute = AppSettingsMcpIndexRouteImport.update({
-  id: '/settings/mcp/',
-  path: '/settings/mcp/',
-  getParentRoute: () => AppRoute,
+  id: '/mcp/',
+  path: '/mcp/',
+  getParentRoute: () => AppSettingsRoute,
 } as any)
 const AppInventoryInventoryHistoryIndexRoute =
   AppInventoryInventoryHistoryIndexRouteImport.update({
@@ -130,9 +160,9 @@ const AppInventoryInventoryIssueIndexRoute =
   } as any)
 const AppInventoryInventoryItemsIndexRoute =
   AppInventoryInventoryItemsIndexRouteImport.update({
-    id: '/inventory/items/',
-    path: '/inventory/items/',
-    getParentRoute: () => AppInventoryRoute,
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppInventoryInventoryItemsRoute,
   } as any)
 const AppInventoryInventoryReceiveIndexRoute =
   AppInventoryInventoryReceiveIndexRouteImport.update({
@@ -148,27 +178,31 @@ const AppInventoryInventoryStocktakeIndexRoute =
   } as any)
 const AppInventoryReceiptsReceiptIdIndexRoute =
   AppInventoryReceiptsReceiptIdIndexRouteImport.update({
-    id: '/receipts/$receiptId/',
-    path: '/receipts/$receiptId/',
-    getParentRoute: () => AppInventoryRoute,
+    id: '/$receiptId/',
+    path: '/$receiptId/',
+    getParentRoute: () => AppInventoryReceiptsRoute,
   } as any)
 const AppInventoryReceiptsNewIndexRoute =
   AppInventoryReceiptsNewIndexRouteImport.update({
-    id: '/receipts/new/',
-    path: '/receipts/new/',
-    getParentRoute: () => AppInventoryRoute,
+    id: '/new/',
+    path: '/new/',
+    getParentRoute: () => AppInventoryReceiptsRoute,
   } as any)
 const AppInventoryInventoryItemsItemIdIndexRoute =
   AppInventoryInventoryItemsItemIdIndexRouteImport.update({
-    id: '/inventory/items/$itemId/',
-    path: '/inventory/items/$itemId/',
-    getParentRoute: () => AppInventoryRoute,
+    id: '/$itemId/',
+    path: '/$itemId/',
+    getParentRoute: () => AppInventoryInventoryItemsRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/settings': typeof AppSettingsRouteWithChildren
   '/api/$': typeof ApiSplatRoute
+  '/receipts': typeof AppInventoryReceiptsRouteWithChildren
+  '/locations': typeof AppMasterLocationsRouteWithChildren
   '/license/': typeof AppLicenseIndexRoute
+  '/inventory/items': typeof AppInventoryInventoryItemsRouteWithChildren
   '/locations/$': typeof AppMasterLocationsSplatRoute
   '/inventory/': typeof AppInventoryInventoryIndexRoute
   '/receipts/': typeof AppInventoryReceiptsIndexRoute
@@ -176,7 +210,7 @@ export interface FileRoutesByFullPath {
   '/items/': typeof AppMasterItemsIndexRoute
   '/locations/': typeof AppMasterLocationsIndexRoute
   '/references/': typeof AppMasterReferencesIndexRoute
-  '/stores/': typeof AppMasterStoresIndexRoute
+  '/stores/': typeof AppPriceStoresIndexRoute
   '/settings/integrations/': typeof AppSettingsIntegrationsIndexRoute
   '/settings/mcp/': typeof AppSettingsMcpIndexRoute
   '/inventory/history/': typeof AppInventoryInventoryHistoryIndexRoute
@@ -190,6 +224,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
+  '/settings': typeof AppSettingsRouteWithChildren
   '/api/$': typeof ApiSplatRoute
   '/license': typeof AppLicenseIndexRoute
   '/locations/$': typeof AppMasterLocationsSplatRoute
@@ -199,7 +234,7 @@ export interface FileRoutesByTo {
   '/items': typeof AppMasterItemsIndexRoute
   '/locations': typeof AppMasterLocationsIndexRoute
   '/references': typeof AppMasterReferencesIndexRoute
-  '/stores': typeof AppMasterStoresIndexRoute
+  '/stores': typeof AppPriceStoresIndexRoute
   '/settings/integrations': typeof AppSettingsIntegrationsIndexRoute
   '/settings/mcp': typeof AppSettingsMcpIndexRoute
   '/inventory/history': typeof AppInventoryInventoryHistoryIndexRoute
@@ -216,9 +251,14 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/_app/_inventory': typeof AppInventoryRouteWithChildren
   '/_app/_master': typeof AppMasterRouteWithChildren
+  '/_app/_price': typeof AppPriceRouteWithChildren
+  '/_app/settings': typeof AppSettingsRouteWithChildren
   '/api/$': typeof ApiSplatRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/_inventory/receipts': typeof AppInventoryReceiptsRouteWithChildren
+  '/_app/_master/locations': typeof AppMasterLocationsRouteWithChildren
   '/_app/license/': typeof AppLicenseIndexRoute
+  '/_app/_inventory/inventory/items': typeof AppInventoryInventoryItemsRouteWithChildren
   '/_app/_master/locations/$': typeof AppMasterLocationsSplatRoute
   '/_app/_inventory/inventory/': typeof AppInventoryInventoryIndexRoute
   '/_app/_inventory/receipts/': typeof AppInventoryReceiptsIndexRoute
@@ -226,7 +266,7 @@ export interface FileRoutesById {
   '/_app/_master/items/': typeof AppMasterItemsIndexRoute
   '/_app/_master/locations/': typeof AppMasterLocationsIndexRoute
   '/_app/_master/references/': typeof AppMasterReferencesIndexRoute
-  '/_app/_master/stores/': typeof AppMasterStoresIndexRoute
+  '/_app/_price/stores/': typeof AppPriceStoresIndexRoute
   '/_app/settings/integrations/': typeof AppSettingsIntegrationsIndexRoute
   '/_app/settings/mcp/': typeof AppSettingsMcpIndexRoute
   '/_app/_inventory/inventory/history/': typeof AppInventoryInventoryHistoryIndexRoute
@@ -242,8 +282,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/settings'
     | '/api/$'
+    | '/receipts'
+    | '/locations'
     | '/license/'
+    | '/inventory/items'
     | '/locations/$'
     | '/inventory/'
     | '/receipts/'
@@ -265,6 +309,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/settings'
     | '/api/$'
     | '/license'
     | '/locations/$'
@@ -290,9 +335,14 @@ export interface FileRouteTypes {
     | '/_app'
     | '/_app/_inventory'
     | '/_app/_master'
+    | '/_app/_price'
+    | '/_app/settings'
     | '/api/$'
     | '/_app/'
+    | '/_app/_inventory/receipts'
+    | '/_app/_master/locations'
     | '/_app/license/'
+    | '/_app/_inventory/inventory/items'
     | '/_app/_master/locations/$'
     | '/_app/_inventory/inventory/'
     | '/_app/_inventory/receipts/'
@@ -300,7 +350,7 @@ export interface FileRouteTypes {
     | '/_app/_master/items/'
     | '/_app/_master/locations/'
     | '/_app/_master/references/'
-    | '/_app/_master/stores/'
+    | '/_app/_price/stores/'
     | '/_app/settings/integrations/'
     | '/_app/settings/mcp/'
     | '/_app/_inventory/inventory/history/'
@@ -348,12 +398,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMasterRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/_price': {
+      id: '/_app/_price'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppPriceRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/$': {
       id: '/api/$'
       path: '/api/$'
       fullPath: '/api/$'
       preLoaderRoute: typeof ApiSplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/_inventory/receipts': {
+      id: '/_app/_inventory/receipts'
+      path: '/receipts'
+      fullPath: '/receipts'
+      preLoaderRoute: typeof AppInventoryReceiptsRouteImport
+      parentRoute: typeof AppInventoryRoute
+    }
+    '/_app/_master/locations': {
+      id: '/_app/_master/locations'
+      path: '/locations'
+      fullPath: '/locations'
+      preLoaderRoute: typeof AppMasterLocationsRouteImport
+      parentRoute: typeof AppMasterRoute
     }
     '/_app/license/': {
       id: '/_app/license/'
@@ -369,12 +447,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInventoryInventoryIndexRouteImport
       parentRoute: typeof AppInventoryRoute
     }
+    '/_app/_inventory/inventory/items': {
+      id: '/_app/_inventory/inventory/items'
+      path: '/inventory/items'
+      fullPath: '/inventory/items'
+      preLoaderRoute: typeof AppInventoryInventoryItemsRouteImport
+      parentRoute: typeof AppInventoryRoute
+    }
     '/_app/_inventory/receipts/': {
       id: '/_app/_inventory/receipts/'
-      path: '/receipts'
+      path: '/'
       fullPath: '/receipts/'
       preLoaderRoute: typeof AppInventoryReceiptsIndexRouteImport
-      parentRoute: typeof AppInventoryRoute
+      parentRoute: typeof AppInventoryReceiptsRoute
     }
     '/_app/_master/categories/': {
       id: '/_app/_master/categories/'
@@ -392,17 +477,17 @@ declare module '@tanstack/react-router' {
     }
     '/_app/_master/locations/': {
       id: '/_app/_master/locations/'
-      path: '/locations'
+      path: '/'
       fullPath: '/locations/'
       preLoaderRoute: typeof AppMasterLocationsIndexRouteImport
-      parentRoute: typeof AppMasterRoute
+      parentRoute: typeof AppMasterLocationsRoute
     }
     '/_app/_master/locations/$': {
       id: '/_app/_master/locations/$'
-      path: '/locations/$'
+      path: '/$'
       fullPath: '/locations/$'
       preLoaderRoute: typeof AppMasterLocationsSplatRouteImport
-      parentRoute: typeof AppMasterRoute
+      parentRoute: typeof AppMasterLocationsRoute
     }
     '/_app/_master/references/': {
       id: '/_app/_master/references/'
@@ -411,26 +496,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMasterReferencesIndexRouteImport
       parentRoute: typeof AppMasterRoute
     }
-    '/_app/_master/stores/': {
-      id: '/_app/_master/stores/'
+    '/_app/_price/stores/': {
+      id: '/_app/_price/stores/'
       path: '/stores'
       fullPath: '/stores/'
-      preLoaderRoute: typeof AppMasterStoresIndexRouteImport
-      parentRoute: typeof AppMasterRoute
+      preLoaderRoute: typeof AppPriceStoresIndexRouteImport
+      parentRoute: typeof AppPriceRoute
     }
     '/_app/settings/integrations/': {
       id: '/_app/settings/integrations/'
-      path: '/settings/integrations'
+      path: '/integrations'
       fullPath: '/settings/integrations/'
       preLoaderRoute: typeof AppSettingsIntegrationsIndexRouteImport
-      parentRoute: typeof AppRoute
+      parentRoute: typeof AppSettingsRoute
     }
     '/_app/settings/mcp/': {
       id: '/_app/settings/mcp/'
-      path: '/settings/mcp'
+      path: '/mcp'
       fullPath: '/settings/mcp/'
       preLoaderRoute: typeof AppSettingsMcpIndexRouteImport
-      parentRoute: typeof AppRoute
+      parentRoute: typeof AppSettingsRoute
     }
     '/_app/_inventory/inventory/history/': {
       id: '/_app/_inventory/inventory/history/'
@@ -448,10 +533,10 @@ declare module '@tanstack/react-router' {
     }
     '/_app/_inventory/inventory/items/': {
       id: '/_app/_inventory/inventory/items/'
-      path: '/inventory/items'
+      path: '/'
       fullPath: '/inventory/items/'
       preLoaderRoute: typeof AppInventoryInventoryItemsIndexRouteImport
-      parentRoute: typeof AppInventoryRoute
+      parentRoute: typeof AppInventoryInventoryItemsRoute
     }
     '/_app/_inventory/inventory/receive/': {
       id: '/_app/_inventory/inventory/receive/'
@@ -469,101 +554,161 @@ declare module '@tanstack/react-router' {
     }
     '/_app/_inventory/receipts/$receiptId/': {
       id: '/_app/_inventory/receipts/$receiptId/'
-      path: '/receipts/$receiptId'
+      path: '/$receiptId'
       fullPath: '/receipts/$receiptId/'
       preLoaderRoute: typeof AppInventoryReceiptsReceiptIdIndexRouteImport
-      parentRoute: typeof AppInventoryRoute
+      parentRoute: typeof AppInventoryReceiptsRoute
     }
     '/_app/_inventory/receipts/new/': {
       id: '/_app/_inventory/receipts/new/'
-      path: '/receipts/new'
+      path: '/new'
       fullPath: '/receipts/new/'
       preLoaderRoute: typeof AppInventoryReceiptsNewIndexRouteImport
-      parentRoute: typeof AppInventoryRoute
+      parentRoute: typeof AppInventoryReceiptsRoute
     }
     '/_app/_inventory/inventory/items/$itemId/': {
       id: '/_app/_inventory/inventory/items/$itemId/'
-      path: '/inventory/items/$itemId'
+      path: '/$itemId'
       fullPath: '/inventory/items/$itemId/'
       preLoaderRoute: typeof AppInventoryInventoryItemsItemIdIndexRouteImport
-      parentRoute: typeof AppInventoryRoute
+      parentRoute: typeof AppInventoryInventoryItemsRoute
     }
   }
 }
 
-interface AppInventoryRouteChildren {
-  AppInventoryInventoryIndexRoute: typeof AppInventoryInventoryIndexRoute
+interface AppInventoryReceiptsRouteChildren {
   AppInventoryReceiptsIndexRoute: typeof AppInventoryReceiptsIndexRoute
-  AppInventoryInventoryHistoryIndexRoute: typeof AppInventoryInventoryHistoryIndexRoute
-  AppInventoryInventoryIssueIndexRoute: typeof AppInventoryInventoryIssueIndexRoute
-  AppInventoryInventoryItemsIndexRoute: typeof AppInventoryInventoryItemsIndexRoute
-  AppInventoryInventoryReceiveIndexRoute: typeof AppInventoryInventoryReceiveIndexRoute
-  AppInventoryInventoryStocktakeIndexRoute: typeof AppInventoryInventoryStocktakeIndexRoute
   AppInventoryReceiptsReceiptIdIndexRoute: typeof AppInventoryReceiptsReceiptIdIndexRoute
   AppInventoryReceiptsNewIndexRoute: typeof AppInventoryReceiptsNewIndexRoute
+}
+
+const AppInventoryReceiptsRouteChildren: AppInventoryReceiptsRouteChildren = {
+  AppInventoryReceiptsIndexRoute: AppInventoryReceiptsIndexRoute,
+  AppInventoryReceiptsReceiptIdIndexRoute:
+    AppInventoryReceiptsReceiptIdIndexRoute,
+  AppInventoryReceiptsNewIndexRoute: AppInventoryReceiptsNewIndexRoute,
+}
+
+const AppInventoryReceiptsRouteWithChildren =
+  AppInventoryReceiptsRoute._addFileChildren(AppInventoryReceiptsRouteChildren)
+
+interface AppInventoryInventoryItemsRouteChildren {
+  AppInventoryInventoryItemsIndexRoute: typeof AppInventoryInventoryItemsIndexRoute
   AppInventoryInventoryItemsItemIdIndexRoute: typeof AppInventoryInventoryItemsItemIdIndexRoute
 }
 
+const AppInventoryInventoryItemsRouteChildren: AppInventoryInventoryItemsRouteChildren =
+  {
+    AppInventoryInventoryItemsIndexRoute: AppInventoryInventoryItemsIndexRoute,
+    AppInventoryInventoryItemsItemIdIndexRoute:
+      AppInventoryInventoryItemsItemIdIndexRoute,
+  }
+
+const AppInventoryInventoryItemsRouteWithChildren =
+  AppInventoryInventoryItemsRoute._addFileChildren(
+    AppInventoryInventoryItemsRouteChildren,
+  )
+
+interface AppInventoryRouteChildren {
+  AppInventoryReceiptsRoute: typeof AppInventoryReceiptsRouteWithChildren
+  AppInventoryInventoryItemsRoute: typeof AppInventoryInventoryItemsRouteWithChildren
+  AppInventoryInventoryIndexRoute: typeof AppInventoryInventoryIndexRoute
+  AppInventoryInventoryHistoryIndexRoute: typeof AppInventoryInventoryHistoryIndexRoute
+  AppInventoryInventoryIssueIndexRoute: typeof AppInventoryInventoryIssueIndexRoute
+  AppInventoryInventoryReceiveIndexRoute: typeof AppInventoryInventoryReceiveIndexRoute
+  AppInventoryInventoryStocktakeIndexRoute: typeof AppInventoryInventoryStocktakeIndexRoute
+}
+
 const AppInventoryRouteChildren: AppInventoryRouteChildren = {
+  AppInventoryReceiptsRoute: AppInventoryReceiptsRouteWithChildren,
+  AppInventoryInventoryItemsRoute: AppInventoryInventoryItemsRouteWithChildren,
   AppInventoryInventoryIndexRoute: AppInventoryInventoryIndexRoute,
-  AppInventoryReceiptsIndexRoute: AppInventoryReceiptsIndexRoute,
   AppInventoryInventoryHistoryIndexRoute:
     AppInventoryInventoryHistoryIndexRoute,
   AppInventoryInventoryIssueIndexRoute: AppInventoryInventoryIssueIndexRoute,
-  AppInventoryInventoryItemsIndexRoute: AppInventoryInventoryItemsIndexRoute,
   AppInventoryInventoryReceiveIndexRoute:
     AppInventoryInventoryReceiveIndexRoute,
   AppInventoryInventoryStocktakeIndexRoute:
     AppInventoryInventoryStocktakeIndexRoute,
-  AppInventoryReceiptsReceiptIdIndexRoute:
-    AppInventoryReceiptsReceiptIdIndexRoute,
-  AppInventoryReceiptsNewIndexRoute: AppInventoryReceiptsNewIndexRoute,
-  AppInventoryInventoryItemsItemIdIndexRoute:
-    AppInventoryInventoryItemsItemIdIndexRoute,
 }
 
 const AppInventoryRouteWithChildren = AppInventoryRoute._addFileChildren(
   AppInventoryRouteChildren,
 )
 
-interface AppMasterRouteChildren {
+interface AppMasterLocationsRouteChildren {
   AppMasterLocationsSplatRoute: typeof AppMasterLocationsSplatRoute
+  AppMasterLocationsIndexRoute: typeof AppMasterLocationsIndexRoute
+}
+
+const AppMasterLocationsRouteChildren: AppMasterLocationsRouteChildren = {
+  AppMasterLocationsSplatRoute: AppMasterLocationsSplatRoute,
+  AppMasterLocationsIndexRoute: AppMasterLocationsIndexRoute,
+}
+
+const AppMasterLocationsRouteWithChildren =
+  AppMasterLocationsRoute._addFileChildren(AppMasterLocationsRouteChildren)
+
+interface AppMasterRouteChildren {
+  AppMasterLocationsRoute: typeof AppMasterLocationsRouteWithChildren
   AppMasterCategoriesIndexRoute: typeof AppMasterCategoriesIndexRoute
   AppMasterItemsIndexRoute: typeof AppMasterItemsIndexRoute
-  AppMasterLocationsIndexRoute: typeof AppMasterLocationsIndexRoute
   AppMasterReferencesIndexRoute: typeof AppMasterReferencesIndexRoute
-  AppMasterStoresIndexRoute: typeof AppMasterStoresIndexRoute
 }
 
 const AppMasterRouteChildren: AppMasterRouteChildren = {
-  AppMasterLocationsSplatRoute: AppMasterLocationsSplatRoute,
+  AppMasterLocationsRoute: AppMasterLocationsRouteWithChildren,
   AppMasterCategoriesIndexRoute: AppMasterCategoriesIndexRoute,
   AppMasterItemsIndexRoute: AppMasterItemsIndexRoute,
-  AppMasterLocationsIndexRoute: AppMasterLocationsIndexRoute,
   AppMasterReferencesIndexRoute: AppMasterReferencesIndexRoute,
-  AppMasterStoresIndexRoute: AppMasterStoresIndexRoute,
 }
 
 const AppMasterRouteWithChildren = AppMasterRoute._addFileChildren(
   AppMasterRouteChildren,
 )
 
+interface AppPriceRouteChildren {
+  AppPriceStoresIndexRoute: typeof AppPriceStoresIndexRoute
+}
+
+const AppPriceRouteChildren: AppPriceRouteChildren = {
+  AppPriceStoresIndexRoute: AppPriceStoresIndexRoute,
+}
+
+const AppPriceRouteWithChildren = AppPriceRoute._addFileChildren(
+  AppPriceRouteChildren,
+)
+
+interface AppSettingsRouteChildren {
+  AppSettingsIntegrationsIndexRoute: typeof AppSettingsIntegrationsIndexRoute
+  AppSettingsMcpIndexRoute: typeof AppSettingsMcpIndexRoute
+}
+
+const AppSettingsRouteChildren: AppSettingsRouteChildren = {
+  AppSettingsIntegrationsIndexRoute: AppSettingsIntegrationsIndexRoute,
+  AppSettingsMcpIndexRoute: AppSettingsMcpIndexRoute,
+}
+
+const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
+  AppSettingsRouteChildren,
+)
+
 interface AppRouteChildren {
   AppInventoryRoute: typeof AppInventoryRouteWithChildren
   AppMasterRoute: typeof AppMasterRouteWithChildren
+  AppPriceRoute: typeof AppPriceRouteWithChildren
+  AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppIndexRoute: typeof AppIndexRoute
   AppLicenseIndexRoute: typeof AppLicenseIndexRoute
-  AppSettingsIntegrationsIndexRoute: typeof AppSettingsIntegrationsIndexRoute
-  AppSettingsMcpIndexRoute: typeof AppSettingsMcpIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppInventoryRoute: AppInventoryRouteWithChildren,
   AppMasterRoute: AppMasterRouteWithChildren,
+  AppPriceRoute: AppPriceRouteWithChildren,
+  AppSettingsRoute: AppSettingsRouteWithChildren,
   AppIndexRoute: AppIndexRoute,
   AppLicenseIndexRoute: AppLicenseIndexRoute,
-  AppSettingsIntegrationsIndexRoute: AppSettingsIntegrationsIndexRoute,
-  AppSettingsMcpIndexRoute: AppSettingsMcpIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

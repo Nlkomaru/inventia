@@ -9,9 +9,6 @@ import { LocationMasterPage } from "./-components/location-master-page";
 export const Route = createFileRoute("/_app/_master/locations/")({
     loader: ({ context }) =>
         context.queryClient.ensureQueryData(locationTreeQueryOptions()),
-    staticData: {
-        breadcrumbs: [{ label: "保管場所" }],
-    },
     component: LocationsPage,
     pendingComponent: LocationsPending,
     errorComponent: LocationsError,
