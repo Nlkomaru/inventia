@@ -1,4 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
+
+/** 価格フォームの店舗選択に必要な最小限。 */
+export type StoreOption = { id: string; name: string };
+
 import { z } from "zod";
 import type { CategoryDto } from "@/domain/category";
 import type { ItemDetailDto } from "@/domain/item";
@@ -105,3 +109,26 @@ export const listItemPriceRecords = createServerFn({ method: "GET" })
             return listPriceRecords(env.DB, data);
         },
     );
+
+/** 価格の記録先として選ぶ店舗の一覧。店舗は数が限られるため全件を集める。 */
+export const listStoreOptions = createServerFn({ method: "GET" }).handler(
+    async (): Promise<StoreOption[]> => {
+        const [{ env }, { listStores }] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/storeService"),
+        ]);
+        const options: StoreOption[] = [];
+        let cursor: string | undefined;
+        do {
+            const page = await listStores(env.DB, { limit: 100, cursor });
+            options.push(
+                ...page.items.map((store) => ({
+                    id: store.id,
+                    name: store.name,
+                })),
+            );
+            cursor = page.nextCursor ?? undefined;
+        } while (cursor);
+        return options;
+    },
+);
