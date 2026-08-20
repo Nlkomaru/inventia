@@ -120,6 +120,9 @@ export const itemListQuerySchema = z
         // 指定した読書状態が保存されている品目だけに絞る。読書状態を持たない品目は
         // どの値にも一致しない（未設定を unread とみなさない）
         readingStatus: readingStatusSchema.optional(),
+        // 並び順。expiry は期限が早い順（期限なしは最後）で、期限の近い在庫を
+        // 先頭のページで答えられるようにする。既定は従来どおり名前順
+        sort: z.enum(["name", "expiry"]).default("name"),
         limit: z.coerce.number().int().min(1).max(100).default(50),
         cursor: z.string().min(1).optional(),
     })
@@ -194,6 +197,30 @@ export const itemNameMatchOutputSchema = z
 export type ItemNameMatchInput = z.infer<typeof itemNameMatchInputSchema>;
 export type ItemNameMatchResult = z.infer<typeof itemNameMatchResultSchema>;
 export type ItemNameMatchOutput = z.infer<typeof itemNameMatchOutputSchema>;
+
+// id の一括読み取り。1 件ずつ引くと呼び出し回数が id の数に比例するため、
+// まとめて受ける。上限は D1 の bind 上限（100）に収まる値で、読書状態の
+// 一括取得が 1 つの IN 句を作るためこれ以上には広げられない
+export const itemBatchIdsMax = 90;
+
+export const itemBatchInputSchema = z
+    .object({
+        ids: z.array(z.string().trim().min(1)).min(1).max(itemBatchIdsMax),
+        // ロットは品目あたりの件数に上限が無いため、要約だけ欲しい場合に落とせる
+        includeLots: z.boolean().default(true),
+    })
+    .strict();
+
+export const itemBatchOutputSchema = z
+    .object({
+        items: z.array(itemDetailDtoSchema),
+        // 見つからなかった id。1 件の欠落で全体を失わせない
+        notFound: z.array(z.string()),
+    })
+    .strict();
+
+export type ItemBatchInput = z.infer<typeof itemBatchInputSchema>;
+export type ItemBatchOutput = z.infer<typeof itemBatchOutputSchema>;
 
 export type ItemCreateInput = z.infer<typeof itemCreateSchema>;
 export type ItemUpdateInput = z.infer<typeof itemUpdateSchema>;

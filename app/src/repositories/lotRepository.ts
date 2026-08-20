@@ -29,6 +29,9 @@ const lotColumns = `id,
 // FEFO 順（期限昇順・期限なし最後・同期限は id 昇順）で並びを一意に安定させる
 const fefoOrder = "ORDER BY (expiry_date IS NULL) ASC, expiry_date ASC, id ASC";
 
+// D1 の bind 上限（100）より小さく保つ。items 側の getItemsByIds と同じ値
+const listItemLotsChunkSize = 90;
+
 const errorMessage = (error: unknown): string =>
     error instanceof Error ? error.message : String(error);
 
@@ -50,6 +53,55 @@ export const listItemLots = async (
         .bind(itemId)
         .all<ItemLotRow>();
     return result.results;
+};
+
+/**
+ * 複数の品目のロットを IN 句 1 回で引く。品目ごとに問い合わせない用途のためにあり、
+ * プレースホルダ数は D1 の bind 上限に収まるようチャンクへ分ける。
+ * 返す Map は品目 id ごとに `listItemLots` と同じ FEFO 順を保つ。
+ */
+export const listItemLotsByItemIds = async (
+    db: D1Database,
+    itemIds: readonly string[],
+    options: ItemLotListOptions,
+): Promise<Map<string, ItemLotRow[]>> => {
+    const byItemId = new Map<string, ItemLotRow[]>();
+    if (itemIds.length === 0) {
+        return byItemId;
+    }
+    const chunks: string[][] = [];
+    for (
+        let offset = 0;
+        offset < itemIds.length;
+        offset += listItemLotsChunkSize
+    ) {
+        chunks.push([...itemIds].slice(offset, offset + listItemLotsChunkSize));
+    }
+    const results = await Promise.all(
+        chunks.map((chunk) => {
+            const placeholders = chunk.map(() => "?").join(", ");
+            return db
+                .prepare(
+                    `SELECT ${lotColumns}
+             FROM item_lots
+             WHERE item_id IN (${placeholders})${options.includeEmpty ? "" : " AND quantity > 0"}
+             ${fefoOrder}`,
+                )
+                .bind(...chunk)
+                .all<ItemLotRow>();
+        }),
+    );
+    for (const result of results) {
+        for (const row of result.results) {
+            const existing = byItemId.get(row.itemId);
+            if (existing) {
+                existing.push(row);
+            } else {
+                byItemId.set(row.itemId, [row]);
+            }
+        }
+    }
+    return byItemId;
 };
 
 export const getItemLot = async (

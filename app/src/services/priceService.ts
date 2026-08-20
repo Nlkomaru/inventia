@@ -6,10 +6,12 @@ import {
     encodePriceComparisonCursor,
     encodePriceRecordCursor,
     normalizeContentAmount,
+    type PriceBatchOutput,
     type PriceComparisonListInput,
     type PriceRecordCreateInput,
     type PriceRecordDto,
     type PriceRecordListInput,
+    priceBatchInputSchema,
     priceComparisonListInputSchema,
     priceRecordCreateInputSchema,
     priceRecordListInputSchema,
@@ -194,8 +196,8 @@ export const listPriceRecords = async (
         limit: parsed.limit,
         cursor,
     });
-    // toDto の第 2 引数は既定値で単価を計算する。map をそのまま渡すと
-    // 配列の index が単価として入ってしまうため、1 引数で呼ぶ
+    // toDto の第 2 引数は単価で、既定は行から計算する。map へ関数をそのまま渡すと
+    // 添字が単価として入るため、1 引数で呼ぶ
     const items = page.rows.map((row) => toDto(row));
     const last = items.at(-1);
     return {
@@ -253,5 +255,77 @@ export const compareUnitPrices = async (
                 : null,
     };
 };
+
+/**
+ * 複数品目の価格履歴をまとめて読む。cursor は品目ごとに紐付くため一括では扱わず、
+ * 品目ごとに `limitPerItem` で切って `truncated` を返す（続きは 1 品目ずつの経路）。
+ * 品目ごとのクエリは並列に投げるが、件数の上限は入力 schema 側で抑える。
+ */
+const listPriceBatch = async (
+    db: D1Database,
+    input: unknown,
+    read: (args: {
+        itemId: string;
+        limit: number;
+    }) => Promise<{ items: PriceRecordDto[]; hasMore: boolean }>,
+): Promise<PriceBatchOutput> => {
+    const parsed = priceBatchInputSchema.safeParse(input);
+    if (!parsed.success) {
+        throw invalidInput("価格履歴の入力値を確認してください");
+    }
+    const itemIds = [...new Set(parsed.data.itemIds)];
+    const contexts = await Promise.all(
+        itemIds.map((itemId) => findItemPricingContext(db, itemId)),
+    );
+    const known = itemIds.filter((_, index) => contexts[index] !== null);
+    const notFound = itemIds.filter((_, index) => contexts[index] === null);
+    const pages = await Promise.all(
+        known.map((itemId) =>
+            read({ itemId, limit: parsed.data.limitPerItem }),
+        ),
+    );
+    return {
+        results: known.map((itemId, index) => ({
+            itemId,
+            items: pages[index]?.items ?? [],
+            truncated: pages[index]?.hasMore ?? false,
+        })),
+        notFound,
+    };
+};
+
+export const listPriceRecordsForItems = async (
+    db: D1Database,
+    input: unknown,
+): Promise<PriceBatchOutput> =>
+    await listPriceBatch(db, input, async ({ itemId, limit }) => {
+        const page = await listPriceRecordRows(db, {
+            itemId,
+            limit,
+            cursor: null,
+        });
+        return {
+            items: page.rows.map((row) => toDto(row)),
+            hasMore: page.hasMore,
+        };
+    });
+
+export const compareUnitPricesForItems = async (
+    db: D1Database,
+    input: unknown,
+): Promise<PriceBatchOutput> =>
+    await listPriceBatch(db, input, async ({ itemId, limit }) => {
+        const page = await listPriceRecordsByUnitPrice(db, {
+            itemId,
+            limit,
+            cursor: null,
+        });
+        return {
+            items: page.rows.map((row: PriceComparisonRecordRow) =>
+                toDto(row, row.unitPrice),
+            ),
+            hasMore: page.hasMore,
+        };
+    });
 
 export type { PriceRecordCreateInput, PriceRecordListInput };
