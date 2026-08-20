@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ItemSearchEnv } from "../../services/itemSearchService";
 import { registerCategoryTools } from "./tools/categories";
+import { registerExternalProviderTools } from "./tools/external-providers";
 import { registerHealthTool } from "./tools/health";
 import { registerInventoryTools } from "./tools/inventory";
 import { registerInventoryWriteTools } from "./tools/inventory-write";
@@ -20,6 +21,7 @@ export const createMcpServer = (env: ItemSearchEnv): McpServer => {
     registerInventoryTools(server, env);
     registerLocationTools(server, env.DB);
     registerCategoryTools(server, env.DB);
+    registerExternalProviderTools(server, env.DB);
     registerInventoryWriteTools(server, env);
 
     return server;
