@@ -16,65 +16,7 @@ import {
     SidebarMenuItem,
     SidebarRail,
 } from "@/components/ui/sidebar";
-
-interface NavItem {
-    title: string;
-    url: string;
-    /** SPA のルートではない画面は、取込作業などを中断させないため別タブで開く */
-    opensInNewTab?: boolean;
-}
-
-const data: {
-    navMain: { title: string; items: NavItem[] }[];
-    resources: NavItem[];
-} = {
-    navMain: [
-        {
-            title: "在庫管理",
-            items: [
-                { title: "在庫一覧", url: "/inventory/items" },
-                { title: "入庫", url: "/inventory/receive" },
-                { title: "出庫", url: "/inventory/issue" },
-                { title: "棚卸・調整", url: "/inventory/stocktake" },
-                { title: "在庫履歴", url: "/inventory/history" },
-                { title: "レシート取込", url: "/receipts/new" },
-            ],
-        },
-        {
-            title: "価格",
-            items: [{ title: "店舗", url: "/stores" }],
-        },
-        {
-            title: "マスタ",
-            items: [
-                { title: "品目", url: "/items" },
-                { title: "カテゴリ", url: "/categories" },
-                { title: "保管場所", url: "/locations" },
-                { title: "識別子・外部リンク", url: "/references" },
-            ],
-        },
-        {
-            title: "連携・設定",
-            items: [
-                { title: "AI・ベクトル検索", url: "/settings/integrations" },
-                {
-                    title: "API リファレンス",
-                    url: "/api/scalar",
-                    opensInNewTab: true,
-                },
-                { title: "MCP エンドポイント", url: "/settings/mcp" },
-            ],
-        },
-    ],
-    resources: [
-        { title: "OSS ライセンス", url: "/license" },
-        {
-            title: "GitHub",
-            url: "https://github.com/Nlkomaru/inventia",
-        },
-        { title: "Storybook", url: "/storybook", opensInNewTab: true },
-    ],
-};
+import { navigationGroups, navigationResources } from "@/lib/navigation";
 
 const deployedAt =
     import.meta.env.VITE_DEPLOYED_AT ?? "2026-08-11T04:59:26.000Z";
@@ -115,7 +57,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </SidebarMenu>
             </SidebarHeader>
             <SidebarContent>
-                {data.navMain.map((group) => (
+                {navigationGroups.map((group) => (
                     <SidebarGroup key={group.title}>
                         <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
                         <SidebarGroupContent>
@@ -160,7 +102,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarContent>
             <SidebarFooter className="mt-auto">
                 <SidebarMenu>
-                    {data.resources.map((item) => {
+                    {navigationResources.map((item) => {
                         // 別オリジンは常に別タブ。同一オリジンでも opensInNewTab で明示できる
                         const isExternal =
                             item.opensInNewTab ??
