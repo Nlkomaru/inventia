@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import {
     createColumnHelper,
     tableFeatures,
@@ -36,6 +37,10 @@ import {
 } from "@/components/ui/table";
 import type { LocationDto } from "@/domain/location";
 import { cn } from "@/lib/utils";
+import {
+    buildLocationDetailPath,
+    locationDetailBasePath,
+} from "../-functions/location-path";
 import {
     expandedLocationIdsAtom,
     locationQueryAtom,
@@ -191,7 +196,18 @@ export function LocationTable({
                                     // 子を持たない行も名前の開始位置を揃える
                                     <span aria-hidden className="size-7" />
                                 )}
-                                <span>{item.name}</span>
+                                <Link
+                                    className="underline-offset-4 hover:underline"
+                                    params={{
+                                        _splat: locationSplat(
+                                            locations,
+                                            item.id,
+                                        ),
+                                    }}
+                                    to="/locations/$"
+                                >
+                                    {item.name}
+                                </Link>
                             </div>
                         );
                     },
@@ -278,6 +294,7 @@ export function LocationTable({
         [
             copyLocationId,
             expanded,
+            locations,
             onDelete,
             query,
             setExpanded,
@@ -360,3 +377,12 @@ export function LocationTable({
         </section>
     );
 }
+
+/** `/locations/$` の余りに渡す、祖先を含む id の並び。 */
+const locationSplat = (
+    locations: readonly LocationDto[],
+    locationId: string,
+): string =>
+    buildLocationDetailPath(locations, locationId).slice(
+        `${locationDetailBasePath}/`.length,
+    );

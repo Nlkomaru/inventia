@@ -260,7 +260,7 @@ function ReceiveStockPage() {
                     登録済みの品目へ足す場合は、
                     <Link
                         className="underline underline-offset-4"
-                        to="/inventory"
+                        to="/inventory/items"
                     >
                         在庫一覧
                     </Link>

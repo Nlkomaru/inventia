@@ -2,6 +2,17 @@ packages:
   - app
   - storybook
 
+# storybook は app のコンポーネントをそのまま描くため、router を両方が同じ実体で
+# 解決しなければならない。別バージョンになると RouterProvider と Link が別
+# インスタンスになり、context を共有できず Link が壊れる。
+# catalog は直接依存だけを揃えるため、react-start が推移的に引く分も overrides で固定する。
+# react-start を上げて型が合わなくなったときは、この 2 つを同時に上げること
+catalog:
+  '@tanstack/react-router': 1.170.30
+
+overrides:
+  '@tanstack/react-router': 1.170.30
+
 allowBuilds:
   esbuild: true
   lightningcss: true

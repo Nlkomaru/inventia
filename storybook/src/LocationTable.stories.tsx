@@ -1,4 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import {
+	createMemoryHistory,
+	createRootRoute,
+	createRoute,
+	createRouter,
+	RouterProvider,
+} from "@tanstack/react-router";
 import { LocationTable } from "../../app/src/routes/_app/_master/locations/-components/location-table";
 
 const locations = [
@@ -28,12 +35,33 @@ const locations = [
 	},
 ];
 
+// 場所名は個別ページへの Link になっており、Link は router context を要求する。
+// app と同じ実体の router を使うため、workspace の catalog と overrides で
+// @tanstack/react-router のバージョンを揃えている
+const rootRoute = createRootRoute();
+const routeTree = rootRoute.addChildren([
+	createRoute({ getParentRoute: () => rootRoute, path: "/" }),
+	createRoute({ getParentRoute: () => rootRoute, path: "/locations/$" }),
+]);
+const storyRouter = createRouter({
+	routeTree,
+	history: createMemoryHistory({ initialEntries: ["/"] }),
+});
+
 const meta = {
 	title: "Locations/LocationTable",
 	component: LocationTable,
 	parameters: {
 		layout: "padded",
 	},
+	decorators: [
+		(Story: () => React.JSX.Element) => (
+			<RouterProvider
+				defaultComponent={() => <Story />}
+				router={storyRouter}
+			/>
+		),
+	],
 	args: {
 		locations,
 		itemCounts: { "warehouse-1": 3, "shelf-a": 5 },

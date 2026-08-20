@@ -13,7 +13,7 @@ import licenseGroups from "./-data.json";
 export const Route = createFileRoute("/_app/license/")({
     staticData: {
         breadcrumbs: [
-            { label: "Inventia", to: "/inventory" },
+            { label: "Inventia", to: "/inventory/items" },
             { label: "ライセンス" },
         ],
     },
