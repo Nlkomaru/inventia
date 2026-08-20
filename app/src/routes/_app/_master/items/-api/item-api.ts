@@ -147,11 +147,50 @@ export const listLocationTree = createServerFn({ method: "GET" }).handler(
 export const getItemDetail = createServerFn({ method: "GET" })
     .validator(z.object({ itemId: z.string().min(1) }))
     .handler(async ({ data }): Promise<ItemDetailDto> => {
-        const [{ env }, { getItem }] = await Promise.all([
+        const [{ env }, { getItem, ItemServiceError }] = await Promise.all([
             import("cloudflare:workers"),
             import("@/services/itemService"),
         ]);
-        return await getItem(env.DB, data.itemId);
+        try {
+            return await getItem(env.DB, data.itemId);
+        } catch (error) {
+            // service の文言は API 利用者向けの英語なので、画面へ出す分だけ
+            // 次に何をすればよいか分かる日本語へ言い換える
+            if (error instanceof ItemServiceError && error.status === 404) {
+                throw new Error(
+                    "品目が見つかりません。削除された可能性があります。品目マスタから選び直してください。",
+                );
+            }
+            throw error;
+        }
+    });
+
+/**
+ * 基準単位・次元のつけ替えで意味が変わる記録があるか。件数は使わないため、
+ * それぞれ 1 件だけ引いて有無を判定する。
+ */
+export type ItemRelabelImpact = {
+    hasStockMovements: boolean;
+    hasPriceRecords: boolean;
+};
+
+export const getItemRelabelImpact = createServerFn({ method: "GET" })
+    .validator(z.object({ itemId: z.string().min(1) }))
+    .handler(async ({ data }): Promise<ItemRelabelImpact> => {
+        const [{ env }, { listStockHistory }, { listPriceRecords }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/stockService"),
+                import("@/services/priceService"),
+            ]);
+        const [history, prices] = await Promise.all([
+            listStockHistory(env.DB, { itemId: data.itemId, limit: 1 }),
+            listPriceRecords(env.DB, { itemId: data.itemId, limit: 1 }),
+        ]);
+        return {
+            hasStockMovements: history.movements.length > 0,
+            hasPriceRecords: prices.items.length > 0,
+        };
     });
 
 export const createItem = (input: ItemCreateInput): Promise<ItemDto> =>

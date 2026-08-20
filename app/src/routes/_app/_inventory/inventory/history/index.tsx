@@ -30,11 +30,14 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import {
+    type StockMovementDto,
     type StockMovementReason,
     stockMovementReasonSchema,
     stockMovementReasons,
 } from "@/domain/stock";
 import { formatDisplayDateTime } from "@/lib/datetime";
+// 連携先の表示はマスタ画面と同じ部品を使う
+import { ProviderFavicon } from "@/routes/_app/_master/providers/-components/provider-favicon";
 import {
     itemListQueryOptions,
     stockHistoryQueryOptions,
@@ -76,7 +79,7 @@ export const Route = createFileRoute("/_app/_inventory/inventory/history/")({
     errorComponent: StockHistoryError,
 });
 
-const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "w-full space-y-6 p-4 sm:p-6 lg:p-8";
 
 const reasonLabels: Record<StockMovementReason, string> = {
     purchase: "購入",
@@ -261,6 +264,8 @@ function StockHistoryPage() {
                                 <TableHead className="px-5">
                                     ロット内訳
                                 </TableHead>
+                                <TableHead className="px-5">用途</TableHead>
+                                <TableHead className="px-5">連携先</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -321,6 +326,21 @@ function StockHistoryPage() {
                                                 </ul>
                                             )}
                                         </TableCell>
+                                        <TableCell className="px-5 py-3 align-top">
+                                            {movement.note ?? "—"}
+                                        </TableCell>
+                                        {/* 外部 ID は連携先アプリ用の値なので表示しない */}
+                                        <TableCell className="px-5 py-3 align-top">
+                                            {movement.externalProvider ? (
+                                                <ExternalProviderCell
+                                                    provider={
+                                                        movement.externalProvider
+                                                    }
+                                                />
+                                            ) : (
+                                                "—"
+                                            )}
+                                        </TableCell>
                                     </TableRow>
                                 );
                             })}
@@ -348,6 +368,36 @@ function StockHistoryPage() {
                 </div>
             </section>
         </main>
+    );
+}
+
+type MovementExternalProvider = NonNullable<
+    StockMovementDto["externalProvider"]
+>;
+
+/** 連携先はファビコンと名前で示し、URL を持つものだけリンクにする。 */
+function ExternalProviderCell({
+    provider,
+}: {
+    provider: MovementExternalProvider;
+}) {
+    const content = (
+        <>
+            <ProviderFavicon faviconUrl={provider.faviconUrl} />
+            <span>{provider.name}</span>
+        </>
+    );
+    return provider.url === null ? (
+        <span className="flex items-center gap-2">{content}</span>
+    ) : (
+        <a
+            className="flex items-center gap-2 underline underline-offset-4 hover:text-primary"
+            href={provider.url}
+            rel="noreferrer"
+            target="_blank"
+        >
+            {content}
+        </a>
     );
 }
 

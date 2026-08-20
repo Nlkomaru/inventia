@@ -67,7 +67,7 @@ export const Route = createFileRoute("/_app/_inventory/inventory/stocktake/")({
     errorComponent: StocktakeError,
 });
 
-const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "w-full space-y-6 p-4 sm:p-6 lg:p-8";
 
 // 未取得時の既定値は参照を固定する。毎描画で新しい配列を作ると
 // ロットに依存する useMemo が毎回作り直される

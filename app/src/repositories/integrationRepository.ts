@@ -1,4 +1,7 @@
-import { openRouterProvider } from "../domain/integration";
+import {
+    openRouterDefaultEmojiModel,
+    openRouterProvider,
+} from "../domain/integration";
 
 export interface IntegrationCredentialRecord {
     provider: typeof openRouterProvider;
@@ -40,6 +43,8 @@ export interface IntegrationSettingsRecord {
     /** null は既定の指示を使うことを表す。 */
     receiptPrompt: string | null;
     receiptToolsEnabled: boolean;
+    /** 品目の絵文字を生成するモデル。未保存の行では既定の ID を返す。 */
+    emojiModel: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -50,9 +55,19 @@ interface IntegrationSettingsRow {
     receiptPrompt: string | null;
     // SQLite に真偽値型が無いため 0 / 1 で読み書きする
     receiptToolsEnabled: number;
+    emojiModel: string | null;
     createdAt: string;
     updatedAt: string;
 }
+
+/**
+ * 絵文字モデルだけを省略できる書き込み。既存の呼び出し元は絵文字を扱わないため、
+ * 省略時は保存済みの値（無ければ既定）を保つ。
+ */
+export type IntegrationSettingsWrite = Omit<
+    IntegrationSettingsRecord,
+    "provider" | "emojiModel"
+> & { emojiModel?: string };
 
 const toSettingsRecord = (
     row: IntegrationSettingsRow,
@@ -68,6 +83,10 @@ const toSettingsRecord = (
                 ? row.receiptPrompt
                 : null,
         receiptToolsEnabled: row.receiptToolsEnabled !== 0,
+        emojiModel:
+            row.emojiModel !== null && row.emojiModel.length > 0
+                ? row.emojiModel
+                : openRouterDefaultEmojiModel,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };
@@ -137,6 +156,7 @@ export const getOpenRouterSettings = async (
                 chat_model AS chatModel,
                 receipt_prompt AS receiptPrompt,
                 receipt_tools_enabled AS receiptToolsEnabled,
+                emoji_model AS emojiModel,
                 created_at AS createdAt,
                 updated_at AS updatedAt
             FROM integration_settings
@@ -149,7 +169,7 @@ export const getOpenRouterSettings = async (
 
 export const upsertOpenRouterSettings = async (
     db: D1Database,
-    settings: Omit<IntegrationSettingsRecord, "provider">,
+    settings: IntegrationSettingsWrite,
 ): Promise<void> => {
     await db
         .prepare(
@@ -158,13 +178,16 @@ export const upsertOpenRouterSettings = async (
                 chat_model,
                 receipt_prompt,
                 receipt_tools_enabled,
+                emoji_model,
                 created_at,
                 updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            ) VALUES (?1, ?2, ?3, ?4, coalesce(?5, ?6), ?7, ?8)
             ON CONFLICT(provider) DO UPDATE SET
                 chat_model = excluded.chat_model,
                 receipt_prompt = excluded.receipt_prompt,
                 receipt_tools_enabled = excluded.receipt_tools_enabled,
+                -- 絵文字モデルを渡さない呼び出しでは保存済みの値を残す
+                emoji_model = coalesce(?5, integration_settings.emoji_model),
                 updated_at = excluded.updated_at`,
         )
         .bind(
@@ -172,6 +195,8 @@ export const upsertOpenRouterSettings = async (
             settings.chatModel,
             settings.receiptPrompt,
             settings.receiptToolsEnabled ? 1 : 0,
+            settings.emojiModel ?? null,
+            openRouterDefaultEmojiModel,
             settings.createdAt,
             settings.updatedAt,
         )

@@ -13,7 +13,9 @@ import {
     type ItemLotDto,
     lotExpiryDateSchema,
 } from "../domain/lot";
+import { getPriceUnitDefinition } from "../domain/price";
 import { type ReadingStatus, toReadingStateDto } from "../domain/reading";
+import { findCategoryById } from "../repositories/categoryRepository";
 import {
     categoryExists,
     countItemsByLocation as countItemRecordsByLocation,
@@ -33,17 +35,28 @@ import {
     listItemLots,
     listItemLotsByItemIds,
 } from "../repositories/lotRepository";
+import { itemHasPriceRecords } from "../repositories/priceRepository";
 import {
     getReadingState as getReadingStateRecord,
     listReadingStatesByItemIds,
     type ReadingStateRow,
 } from "../repositories/readingRepository";
+import {
+    generateItemEmoji,
+    type ItemEmojiEnv,
+    type ItemEmojiSource,
+    requestItemEmoji,
+} from "./itemEmojiService";
 
 export class ItemServiceError extends Error {
-    readonly status: 400 | 404 | 409;
+    readonly status: 400 | 404 | 409 | 502 | 503;
     readonly code: string;
 
-    constructor(status: 400 | 404 | 409, code: string, message: string) {
+    constructor(
+        status: 400 | 404 | 409 | 502 | 503,
+        code: string,
+        message: string,
+    ) {
         super(message);
         this.name = "ItemServiceError";
         this.status = status;
@@ -93,6 +106,7 @@ export const toItemDto = (
 ): ItemDto => ({
     id: row.id,
     name: row.name,
+    emoji: row.emoji,
     categoryId: row.categoryId,
     locationId: row.locationId,
     baseUnit: row.baseUnit,
@@ -241,15 +255,30 @@ export const getItems = async (
 };
 
 /**
+ * 絵文字の生成に渡す手掛かりを揃える。カテゴリ名は選定の手掛かりとして強いため
+ * 1 件だけ読む。絵文字を生成しない経路ではこの読み取り自体を行わない。
+ */
+const buildEmojiSource = async (
+    db: D1Database,
+    input: { name: string; categoryId: string; memo: string | null },
+): Promise<ItemEmojiSource> => ({
+    name: input.name,
+    categoryName: (await findCategoryById(db, input.categoryId))?.name ?? null,
+    memo: input.memo,
+});
+
+/**
  * 品目を作る。`options.id` は再実行で同じ品目へ収束させたい呼び出し元
  * （レシート反映など）が採番済みの ID を渡すためだけにあり、
  * 公開入力スキーマ（`itemCreateSchema`）には含めない。
+ * 絵文字を省略した場合は AI で生成するが、生成できなくても既定の絵文字で作成を続ける。
  */
 export const createItem = async (
-    db: D1Database,
+    env: ItemEmojiEnv,
     input: unknown,
     options: { id?: string } = {},
 ): Promise<ItemDto> => {
+    const db = env.DB;
     const parsed = parseOrThrow(itemCreateSchema.safeParse(input));
     if (!(await categoryExists(db, parsed.categoryId))) {
         throw new ItemServiceError(
@@ -278,6 +307,16 @@ export const createItem = async (
         );
     }
     const currentQuantity = parsed.currentQuantity ?? (isDocument ? 1 : 0);
+    const emoji =
+        parsed.emoji ??
+        (await generateItemEmoji(
+            env,
+            await buildEmojiSource(db, {
+                name: parsed.name,
+                categoryId: parsed.categoryId,
+                memo: parsed.memo ?? null,
+            }),
+        ));
     const row = await createItemRecord(
         db,
         {
@@ -285,6 +324,7 @@ export const createItem = async (
             baseUnit,
             baseDimension,
             currentQuantity,
+            emoji,
         },
         options,
     );
@@ -292,6 +332,56 @@ export const createItem = async (
     return toItemDto(row, null);
 };
 
+/**
+ * つけ替えで価格記録が読めなくなる組み合わせを拒む。単価は保存せず、読み取り
+ * のたびに品目の「現在の」基準単位から最小単位（質量は g、体積は mL）へ直して
+ * 導くため、質量・体積で単位表に無い基準単位（袋、パックなど）へ移すと、既存の
+ * 価格記録が単価を導けなくなり品目詳細・価格一覧・価格ツールがまとめて落ちる。
+ * 価格記録の作成は同じ換算を通しているので、ここを塞げば「価格記録がある品目の
+ * 基準単位は換算できる」という不変条件が書き込み側で保たれる。個数は基準単位が
+ * そのまま最小単位なので、どの表記でも読める。
+ */
+const assertRelabelKeepsPricesReadable = async (
+    db: D1Database,
+    id: string,
+    existing: ItemRow,
+    parsed: ItemUpdateInput,
+): Promise<void> => {
+    const nextUnit = parsed.baseUnit ?? existing.baseUnit;
+    const nextDimension = parsed.baseDimension ?? existing.baseDimension;
+    if (
+        nextUnit === existing.baseUnit &&
+        nextDimension === existing.baseDimension
+    ) {
+        return;
+    }
+    if (nextDimension === "count") {
+        return;
+    }
+    const definition = getPriceUnitDefinition(nextUnit);
+    if (definition && definition.dimension === nextDimension) {
+        return;
+    }
+    if (!(await itemHasPriceRecords(db, id))) {
+        return;
+    }
+    throw new ItemServiceError(
+        409,
+        "ITEM_PRICE_UNIT_CONFLICT",
+        "the item holds price records, so a mass base unit must be g or kg and a volume base unit must be mL or L",
+    );
+};
+
+/**
+ * 品目のマスタ情報を更新する。baseUnit / baseDimension も変更できるが、これは
+ * 換算を伴わない「つけ替え」で、item_lots・stock_movements・price_records は
+ * 一切書き換えない（items の数量キャッシュ current_quantity と、基準単位で
+ * 表した在庫下限 low_stock_threshold も触らない）。保存済みの数値がそのまま
+ * 新しい単位の数量として読まれることになるため、在庫や履歴を持つ品目では
+ * 呼び出し側が利用者へ警告してから呼ぶこと。
+ * 応答は更新後の ItemDto をそのまま返し、単位が変わった後の見え方を
+ * 呼び出し側がそのまま確認できるようにする。
+ */
 export const updateItem = async (
     db: D1Database,
     id: string,
@@ -350,7 +440,52 @@ export const updateItem = async (
             );
         }
     }
+    await assertRelabelKeepsPricesReadable(db, id, existing, parsed);
+    // baseUnit / baseDimension を含めて items の 1 行だけを書き換える。
+    // 数量を持つテーブルへの換算処理は意図的に行わない
     const row = await updateItemRecord(db, id, parsed);
+    if (!row) {
+        throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
+    }
+    const reading = await getReadingStateRecord(db, id);
+    return toItemDto(row, reading?.status ?? null);
+};
+
+/**
+ * 既存品目の絵文字を AI で作り直す。生成できなかった場合は保存済みの絵文字を
+ * そのまま残して失敗を返し、利用者が絵文字を直接入力して直せるようにする。
+ * 文言は API 利用者だけでなく画面にもそのまま出るため、次に取れる行動を日本語で書く。
+ */
+export const regenerateItemEmoji = async (
+    env: ItemEmojiEnv,
+    id: string,
+): Promise<ItemDto> => {
+    const db = env.DB;
+    if (id.trim().length === 0) {
+        throw new ItemServiceError(400, "INVALID_ID", "id must not be empty");
+    }
+    const existing = await getItemRecord(db, id);
+    if (!existing) {
+        throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
+    }
+    const generated = await requestItemEmoji(
+        env,
+        await buildEmojiSource(db, existing),
+    );
+    if (!generated.ok) {
+        throw generated.reason === "not_configured"
+            ? new ItemServiceError(
+                  503,
+                  "ITEM_EMOJI_NOT_CONFIGURED",
+                  "OpenRouter API key を連携設定から保存してください。",
+              )
+            : new ItemServiceError(
+                  502,
+                  "ITEM_EMOJI_UNAVAILABLE",
+                  "絵文字を生成できませんでした。時間をおいて再試行するか、絵文字を直接入力してください。",
+              );
+    }
+    const row = await updateItemRecord(db, id, { emoji: generated.emoji });
     if (!row) {
         throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
     }

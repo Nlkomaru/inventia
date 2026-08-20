@@ -2,12 +2,13 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 import type { ApiBindings } from "./bindings";
 import { categoriesApp } from "./http/categories";
+import { externalProvidersApp } from "./http/external-providers";
 import { healthApp } from "./http/health";
 import { integrationsApp } from "./http/integrations";
 import { itemsApp } from "./http/items";
 import { locationsApp } from "./http/locations";
 import { lotsApp } from "./http/lots";
-import { pricesApp } from "./http/prices";
+import { priceRecordsApp, pricesApp } from "./http/prices";
 import { readingApp } from "./http/reading";
 import { receiptsApp } from "./http/receipts";
 import { stockInventoryApp, stockItemsApp } from "./http/stock";
@@ -28,6 +29,8 @@ apiApp.route("/api/inventory", stockInventoryApp);
 apiApp.route("/api/settings/integrations", integrationsApp);
 apiApp.route("/api/receipts", receiptsApp);
 apiApp.route("/api/stores", storesApp);
+apiApp.route("/api/providers", externalProvidersApp);
+apiApp.route("/api/prices", priceRecordsApp);
 
 apiApp.doc31("/api/openapi", {
     openapi: "3.1.0",

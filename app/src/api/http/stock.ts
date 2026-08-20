@@ -86,7 +86,7 @@ stockItemsApp.openAPIRegistry.registerPath({
     summary: "Adjust item stock",
     operationId: "adjustItemStock",
     description:
-        "Applies a signed stock delta to the item's expiry lots; delta must not be 0. Side effects: lot quantities change, an immutable stock movement and its per-lot allocations are recorded, and the item's cached total quantity is recomputed from the lots. A positive delta is added to the lot with the given expiryDate, creating that lot when it does not exist yet; omitting expiryDate or sending null targets the lot without an expiry date. A negative delta is subtracted from the lot named by lotId or expiryDate; omitting both consumes lots in FEFO order (earliest expiry first, the lot without an expiry date last), while an explicit expiryDate of null targets the lot without an expiry date. lotId and expiryDate cannot be sent together. Retrying with the same idempotencyKey returns the stored operation instead of applying the delta twice.",
+        "Applies a signed stock delta to the item's expiry lots; delta must not be 0. Side effects: lot quantities change, an immutable stock movement and its per-lot allocations are recorded, and the item's cached total quantity is recomputed from the lots. A positive delta is added to the lot with the given expiryDate, creating that lot when it does not exist yet; omitting expiryDate or sending null targets the lot without an expiry date. A negative delta is subtracted from the lot named by lotId or expiryDate; omitting both consumes lots in FEFO order (earliest expiry first, the lot without an expiry date last), while an explicit expiryDate of null targets the lot without an expiry date. lotId and expiryDate cannot be sent together. note is free-text describing what the stock was used for, such as cooking a meal, and complements reason, which is a fixed category. externalProviderId is the id of an external provider from /api/providers and records the app the stock went to. externalId is that app's own identifier for the record; Inventia stores and displays it but never interprets or resolves it, and it can only be sent together with externalProviderId. Retrying with the same idempotencyKey returns the stored operation instead of applying the delta twice; note, externalProviderId, and externalId are part of the compared request, so a retry that changes them is a conflict.",
     request: {
         params: z.object({ itemId: itemIdParameter }),
         body: {
@@ -109,7 +109,7 @@ stockItemsApp.openAPIRegistry.registerPath({
             "The request is invalid; correct the reported input. Codes: VALIDATION_ERROR, INVALID_JSON, INVALID_ID, INVALID_OCCURRED_AT.",
         ),
         404: jsonError(
-            "The target does not exist. Codes: ITEM_NOT_FOUND, LOT_NOT_FOUND (the requested lotId or expiryDate has no lot; pick a target from the lot list).",
+            "The target does not exist. Codes: ITEM_NOT_FOUND, LOT_NOT_FOUND (the requested lotId or expiryDate has no lot; pick a target from the lot list), EXTERNAL_PROVIDER_NOT_FOUND (the requested externalProviderId has no provider; pick one from /api/providers).",
         ),
         409: jsonError(
             "The adjustment conflicts with current inventory data. Codes: INSUFFICIENT_STOCK (the issue exceeds the targeted lots), IDEMPOTENCY_CONFLICT (the same idempotencyKey was used for a different request), STOCK_LOT_CONFLICT (the lots changed concurrently; reload the lots and retry).",
@@ -162,7 +162,7 @@ stockItemsApp.openAPIRegistry.registerPath({
     summary: "List an item's stock history",
     operationId: "listItemStockHistory",
     description:
-        "Lists immutable stock movements for one item in reverse chronological order with scoped cursor pagination. Each movement carries its per-lot allocations; the expiry date in an allocation is the value recorded at the time of the movement, so later expiry corrections never rewrite history. Movements recorded before lot tracking existed have an empty allocations array.",
+        "Lists immutable stock movements for one item in reverse chronological order with scoped cursor pagination. Each movement carries its per-lot allocations; the expiry date in an allocation is the value recorded at the time of the movement, so later expiry corrections never rewrite history. Movements recorded before lot tracking existed have an empty allocations array. Each movement also carries note, the free-text purpose recorded with it, and externalProvider, the external app the stock went to resolved to its current name, faviconUrl, and url; both are null when the movement records neither. externalId is the external app's own identifier and is returned as stored without being interpreted.",
     request: {
         params: z.object({ itemId: itemIdParameter }),
         query: stockHistoryItemQuerySchema,
@@ -187,7 +187,7 @@ stockInventoryApp.openAPIRegistry.registerPath({
     summary: "List stock history",
     operationId: "listStockHistory",
     description:
-        "Lists immutable stock movements across inventory, optionally filtered by item or reason. Each movement carries its per-lot allocations; the expiry date in an allocation is the value recorded at the time of the movement, so later expiry corrections never rewrite history. Movements recorded before lot tracking existed have an empty allocations array.",
+        "Lists immutable stock movements across inventory, optionally filtered by item or reason. Each movement carries its per-lot allocations; the expiry date in an allocation is the value recorded at the time of the movement, so later expiry corrections never rewrite history. Movements recorded before lot tracking existed have an empty allocations array. Each movement also carries note, the free-text purpose recorded with it, and externalProvider, the external app the stock went to resolved to its current name, faviconUrl, and url; both are null when the movement records neither. externalId is the external app's own identifier and is returned as stored without being interpreted.",
     request: { query: stockHistoryQuerySchema },
     responses: {
         200: {

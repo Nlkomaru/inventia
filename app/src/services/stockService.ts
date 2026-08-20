@@ -34,6 +34,7 @@ import {
     listStockMovements,
     type StockHistoryResult as RepositoryHistoryResult,
     replayStockOperation,
+    StockExternalProviderNotFoundError,
     StockItemNotFoundError,
     type StockLotAllocationRow,
     StockLotConflictError,
@@ -43,6 +44,7 @@ import {
     type StockOperationIdentity,
     type StockWriteResult,
 } from "../repositories/stockRepository";
+import { externalProviderExists } from "./externalProviderService";
 import { toItemDto } from "./itemService";
 
 export class StockServiceError extends Error {
@@ -97,6 +99,20 @@ const toAllocationDto = (row: StockLotAllocationRow): LotAllocationDto => ({
     delta: row.delta,
 });
 
+// 連携先は LEFT JOIN で解決済みの列から組み立てる。参照が無い履歴は id ごと
+// null になるため、名前が読めた行だけを連携先として返す
+const toMovementProvider = (
+    row: StockMovementRow,
+): StockMovementDto["externalProvider"] =>
+    row.externalProviderId === null || row.externalProviderName === null
+        ? null
+        : {
+              id: row.externalProviderId,
+              name: row.externalProviderName,
+              faviconUrl: row.externalProviderFaviconUrl,
+              url: row.externalProviderUrl,
+          };
+
 const toMovementDto = (
     row: StockMovementRow,
     allocations: readonly StockLotAllocationRow[],
@@ -109,6 +125,9 @@ const toMovementDto = (
     idempotencyKey: row.idempotencyKey,
     createdAt: row.createdAt,
     allocations: allocations.map(toAllocationDto),
+    note: row.note,
+    externalProvider: toMovementProvider(row),
+    externalId: row.externalId,
 });
 
 // ロットが在庫の正なので、応答の数量とロット内訳は同じ読み取りから導く。
@@ -166,9 +185,20 @@ const normalizeItemId = (itemId: string): string => {
     return normalized;
 };
 
+const externalProviderNotFound = (): never => {
+    throw new StockServiceError(
+        404,
+        "EXTERNAL_PROVIDER_NOT_FOUND",
+        "指定した連携先が見つかりません。連携先の一覧から選び直してください。",
+    );
+};
+
 const mapRepositoryError = (error: unknown): never => {
     if (error instanceof StockItemNotFoundError) {
         throw new StockServiceError(404, "ITEM_NOT_FOUND", error.message);
+    }
+    if (error instanceof StockExternalProviderNotFoundError) {
+        return externalProviderNotFound();
     }
     if (error instanceof StockNegativeQuantityError) {
         throw new StockServiceError(409, "INSUFFICIENT_STOCK", error.message);
@@ -292,6 +322,47 @@ const requireItem = async (db: D1Database, itemId: string): Promise<void> => {
     }
 };
 
+/** 在庫の行き先の記録。未指定の項目は履歴でも null になる。 */
+interface StockProvenance {
+    note: string | null;
+    externalProviderId: string | null;
+    externalId: string | null;
+}
+
+// 連携先が分からない外部 ID は後から辿れないため記録として意味を持たない。
+// stockAdjustmentSchema の refine と同じ条件を service でも課し、schema を
+// 通さない呼び出しでも壊れないようにする
+const toProvenance = (input: StockAdjustmentInput): StockProvenance => {
+    if (
+        input.externalId !== undefined &&
+        input.externalProviderId === undefined
+    ) {
+        throw new StockServiceError(
+            400,
+            "VALIDATION_ERROR",
+            "externalProviderId: 外部IDを指定するときは連携先も指定してください",
+        );
+    }
+    return {
+        note: input.note ?? null,
+        externalProviderId: input.externalProviderId ?? null,
+        externalId: input.externalId ?? null,
+    };
+};
+
+// FK 違反は理由を返せない汎用エラーになるため、書き込みバッチの前に確かめる
+const requireExternalProvider = async (
+    db: D1Database,
+    externalProviderId: string | null,
+): Promise<void> => {
+    if (
+        externalProviderId !== null &&
+        !(await externalProviderExists(db, externalProviderId))
+    ) {
+        return externalProviderNotFound();
+    }
+};
+
 export const adjustStock = async (
     db: D1Database,
     itemId: string,
@@ -303,6 +374,7 @@ export const adjustStock = async (
     );
     const occurredAt = normalizeOccurredAt(parsed.occurredAt);
     const selector = toLotSelector(parsed);
+    const provenance = toProvenance(parsed);
     try {
         const identity: StockOperationIdentity = {
             idempotencyKey: parsed.idempotencyKey,
@@ -324,6 +396,7 @@ export const adjustStock = async (
                 targetQuantity: null,
                 selector,
                 lots: null,
+                ...provenance,
             }),
         };
         // 適用済みのリクエストはロット計画を作らずに保存済みの結果を返す。
@@ -333,6 +406,7 @@ export const adjustStock = async (
             return await toOperationResult(db, normalizedItemId, replayed);
         }
         await requireItem(db, normalizedItemId);
+        await requireExternalProvider(db, provenance.externalProviderId);
         // 数量 0 のロットも upsert 先・指定先になり得るため全件読む
         const lots = await listItemLots(db, normalizedItemId, {
             includeEmpty: true,
@@ -343,6 +417,7 @@ export const adjustStock = async (
             ...identity,
             lotPlan,
             expectedQuantity: null,
+            ...provenance,
         });
         return await toOperationResult(db, normalizedItemId, result);
     } catch (error) {
@@ -459,6 +534,10 @@ export const stocktake = async (
                 (total, lot) => total + lot.quantity,
                 0,
             ),
+            // 棚卸しは「数えた結果」であり在庫の行き先を持たない
+            note: null,
+            externalProviderId: null,
+            externalId: null,
         });
         return await toOperationResult(db, normalizedItemId, result);
     } catch (error) {

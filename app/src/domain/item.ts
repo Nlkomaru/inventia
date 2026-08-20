@@ -8,9 +8,37 @@ import { readingStateDtoSchema, readingStatusSchema } from "./reading";
 
 export const itemBaseDimensionSchema = z.enum(["mass", "volume", "count"]);
 
+/** 絵文字が決まっていない品目のプレースホルダ。AI 生成に失敗してもこの値で成立させる。 */
+export const defaultItemEmoji = "📦";
+
+/**
+ * 絵文字 1 個だけを許す。文字数では判定できない（👩‍🍳 は 3 code point、
+ * 🇯🇵 は 2 code point ある）ため、絵文字の並びとして受け付ける形を直接書く。
+ *
+ * - 国旗（Regional_Indicator 2 個）
+ * - 絵文字 + 肌色修飾（\p{Emoji_Modifier}）
+ * - 絵文字 + 異体字セレクタ（U+FE0F）
+ * - ZWJ（U+200D）で連結した絵文字列（家族、レインボーフラッグなど）
+ *
+ * 数字のキーキャップ（1️⃣）のように絵文字以外から始まる並びは通さない。
+ * DB は ALTER ADD COLUMN で CHECK を足せないため、この検証だけが妥当性の担保になる
+ */
+const itemEmojiPattern =
+    /^(?:\p{RI}\p{RI}|\p{Extended_Pictographic}(?:\p{Emoji_Modifier}|\uFE0F|\u200D(?:\p{Extended_Pictographic}|\p{RI}\p{RI}))*)$/u;
+
+export const itemEmojiSchema = z
+    .string()
+    .trim()
+    .min(1, "絵文字を入力してください")
+    // ZWJ で連結した家族絵文字は 11 code unit になるため、1 個分の上限として 16 を取る
+    .max(16, "絵文字は1文字だけ入力してください")
+    .regex(itemEmojiPattern, "絵文字を1個だけ入力してください");
+
 export const itemDtoSchema = z.object({
     id: z.string().min(1),
     name: z.string(),
+    // 一覧で品目を見分けるための絵文字 1 個。未生成の品目は既定の 📦 が入る
+    emoji: z.string(),
     categoryId: z.string(),
     locationId: z.string(),
     baseUnit: z.string(),
@@ -71,6 +99,8 @@ export const itemCreateSchema = z
         expiryDate: itemFields.expiryDate.optional(),
         lowStockThreshold: itemFields.lowStockThreshold.optional(),
         memo: itemFields.memo.optional(),
+        // 省略時は品目名から AI が生成する。生成に失敗しても品目作成は成立させる
+        emoji: itemEmojiSchema.optional(),
     })
     .strict()
     .refine(
@@ -88,13 +118,31 @@ export const itemUpdateSchema = z
         name: itemFields.name.optional(),
         categoryId: itemFields.categoryId.optional(),
         locationId: itemFields.locationId.optional(),
+        // 基準単位と次元の変更は換算を伴わない「つけ替え」で、保存済みの数量の
+        // 数値（items.current_quantity、ロット、入出庫履歴、価格の内容量）は
+        // どれも書き換えない。同じ数値のまま意味だけが変わるため、在庫や履歴を
+        // 持つ品目では呼び出し側が利用者へ警告し、了解を得てから送ること
+        baseUnit: itemFields.baseUnit.optional(),
+        baseDimension: itemFields.baseDimension.optional(),
         lowStockThreshold: itemFields.lowStockThreshold.optional(),
         memo: itemFields.memo.optional(),
+        emoji: itemEmojiSchema.optional(),
     })
     .strict()
     .refine((value) => Object.keys(value).length > 0, {
         message: "at least one field is required",
-    });
+    })
+    // 次元だけを差し替えると、単位の表記が前の次元のまま残る（体積へ移したのに
+    // 単位は g、など）。作成時に両方を対で受け取るのと揃えて、次元を変えるときは
+    // 単位も指定させる。同じ次元での表記直し（単位だけの変更）は許す
+    .refine(
+        (value) =>
+            value.baseDimension === undefined || value.baseUnit !== undefined,
+        {
+            message: "baseUnit is required when baseDimension changes",
+            path: ["baseUnit"],
+        },
+    );
 
 // 未知のキーは拒否する。綴りを誤った絞り込みが黙って無視されると、
 // 呼び出し側は絞り込み済みだと思ったまま全件を受け取ってしまう

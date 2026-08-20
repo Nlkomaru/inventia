@@ -37,7 +37,10 @@ export const navigationGroups: readonly NavGroup[] = [
     },
     {
         title: "価格",
-        items: [{ title: "店舗", url: "/stores" }],
+        items: [
+            { title: "価格一覧", url: "/prices" },
+            { title: "店舗", url: "/stores" },
+        ],
     },
     {
         title: "マスタ",
@@ -46,6 +49,7 @@ export const navigationGroups: readonly NavGroup[] = [
             { title: "カテゴリ", url: "/categories" },
             { title: "保管場所", url: "/locations" },
             { title: "識別子・外部リンク", url: "/references" },
+            { title: "外部連携先", url: "/providers" },
         ],
     },
     {

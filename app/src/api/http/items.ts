@@ -22,6 +22,7 @@ import {
     getItem,
     ItemServiceError,
     listItems,
+    regenerateItemEmoji,
     updateItem,
 } from "../../services/itemService";
 import type { ApiBindings } from "../bindings";
@@ -154,7 +155,7 @@ itemsApp.openAPIRegistry.registerPath({
     summary: "Create an inventory item",
     operationId: "createItem",
     description:
-        "Creates an item. expiryDate is the expiry date of the item's initial lot; a positive initial quantity or an expiryDate creates that lot, and a positive initial quantity also records an immutable stocktake movement with its lot allocation. An omitted currentQuantity is 0 except for document categories, where it defaults to 1, so a document created without a quantity already gets that initial lot and stocktake movement; send currentQuantity 0 to create one holding no stock. Later expiry corrections go through PATCH /api/items/{itemId}/lots/{lotId}, and later quantity changes through the adjustment and stocktake endpoints.",
+        "Creates an item. emoji is the single emoji shown next to the item everywhere it is listed; leave it out to have it written by the configured OpenRouter model from the item name, its category and its memo, which falls back to the placeholder 📦 when no API key is stored or the model cannot be reached, so item creation never fails because of the emoji. Regenerate it later with POST /api/items/{id}/emoji or replace it by hand with PATCH /api/items/{id}. expiryDate is the expiry date of the item's initial lot; a positive initial quantity or an expiryDate creates that lot, and a positive initial quantity also records an immutable stocktake movement with its lot allocation. An omitted currentQuantity is 0 except for document categories, where it defaults to 1, so a document created without a quantity already gets that initial lot and stocktake movement; send currentQuantity 0 to create one holding no stock. Later expiry corrections go through PATCH /api/items/{itemId}/lots/{lotId}, and later quantity changes through the adjustment and stocktake endpoints.",
     request: {
         body: {
             required: true,
@@ -182,7 +183,7 @@ itemsApp.openAPIRegistry.registerPath({
     summary: "Update an inventory item",
     operationId: "updateItem",
     description:
-        "Updates display metadata. Base unit, stock quantity, and lot expiry dates are immutable through this endpoint: change an expiry date with PATCH /api/items/{itemId}/lots/{lotId} and a quantity with the adjustment or stocktake endpoints. Moving an item that holds a reading state out of its book category is rejected, because only items in a book category can hold one; remove it with DELETE /api/items/{itemId}/reading-state first.",
+        "Updates the item master data: name, emoji (exactly one emoji), categoryId, locationId, baseUnit, baseDimension, lowStockThreshold, and memo. At least one field is required, and the fields you omit stay unchanged. baseUnit and baseDimension changes relabel the item without converting existing quantities: the item's current quantity, its lots, its stock movements, its price records and its low-stock threshold all keep their stored numbers, so the same numbers simply start meaning the new unit. The low-stock threshold is expressed in the base unit, so send a corrected lowStockThreshold in the same request or in a follow-up PATCH after relabelling. Warn the user before sending one for an item that already holds stock or history. A baseDimension change must send baseUnit in the same request, because a dimension left with the previous dimension's unit is never what the caller meant; baseUnit alone is accepted for relabelling within the same dimension. Stock quantity and lot expiry dates remain immutable through this endpoint: change an expiry date with PATCH /api/items/{itemId}/lots/{lotId} and a quantity with the adjustment or stocktake endpoints. Moving an item that holds a reading state out of its book category is rejected, because only items in a book category can hold one; remove it with DELETE /api/items/{itemId}/reading-state first.",
     request: {
         params: z.object({ id: itemIdParameter }),
         body: {
@@ -202,7 +203,32 @@ itemsApp.openAPIRegistry.registerPath({
             "The item or a referenced record does not exist. Codes: ITEM_NOT_FOUND, CATEGORY_NOT_FOUND, LOCATION_NOT_FOUND.",
         ),
         409: jsonError(
-            "The requested category move is not allowed. Codes: ITEM_CATEGORY_KIND_CONFLICT (an item cannot move across the document and non-document category boundary), ITEM_READING_STATE_CONFLICT (the item still holds a reading state; remove it with DELETE /api/items/{itemId}/reading-state before moving the item out of a book category).",
+            "The requested update is not allowed. Codes: ITEM_CATEGORY_KIND_CONFLICT (an item cannot move across the document and non-document category boundary), ITEM_READING_STATE_CONFLICT (the item still holds a reading state; remove it with DELETE /api/items/{itemId}/reading-state before moving the item out of a book category), ITEM_PRICE_UNIT_CONFLICT (the item holds price records whose unit price is derived from the base unit, so a mass base unit must be g or kg and a volume base unit must be mL or L).",
+        ),
+        ...serverErrorResponses,
+    },
+});
+itemsApp.openAPIRegistry.registerPath({
+    method: "post",
+    path: "/{id}/emoji",
+    tags: ["Items"],
+    summary: "Regenerate the item emoji",
+    operationId: "regenerateItemEmoji",
+    description:
+        "Writes a new emoji for the item with the OpenRouter model configured as emojiModel, using the item name, its category and its memo, and stores it. Use it for items that still carry the placeholder 📦 because they were created before the emoji existed or while OpenRouter was unreachable. The stored emoji is left untouched when the model cannot be reached or answers with something that is not a single emoji, so a failed call never replaces a good emoji with the placeholder; send the emoji you want with PATCH /api/items/{id} instead.",
+    request: { params: z.object({ id: itemIdParameter }) },
+    responses: {
+        200: {
+            description: "The item with its regenerated emoji.",
+            content: responseContent(itemDtoSchema),
+        },
+        400: jsonError("INVALID_ID: the path id is empty."),
+        404: jsonError("The requested item does not exist: ITEM_NOT_FOUND."),
+        502: jsonError(
+            "ITEM_EMOJI_UNAVAILABLE: OpenRouter could not be reached or did not answer with a single emoji. The stored emoji is unchanged; retry later or send one with PATCH /api/items/{id}.",
+        ),
+        503: jsonError(
+            "ITEM_EMOJI_NOT_CONFIGURED: the OpenRouter API key is not stored. Save it from the integration settings, then retry.",
         ),
         ...serverErrorResponses,
     },
@@ -358,7 +384,7 @@ itemsApp.get("/:id", async (c) => {
 
 itemsApp.post("/", async (c) => {
     try {
-        const created = await createItem(c.env.DB, await parseJson(c));
+        const created = await createItem(c.env, await parseJson(c));
         // 索引更新は best-effort（内部で例外を握り潰す）。この worker には
         // ExecutionContext が渡らないため waitUntil は使えず、応答を返す前に await する
         await indexItem(c.env, created.id);
@@ -378,6 +404,15 @@ itemsApp.patch("/:id", async (c) => {
             await indexItem(c.env, updated.id);
         }
         return c.json(updated, 200);
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+// 絵文字は品目の一部なので、生成し直した結果は品目そのものとして返す
+itemsApp.post("/:id/emoji", async (c) => {
+    try {
+        return c.json(await regenerateItemEmoji(c.env, c.req.param("id")), 200);
     } catch (error) {
         return errorResponse(c, error);
     }

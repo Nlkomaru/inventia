@@ -27,7 +27,7 @@ import {
 import type { CategoryDto } from "@/domain/category";
 import type { ItemDto } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
-import { buildHierarchyLabels } from "@/lib/hierarchy";
+import { buildAncestrySplat } from "@/lib/hierarchy";
 
 const features = tableFeatures({});
 const columnHelper = createColumnHelper<typeof features, ItemDto>();
@@ -70,12 +70,14 @@ export function ItemTable({
         },
         [announce],
     );
-    const categoryNames = useMemo(
-        () => buildHierarchyLabels(categories),
+    // 表では末端の名前だけを出す。祖先まで並べると行が読みにくくなるため、
+    // 階層はリンク先のカテゴリ・保管場所のページで辿ってもらう
+    const categoryById = useMemo(
+        () => new Map(categories.map((category) => [category.id, category])),
         [categories],
     );
-    const locationNames = useMemo(
-        () => buildHierarchyLabels(locations),
+    const locationById = useMemo(
+        () => new Map(locations.map((location) => [location.id, location])),
         [locations],
     );
     const columns = useMemo(
@@ -83,32 +85,89 @@ export function ItemTable({
             columnHelper.columns([
                 columnHelper.accessor("name", {
                     header: "品目名",
-                    // 品目名から在庫・価格・履歴を見る詳細へ入れるようにする。
-                    // マスタの編集はこの行の操作メニューに残す
+                    // 品目名からはマスタの品目ページへ入る。単位や次元の
+                    // つけ替えなど、この一覧が扱う登録内容の変更先に揃える
                     cell: ({ getValue, row }) => (
-                        <Link
-                            className="font-medium underline-offset-4 hover:underline"
-                            params={{ itemId: row.original.id }}
-                            to="/inventory/items/$itemId"
-                        >
-                            {getValue()}
-                        </Link>
+                        // 絵文字は品目の一部なので隠さず名前と併記する。
+                        // リンクの読み上げを名前だけに保つため外に置く
+                        <span className="inline-flex items-center gap-1.5">
+                            {row.original.emoji}
+                            <Link
+                                className="font-medium underline-offset-4 hover:underline"
+                                params={{ itemId: row.original.id }}
+                                to="/items/$itemId"
+                            >
+                                {getValue()}
+                            </Link>
+                        </span>
                     ),
                 }),
                 columnHelper.display({
                     id: "category",
                     header: "カテゴリ",
-                    cell: ({ row }) =>
-                        categoryNames.get(row.original.categoryId) ?? "—",
+                    cell: ({ row }) => {
+                        const category = categoryById.get(
+                            row.original.categoryId,
+                        );
+                        if (!category) return "—";
+                        return (
+                            <Link
+                                className="underline-offset-4 hover:underline"
+                                params={{
+                                    _splat: buildAncestrySplat(
+                                        categories,
+                                        category.id,
+                                    ),
+                                }}
+                                to="/categories/$"
+                            >
+                                {category.name}
+                            </Link>
+                        );
+                    },
                 }),
                 columnHelper.display({
                     id: "location",
                     header: "保管場所",
-                    cell: ({ row }) =>
-                        locationNames.get(row.original.locationId) ?? "—",
+                    cell: ({ row }) => {
+                        const location = locationById.get(
+                            row.original.locationId,
+                        );
+                        if (!location) return "—";
+                        return (
+                            <Link
+                                className="underline-offset-4 hover:underline"
+                                params={{
+                                    _splat: buildAncestrySplat(
+                                        locations,
+                                        location.id,
+                                    ),
+                                }}
+                                to="/locations/$"
+                            >
+                                {location.name}
+                            </Link>
+                        );
+                    },
                 }),
                 columnHelper.accessor("baseUnit", {
                     header: "単位",
+                }),
+                // 品目名のリンク先をマスタへ移した分、在庫・価格・履歴への
+                // 導線をこの列で残す
+                columnHelper.display({
+                    id: "inventory",
+                    header: "在庫",
+                    cell: ({ row }) => (
+                        <Link
+                            aria-label={`${row.original.name}の在庫詳細`}
+                            className="text-sm underline-offset-4 hover:underline"
+                            params={{ itemId: row.original.id }}
+                            to="/inventory/items/$itemId"
+                        >
+                            在庫詳細
+                        </Link>
+                    ),
                 }),
                 columnHelper.display({
                     id: "actions",
@@ -173,10 +232,12 @@ export function ItemTable({
                 }),
             ]),
         [
-            categoryNames,
+            categories,
+            categoryById,
             copyItemId,
             deletingId,
-            locationNames,
+            locationById,
+            locations,
             onDelete,
             onEdit,
         ],

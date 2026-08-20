@@ -101,7 +101,7 @@ export const Route = createFileRoute("/_app/_inventory/receipts/new/")({
     errorComponent: ReceiptIntakeError,
 });
 
-const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "w-full space-y-6 p-4 sm:p-6 lg:p-8";
 
 const emptyIssueIndex: ReadonlyMap<
     string,

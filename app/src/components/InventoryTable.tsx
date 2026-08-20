@@ -320,6 +320,11 @@ export function InventoryTable({
                     cell: ({ getValue, row }) => (
                         <div className="min-w-48 max-w-72">
                             <p className="font-semibold break-words">
+                                {/* 絵文字は品目の一部なので隠さず名前と併記する。
+                                    リンクの読み上げを名前だけに保つため外に置く */}
+                                <span className="mr-1.5">
+                                    {row.original.emoji}
+                                </span>
                                 {renderItemName
                                     ? renderItemName(row.original, getValue())
                                     : getValue()}

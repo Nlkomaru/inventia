@@ -71,3 +71,25 @@ export const Interactive: Story = {
         );
     },
 };
+
+/**
+ * 日付の有無自体が意味を持つ欄。カレンダーの横の × で空へ戻せる。
+ * 空欄のときは押せる対象が無いため、位置を保ったまま無効になる。
+ */
+export const Clearable: Story = {
+    args: {
+        clearable: true,
+        clearLabel: "期限を空にする",
+    },
+    render: (args) => {
+        const [value, setValue] = useState(args.value);
+        return <DatePicker {...args} onValueChange={setValue} value={value} />;
+    },
+};
+
+export const ClearableEmpty: Story = {
+    args: {
+        clearable: true,
+        value: "",
+    },
+};

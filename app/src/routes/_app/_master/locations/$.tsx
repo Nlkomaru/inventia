@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import type { LocationDto } from "@/domain/location";
 import type { BreadcrumbsLoaderData } from "@/lib/breadcrumbs";
+import { formatDisplayDate } from "@/lib/datetime";
 import {
     locationItemsQueryOptions,
     locationTreeQueryOptions,
@@ -38,8 +39,7 @@ import {
 } from "./-functions/location-path";
 
 // 幅は他の画面と揃える。ここだけ狭いと一覧から入ったときに幅が変わって見える
-const pageClassName =
-    "mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "flex w-full flex-col gap-6 p-4 sm:p-6 lg:p-8";
 
 /** 場所が見つからないことを errorComponent へ伝えるための型。 */
 class LocationNotFoundError extends Error {
@@ -234,8 +234,9 @@ function LocationDetailPage() {
                                             {item.baseUnit}
                                         </TableCell>
                                         <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                                            {item.earliestExpiryDate ??
-                                                "期限なし"}
+                                            {formatEarliestExpiry(
+                                                item.earliestExpiryDate,
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -259,6 +260,10 @@ const locationSplat = (
 
 const formatItemCount = (count: number): string =>
     count === 0 ? "品目なし" : `品目 ${count.toLocaleString("ja-JP")} 件`;
+
+/** 期限は保存値が UTC のため、表示だけ日本時間の日付へ寄せる。 */
+const formatEarliestExpiry = (value: string | null): string =>
+    value === null ? "期限なし" : (formatDisplayDate(value) ?? value);
 
 function LocationDetailPending() {
     return (

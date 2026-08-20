@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { externalProviderDtoSchema } from "./externalProvider";
 import { itemDtoSchema } from "./item";
 import {
     itemLotDtoSchema,
@@ -33,6 +34,31 @@ const idempotencyKeySchema = z.string().trim().min(1).max(200);
 
 const lotIdSchema = z.string().trim().min(1).max(128);
 
+// 制御文字を弾くのは表示のためだけではない。stockRequestDigest は値を制御文字で
+// 区切って連結するため、入力に区切り文字が混ざると内訳の違う再送が同じ digest に
+// なり、IDEMPOTENCY_CONFLICT として検出できなくなる
+const controlCharacterFree = /^\P{Cc}*$/u;
+
+// 在庫を何に使ったかの記録。reason（enum）では表せない用途と、外部アプリへの
+// 参照を持つ。棚卸しは「数えた結果」であり行き先を持たないため、
+// stocktakeSchema には足さない
+const stockNoteSchema = z
+    .string()
+    .trim()
+    .min(1, "用途は1文字以上で入力してください")
+    .max(500, "用途は500文字以内で入力してください")
+    .regex(controlCharacterFree, "用途に制御文字は使用できません");
+
+const stockExternalProviderIdSchema = z.string().trim().min(1).max(128);
+
+// 連携先アプリ側の ID。Inventia は解釈せず、保存と表示だけを行う
+const stockExternalIdSchema = z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .regex(controlCharacterFree, "外部IDに制御文字は使用できません");
+
 // 棚卸しは 1 リクエストのロット指定数を上限で抑える。ロット 1 件ごとに
 // 書き込みバッチへ statement が増えるため、無制限の入力を受け付けない
 const stocktakeLotsSchema = z
@@ -58,6 +84,11 @@ export const stockAdjustmentSchema = z
         lotId: lotIdSchema.optional(),
         occurredAt: stockOccurredAtSchema.optional(),
         idempotencyKey: idempotencyKeySchema,
+        // 用途の自由記述。例「食べ物作成」
+        note: stockNoteSchema.optional(),
+        // 在庫の行き先になった外部アプリ
+        externalProviderId: stockExternalProviderIdSchema.optional(),
+        externalId: stockExternalIdSchema.optional(),
     })
     .strict()
     .refine(
@@ -65,6 +96,18 @@ export const stockAdjustmentSchema = z
         {
             message: "lotId and expiryDate must not be provided together",
             path: ["lotId"],
+        },
+    )
+    // 連携先が分からない外部 ID は、どのアプリの ID なのか後から辿れず記録として
+    // 意味を持たない。DB では ALTER ADD COLUMN の制約でこの関係を CHECK にできないため、
+    // 入力の境界で拒否する
+    .refine(
+        (value) =>
+            value.externalId === undefined ||
+            value.externalProviderId !== undefined,
+        {
+            message: "外部IDを指定するときは連携先も指定してください",
+            path: ["externalProviderId"],
         },
     );
 
@@ -99,6 +142,14 @@ export const stockMovementDtoSchema = z
         createdAt: stockOccurredAtSchema,
         // ロット別の内訳。ロット追跡を導入する前に記録された履歴は空配列になる
         allocations: z.array(lotAllocationDtoSchema),
+        // 用途の自由記述。記録していない履歴は null
+        note: z.string().nullable(),
+        // 在庫の行き先になった外部アプリ。記録時点の参照を解決して返す
+        externalProvider: externalProviderDtoSchema
+            .pick({ id: true, name: true, faviconUrl: true, url: true })
+            .nullable(),
+        // 連携先アプリ側の ID。Inventia は解釈しない
+        externalId: z.string().nullable(),
     })
     .strict();
 
@@ -182,6 +233,11 @@ export interface StockRequestDigestInput {
     targetQuantity: number | null;
     selector: StockLotSelector;
     lots: readonly LotStocktakeEntry[] | null;
+    // 用途と外部連携先。省略した呼び出しは従来と同じ digest になる（下の
+    // provenancePart のコメントを参照）
+    note?: string | null;
+    externalProviderId?: string | null;
+    externalId?: string | null;
 }
 
 // 値の境界を入力に現れない制御文字で区切り、連結による衝突を避ける
@@ -210,6 +266,30 @@ const lotsPart = (lots: readonly LotStocktakeEntry[] | null): string =>
               .map((lot) => `${lot.expiryDate ?? "none"}=${lot.quantity}`)
               .join(",");
 
+/**
+ * 用途と外部連携先の部分。3 つとも未指定なら null を返し、canonical 文字列へ
+ * 何も足さない。
+ *
+ * 既存の stock_operations.request_digest は用途・連携先を持たないリクエストから
+ * 作られている。末尾に常に区切りを足すと canonical 文字列が 1 バイト変わり、
+ * 保存済みの digest と一致しなくなって、同じ idempotency key の再送が
+ * 「内訳の違うリクエスト」として弾かれてしまう。そのため未指定のときだけは
+ * 従来と 1 バイトも変えない。
+ */
+const provenancePart = (input: StockRequestDigestInput): string | null => {
+    const note = input.note ?? null;
+    const providerId = input.externalProviderId ?? null;
+    const externalId = input.externalId ?? null;
+    if (note === null && providerId === null && externalId === null) {
+        return null;
+    }
+    return [
+        `note:${note ?? "none"}`,
+        `provider:${providerId ?? "none"}`,
+        `external:${externalId ?? "none"}`,
+    ].join(digestSeparator);
+};
+
 const toHex = (buffer: ArrayBuffer): string =>
     Array.from(new Uint8Array(buffer))
         .map((byte) => byte.toString(16).padStart(2, "0"))
@@ -222,7 +302,7 @@ const toHex = (buffer: ArrayBuffer): string =>
 export const stockRequestDigest = async (
     input: StockRequestDigestInput,
 ): Promise<string> => {
-    const canonical = [
+    const base = [
         input.kind,
         input.itemId,
         input.reason,
@@ -232,6 +312,9 @@ export const stockRequestDigest = async (
         selectorPart(input.selector),
         lotsPart(input.lots),
     ].join(digestSeparator);
+    const provenance = provenancePart(input);
+    const canonical =
+        provenance === null ? base : `${base}${digestSeparator}${provenance}`;
     const digest = await crypto.subtle.digest(
         "SHA-256",
         new TextEncoder().encode(canonical),

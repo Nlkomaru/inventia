@@ -35,9 +35,14 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import type { ExternalProviderDto } from "@/domain/externalProvider";
 import { allocateFefo, type ItemLotDto } from "@/domain/lot";
 import type { StockMovementReason } from "@/domain/stock";
 import { formatDisplayDateTime } from "@/lib/datetime";
+// 連携先はマスタ画面が持つ query と表示部品をそのまま使い、
+// キャッシュと見た目を一覧・出庫で揃える
+import { providerListQueryOptions } from "@/routes/_app/_master/providers/-api/provider-queries";
+import { ProviderFavicon } from "@/routes/_app/_master/providers/-components/provider-favicon";
 import { type IssueStockInput, issueStock } from "./-api/stock-api";
 import {
     inventoryKeys,
@@ -64,7 +69,7 @@ export const Route = createFileRoute("/_app/_inventory/inventory/issue/")({
     errorComponent: IssueError,
 });
 
-const pageClassName = "mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8";
+const pageClassName = "w-full space-y-6 p-4 sm:p-6 lg:p-8";
 
 // 出庫の理由は減少側のものだけを出す（購入は入庫画面、棚卸しは棚卸画面で扱う）
 const reasonOptions: { label: string; value: StockMovementReason }[] = [
@@ -85,6 +90,10 @@ const emptyPlan: IssuePlan = { status: "ready", rows: [] };
 // 未取得時の既定値は参照を固定する。毎描画で新しい配列を作ると
 // ロットに依存する derive が無限に走る
 const noLots: ItemLotDto[] = [];
+const noProviders: ExternalProviderDto[] = [];
+
+// Select は空文字を値にできないため、「連携先なし」を表す番兵を置く
+const noProviderValue = "none";
 
 type IssueSubmitInput = IssueStockInput & { itemId: string };
 
@@ -94,10 +103,16 @@ function IssueStockPage() {
     const [selectedItemId, setSelectedItemId] = useState("");
     const lotsQuery = useQuery(itemLotsQueryOptions(selectedItemId));
     const lots = lotsQuery.data ?? noLots;
+    // 連携先は任意項目なので、読み込みに失敗しても出庫自体は記録できるようにする
+    const providersQuery = useQuery(providerListQueryOptions());
+    const providers = providersQuery.data ?? noProviders;
     const [quantity, setQuantity] = useState("");
     const [mode, setMode] = useState<IssueMode>("fefo");
     const [selectedLotId, setSelectedLotId] = useState("");
     const [reason, setReason] = useState<StockMovementReason>("consume");
+    const [note, setNote] = useState("");
+    const [providerId, setProviderId] = useState("");
+    const [externalId, setExternalId] = useState("");
     const [selectionError, setSelectionError] = useState<string | null>(null);
     const [quantityError, setQuantityError] = useState<string | null>(null);
     const [lotError, setLotError] = useState<string | null>(null);
@@ -108,6 +123,9 @@ function IssueStockPage() {
     const pendingKey = useRef<{ signature: string; value: string } | null>(
         null,
     );
+    // 前後の空白だけの入力は「未入力」として扱う
+    const trimmedNote = note.trim();
+    const trimmedExternalId = externalId.trim();
 
     // 出庫はロット構成・品目の在庫数・在庫履歴を同時に変えるため、関係する query をまとめて無効化する。
     // onSuccess の Promise を返すと mutateAsync が再取得完了まで待つ。
@@ -130,6 +148,9 @@ function IssueStockPage() {
     const lotsError = lotsQuery.error
         ? errorMessage(lotsQuery.error, "ロットを読み込めませんでした")
         : null;
+    const providersError = providersQuery.error
+        ? errorMessage(providersQuery.error, "連携先を読み込めませんでした")
+        : null;
 
     // 出庫で消えたロットは選択肢から外れるため、選択を持ち越さない
     useEffect(() => {
@@ -137,6 +158,20 @@ function IssueStockPage() {
             current && lots.some((lot) => lot.id === current) ? current : "",
         );
     }, [lots]);
+
+    // マスタから消えた連携先も選択肢に残らない。外部 ID は連携先が無いと
+    // 持てないため一緒に消す（読み込めていない間は選択を保つ）
+    useEffect(() => {
+        const loaded = providersQuery.data;
+        if (
+            loaded &&
+            providerId !== "" &&
+            !loaded.some((provider) => provider.id === providerId)
+        ) {
+            setProviderId("");
+            setExternalId("");
+        }
+    }, [providersQuery.data, providerId]);
 
     const selectedItem = useMemo(
         () => items.find((item) => item.id === selectedItemId) ?? null,
@@ -197,6 +232,26 @@ function IssueStockPage() {
         resetFeedback();
     };
 
+    const handleNoteChange = (value: string) => {
+        setNote(value);
+        resetFeedback();
+    };
+
+    const handleProviderChange = (value: string | null) => {
+        const next = value === null || value === noProviderValue ? "" : value;
+        setProviderId(next);
+        // 連携先を外した外部 ID は、どのアプリの ID か辿れなくなるため一緒に消す
+        if (next === "") {
+            setExternalId("");
+        }
+        resetFeedback();
+    };
+
+    const handleExternalIdChange = (value: string) => {
+        setExternalId(value);
+        resetFeedback();
+    };
+
     const submit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setSelectionError(null);
@@ -225,11 +280,23 @@ function IssueStockPage() {
         }
 
         const lotId = mode === "lot" ? selectedLotId : null;
+        const provenance = {
+            note: trimmedNote === "" ? null : trimmedNote,
+            externalProviderId: providerId === "" ? null : providerId,
+            // 連携先が無ければ外部 ID は送らない（API も同じ条件で拒否する）
+            externalId:
+                providerId === "" || trimmedExternalId === ""
+                    ? null
+                    : trimmedExternalId,
+        };
+        // 用途と連携先もリクエストの同一性に含まれる。署名から漏らすと、
+        // 内容を直しての再送が同じ冪等キーになり衝突として弾かれる
         const signature = JSON.stringify({
             itemId: selectedItem.id,
             quantity: parsedQuantity,
             lotId,
             reason,
+            ...provenance,
         });
         const idempotencyKey =
             pendingKey.current?.signature === signature
@@ -242,11 +309,16 @@ function IssueStockPage() {
                 quantity: parsedQuantity,
                 lotId,
                 reason,
+                ...provenance,
                 idempotencyKey,
             });
             // プレビューは送信前の在庫に基づくため、記録された内訳はサーバーの応答で置き換える
             setRecorded(result.allocations);
             setQuantity("");
+            // 用途と外部 ID は 1 件ごとの内容なので持ち越さない。
+            // 連携先は続けて同じ行き先へ出庫することが多いため残す
+            setNote("");
+            setExternalId("");
             pendingKey.current = null;
             setNotice(
                 result.replayed
@@ -262,6 +334,13 @@ function IssueStockPage() {
         label: item.name,
         value: item.id,
     }));
+    const providerOptions = [
+        { label: "連携先なし", value: noProviderValue },
+        ...providers.map((provider) => ({
+            label: provider.name,
+            value: provider.id,
+        })),
+    ];
     const baseUnit = selectedItem?.baseUnit ?? "—";
     const lotOptions = lots.map((lot) => ({
         label: `${formatExpiry(lot.expiryDate)}（残り ${lot.quantity} ${baseUnit}）`,
@@ -489,6 +568,117 @@ function IssueStockPage() {
                                 </SelectContent>
                             </Select>
                         </Field>
+
+                        <Field>
+                            <FieldLabel htmlFor="issue-note">用途</FieldLabel>
+                            <Input
+                                aria-describedby="issue-note-description"
+                                disabled={!selectedItem || saving}
+                                id="issue-note"
+                                maxLength={500}
+                                onChange={(event) =>
+                                    handleNoteChange(event.target.value)
+                                }
+                                placeholder="食べ物作成"
+                                type="text"
+                                value={note}
+                            />
+                            <FieldDescription id="issue-note-description">
+                                理由では表せない使い道を記録します（任意）。
+                            </FieldDescription>
+                        </Field>
+
+                        <Field data-invalid={Boolean(providersError)}>
+                            <FieldLabel htmlFor="issue-provider">
+                                連携先
+                            </FieldLabel>
+                            <Select
+                                disabled={!selectedItem || saving}
+                                items={providerOptions}
+                                onValueChange={handleProviderChange}
+                                value={providerId || noProviderValue}
+                            >
+                                <SelectTrigger
+                                    aria-describedby={
+                                        [
+                                            "issue-provider-description",
+                                            providersError
+                                                ? "issue-provider-error"
+                                                : null,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(" ") || undefined
+                                    }
+                                    aria-invalid={Boolean(providersError)}
+                                    className="w-full"
+                                    id="issue-provider"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        {providerOptions.map((option) => {
+                                            // 「連携先なし」は一覧に無いのでアイコンを出さない
+                                            const provider = findProvider(
+                                                providers,
+                                                option.value,
+                                            );
+                                            return (
+                                                <SelectItem
+                                                    key={option.value}
+                                                    value={option.value}
+                                                >
+                                                    {provider ? (
+                                                        <ProviderFavicon
+                                                            faviconUrl={
+                                                                provider.faviconUrl
+                                                            }
+                                                        />
+                                                    ) : null}
+                                                    {option.label}
+                                                </SelectItem>
+                                            );
+                                        })}
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                            <FieldDescription id="issue-provider-description">
+                                {providersQuery.isLoading
+                                    ? "連携先を読み込み中…"
+                                    : providers.length === 0
+                                      ? "連携先が登録されていません。マスタの「外部連携先」で追加できます。"
+                                      : "この在庫の行き先になった外部アプリを記録します（任意）。"}
+                            </FieldDescription>
+                            {providersError ? (
+                                <FieldError id="issue-provider-error">
+                                    {providersError}
+                                </FieldError>
+                            ) : null}
+                        </Field>
+
+                        <Field>
+                            <FieldLabel htmlFor="issue-external-id">
+                                連携先の ID
+                            </FieldLabel>
+                            <Input
+                                aria-describedby="issue-external-id-description"
+                                disabled={
+                                    !selectedItem || saving || providerId === ""
+                                }
+                                id="issue-external-id"
+                                maxLength={200}
+                                onChange={(event) =>
+                                    handleExternalIdChange(event.target.value)
+                                }
+                                type="text"
+                                value={externalId}
+                            />
+                            <FieldDescription id="issue-external-id-description">
+                                {providerId === ""
+                                    ? "連携先を選ぶと入力できます。"
+                                    : "連携先アプリ側の ID を保存します。Inventia は内容を解釈しません。"}
+                            </FieldDescription>
+                        </Field>
                     </FieldGroup>
                     <div className="flex justify-end gap-2">
                         <Button
@@ -662,6 +852,13 @@ function IssueError({ error, reset }: ErrorComponentProps) {
 
 const errorMessage = (cause: unknown, fallback: string): string =>
     cause instanceof Error ? cause.message : fallback;
+
+// 「連携先なし」の番兵は一覧に無いため null になる
+const findProvider = (
+    providers: readonly ExternalProviderDto[],
+    id: string,
+): ExternalProviderDto | null =>
+    providers.find((provider) => provider.id === id) ?? null;
 
 const formatExpiry = (value: string | null): string =>
     (value === null ? null : formatDisplayDateTime(value)) ?? "期限なし";
