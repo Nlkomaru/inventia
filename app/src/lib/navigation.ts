@@ -10,6 +10,7 @@ export interface NavItem {
 /** サイドバーの区分名。パンくずの先頭の段にも使うため union で固定する。 */
 export type NavigationGroupTitle =
     | "在庫管理"
+    | "書籍"
     | "価格"
     | "マスタ"
     | "連携・設定";
@@ -34,6 +35,10 @@ export const navigationGroups: readonly NavGroup[] = [
             { title: "在庫履歴", url: "/inventory/history" },
             { title: "レシート取込", url: "/receipts/new" },
         ],
+    },
+    {
+        title: "書籍",
+        items: [{ title: "読書一覧", url: "/books" }],
     },
     {
         title: "価格",
