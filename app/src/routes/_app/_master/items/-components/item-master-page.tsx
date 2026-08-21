@@ -17,6 +17,7 @@ import type { ItemCreateInput, ItemDto, ItemUpdateInput } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
 import type { ReadingStateUpsertInput } from "@/domain/reading";
 import { buildHierarchyLabels } from "@/lib/hierarchy";
+import type { ReadingStateChange } from "@/lib/reading-input";
 import {
     clearReadingState,
     createItem,
@@ -31,7 +32,6 @@ import {
     itemKeys,
     locationKeys,
 } from "../-api/item-queries";
-import type { ReadingStateChange } from "../-functions/reading-state-form";
 import { ItemForm } from "./item-form";
 import { ItemTable } from "./item-table";
 
