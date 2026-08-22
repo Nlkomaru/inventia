@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppBooksRouteImport } from './routes/_app/_books'
 import { Route as AppInventoryRouteImport } from './routes/_app/_inventory'
 import { Route as AppMasterRouteImport } from './routes/_app/_master'
 import { Route as AppPriceRouteImport } from './routes/_app/_price'
@@ -21,6 +22,7 @@ import { Route as AppMasterCategoriesRouteImport } from './routes/_app/_master/c
 import { Route as AppMasterItemsRouteImport } from './routes/_app/_master/items'
 import { Route as AppMasterLocationsRouteImport } from './routes/_app/_master/locations'
 import { Route as AppLicenseIndexRouteImport } from './routes/_app/license/index'
+import { Route as AppBooksBooksIndexRouteImport } from './routes/_app/_books/books/index'
 import { Route as AppInventoryInventoryIndexRouteImport } from './routes/_app/_inventory/inventory/index'
 import { Route as AppInventoryInventoryItemsRouteImport } from './routes/_app/_inventory/inventory/items'
 import { Route as AppInventoryReceiptsIndexRouteImport } from './routes/_app/_inventory/receipts/index'
@@ -52,6 +54,10 @@ const AppRoute = AppRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBooksRoute = AppBooksRouteImport.update({
+  id: '/_books',
   getParentRoute: () => AppRoute,
 } as any)
 const AppInventoryRoute = AppInventoryRouteImport.update({
@@ -100,6 +106,11 @@ const AppLicenseIndexRoute = AppLicenseIndexRouteImport.update({
   id: '/license/',
   path: '/license/',
   getParentRoute: () => AppRoute,
+} as any)
+const AppBooksBooksIndexRoute = AppBooksBooksIndexRouteImport.update({
+  id: '/books/',
+  path: '/books/',
+  getParentRoute: () => AppBooksRoute,
 } as any)
 const AppInventoryInventoryIndexRoute =
   AppInventoryInventoryIndexRouteImport.update({
@@ -245,6 +256,7 @@ export interface FileRoutesByFullPath {
   '/inventory/items': typeof AppInventoryInventoryItemsRouteWithChildren
   '/categories/$': typeof AppMasterCategoriesSplatRoute
   '/locations/$': typeof AppMasterLocationsSplatRoute
+  '/books/': typeof AppBooksBooksIndexRoute
   '/inventory/': typeof AppInventoryInventoryIndexRoute
   '/receipts/': typeof AppInventoryReceiptsIndexRoute
   '/categories/': typeof AppMasterCategoriesIndexRoute
@@ -273,6 +285,7 @@ export interface FileRoutesByTo {
   '/license': typeof AppLicenseIndexRoute
   '/categories/$': typeof AppMasterCategoriesSplatRoute
   '/locations/$': typeof AppMasterLocationsSplatRoute
+  '/books': typeof AppBooksBooksIndexRoute
   '/inventory': typeof AppInventoryInventoryIndexRoute
   '/receipts': typeof AppInventoryReceiptsIndexRoute
   '/categories': typeof AppMasterCategoriesIndexRoute
@@ -297,6 +310,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/_app/_books': typeof AppBooksRouteWithChildren
   '/_app/_inventory': typeof AppInventoryRouteWithChildren
   '/_app/_master': typeof AppMasterRouteWithChildren
   '/_app/_price': typeof AppPriceRouteWithChildren
@@ -311,6 +325,7 @@ export interface FileRoutesById {
   '/_app/_inventory/inventory/items': typeof AppInventoryInventoryItemsRouteWithChildren
   '/_app/_master/categories/$': typeof AppMasterCategoriesSplatRoute
   '/_app/_master/locations/$': typeof AppMasterLocationsSplatRoute
+  '/_app/_books/books/': typeof AppBooksBooksIndexRoute
   '/_app/_inventory/inventory/': typeof AppInventoryInventoryIndexRoute
   '/_app/_inventory/receipts/': typeof AppInventoryReceiptsIndexRoute
   '/_app/_master/categories/': typeof AppMasterCategoriesIndexRoute
@@ -346,6 +361,7 @@ export interface FileRouteTypes {
     | '/inventory/items'
     | '/categories/$'
     | '/locations/$'
+    | '/books/'
     | '/inventory/'
     | '/receipts/'
     | '/categories/'
@@ -374,6 +390,7 @@ export interface FileRouteTypes {
     | '/license'
     | '/categories/$'
     | '/locations/$'
+    | '/books'
     | '/inventory'
     | '/receipts'
     | '/categories'
@@ -397,6 +414,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/_app/_books'
     | '/_app/_inventory'
     | '/_app/_master'
     | '/_app/_price'
@@ -411,6 +429,7 @@ export interface FileRouteTypes {
     | '/_app/_inventory/inventory/items'
     | '/_app/_master/categories/$'
     | '/_app/_master/locations/$'
+    | '/_app/_books/books/'
     | '/_app/_inventory/inventory/'
     | '/_app/_inventory/receipts/'
     | '/_app/_master/categories/'
@@ -452,6 +471,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/_books': {
+      id: '/_app/_books'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppBooksRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/_inventory': {
@@ -523,6 +549,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/license/'
       preLoaderRoute: typeof AppLicenseIndexRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/_books/books/': {
+      id: '/_app/_books/books/'
+      path: '/books'
+      fullPath: '/books/'
+      preLoaderRoute: typeof AppBooksBooksIndexRouteImport
+      parentRoute: typeof AppBooksRoute
     }
     '/_app/_inventory/inventory/': {
       id: '/_app/_inventory/inventory/'
@@ -688,6 +721,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppBooksRouteChildren {
+  AppBooksBooksIndexRoute: typeof AppBooksBooksIndexRoute
+}
+
+const AppBooksRouteChildren: AppBooksRouteChildren = {
+  AppBooksBooksIndexRoute: AppBooksBooksIndexRoute,
+}
+
+const AppBooksRouteWithChildren = AppBooksRoute._addFileChildren(
+  AppBooksRouteChildren,
+)
+
 interface AppInventoryReceiptsRouteChildren {
   AppInventoryReceiptsIndexRoute: typeof AppInventoryReceiptsIndexRoute
   AppInventoryReceiptsReceiptIdIndexRoute: typeof AppInventoryReceiptsReceiptIdIndexRoute
@@ -837,6 +882,7 @@ const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppBooksRoute: typeof AppBooksRouteWithChildren
   AppInventoryRoute: typeof AppInventoryRouteWithChildren
   AppMasterRoute: typeof AppMasterRouteWithChildren
   AppPriceRoute: typeof AppPriceRouteWithChildren
@@ -846,6 +892,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppBooksRoute: AppBooksRouteWithChildren,
   AppInventoryRoute: AppInventoryRouteWithChildren,
   AppMasterRoute: AppMasterRouteWithChildren,
   AppPriceRoute: AppPriceRouteWithChildren,

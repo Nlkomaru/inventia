@@ -17,6 +17,7 @@ import type { ItemCreateInput, ItemDto, ItemUpdateInput } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
 import type { ReadingStateUpsertInput } from "@/domain/reading";
 import { buildHierarchyLabels } from "@/lib/hierarchy";
+import type { ReadingStateChange } from "@/lib/reading-input";
 import {
     clearReadingState,
     createItem,
@@ -25,13 +26,13 @@ import {
     updateItem,
 } from "../-api/item-api";
 import {
+    bookKeys,
     categoryKeys,
     inventoryKeys,
     itemDetailQueryOptions,
     itemKeys,
     locationKeys,
 } from "../-api/item-queries";
-import type { ReadingStateChange } from "../-functions/reading-state-form";
 import { ItemForm } from "./item-form";
 import { ItemTable } from "./item-table";
 
@@ -64,12 +65,14 @@ export function ItemMasterPage({
     const [editingItem, setEditingItem] = useState<ItemDto | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
-    // 品目の変更は在庫一覧の行・ラベルにも波及するため ["inventory"] も無効化する。
+    // 品目の変更は在庫一覧の行・ラベルと書籍一覧にも波及するため、
+    // ["inventory"] と ["books"] も無効化する。
     // onSuccess の Promise を返すと mutateAsync が再取得完了まで待つ。
     const invalidateItems = () =>
         Promise.all([
             queryClient.invalidateQueries({ queryKey: itemKeys.all }),
             queryClient.invalidateQueries({ queryKey: inventoryKeys.all }),
+            queryClient.invalidateQueries({ queryKey: bookKeys.all }),
         ]);
     const createMutation = useMutation({
         mutationFn: (input: ItemCreateInput) => createItem(input),

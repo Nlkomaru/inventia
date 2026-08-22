@@ -51,7 +51,7 @@ import {
     readingStateFormValues,
     readingStatusLabels,
     resolveReadingStateChange,
-} from "../-functions/reading-state-form";
+} from "@/lib/reading-input";
 
 type BaseDimension = "mass" | "volume" | "count";
 

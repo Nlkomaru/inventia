@@ -30,9 +30,15 @@ export const locationKeys = {
 };
 
 // 在庫一覧画面は ["inventory"] 名前空間でキャッシュするため、品目の登録・更新・削除と
-// 読書状態の変更でも併せて無効化する（在庫一覧は品目名・分類・読書状態を表示する）
+// 読書状態の変更でも併せて無効化する（在庫一覧は品目名・分類を表示する）
 export const inventoryKeys = {
     all: ["inventory"] as const,
+};
+
+// 書籍一覧は ["books"] 名前空間でキャッシュする。カテゴリの付け替えで書籍に
+// 出入りし、改名・削除・読書状態の変更も行に出るため、同じ機会に無効化する
+export const bookKeys = {
+    all: ["books"] as const,
 };
 
 export const itemListQueryOptions = () =>
