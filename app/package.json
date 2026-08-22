@@ -13,7 +13,8 @@
 		"preview": "pnpm run build && vite preview",
 		"check": "biome check --write",
 		"deploy": "VITE_DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.000Z) pnpm run build && wrangler deploy",
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+		"test": "vitest run"
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.7.0",
@@ -57,6 +58,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "2.4.5",
 		"@cloudflare/vite-plugin": "^1.26.0",
+		"@cloudflare/vitest-pool-workers": "^0.22.0",
 		"@tanstack/devtools-vite": "latest",
 		"@tanstack/react-query-devtools": "^5.101.4",
 		"@tanstack/router-cli": "^1.132.0",
@@ -67,6 +69,7 @@
 		"drizzle-kit": "^0.31.10",
 		"typescript": "^6.0.2",
 		"vite": "^8.0.0",
+		"vitest": "^4.1.11",
 		"wrangler": "^4.119.0"
 	}
 }
