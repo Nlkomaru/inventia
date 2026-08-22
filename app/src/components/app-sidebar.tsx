@@ -3,6 +3,7 @@
 import { useRouterState } from "@tanstack/react-router";
 import { ExternalLinkIcon, WarehouseIcon } from "lucide-react";
 import type * as React from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
     Sidebar,
     SidebarContent,
@@ -136,6 +137,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                             </SidebarMenuItem>
                         );
                     })}
+                    <ThemeToggle />
                 </SidebarMenu>
                 <div className="px-2 pt-4 text-xs leading-5 text-sidebar-foreground/70">
                     <p>Deployed: {deployedAt.split(".")[0]}</p>
