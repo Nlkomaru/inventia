@@ -4,7 +4,7 @@ import {
     tableFeatures,
     useTable,
 } from "@tanstack/react-table";
-import { Button } from "@/components/ui/button";
+import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
 import {
     Table,
     TableBody,
@@ -134,9 +134,6 @@ export function PriceRecordTable({
         <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
             <div className="border-b p-5">
                 <h2 className="font-bold">記録した価格</h2>
-                <p className="text-xs text-muted-foreground">
-                    記録日時の新しい順に表示します。
-                </p>
             </div>
             <Table aria-label="価格一覧" className="min-w-[840px]">
                 <TableHeader className="bg-muted/50">
@@ -187,20 +184,11 @@ export function PriceRecordTable({
                     )}
                 </TableBody>
             </Table>
-            <div className="flex items-center justify-between border-t p-5">
-                <p aria-live="polite" className="text-sm text-muted-foreground">
-                    {records.length} 件を表示中
-                    {hasNextPage ? "" : "（すべて表示）"}
-                </p>
-                <Button
-                    disabled={!hasNextPage || isFetchingNextPage}
-                    onClick={onLoadMore}
-                    type="button"
-                    variant="outline"
-                >
-                    {isFetchingNextPage ? "読み込み中…" : "続きを読み込む"}
-                </Button>
-            </div>
+            <InfiniteScrollSentinel
+                hasNextPage={hasNextPage}
+                isFetchingNextPage={isFetchingNextPage}
+                onLoadMore={onLoadMore}
+            />
         </section>
     );
 }

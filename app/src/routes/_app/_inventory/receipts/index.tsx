@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { z } from "zod";
+import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -51,6 +52,7 @@ import {
     receiptStatuses,
     receiptStatusSchema,
 } from "@/domain/receipt";
+import { cn } from "@/lib/utils";
 import { deleteReceipt } from "./-api/receipt-api";
 import { receiptKeys, receiptListQueryOptions } from "./-api/receipt-queries";
 import {
@@ -398,7 +400,15 @@ function ReceiptListPage() {
                         ))}
                     </TableBody>
                 </Table>
-                <div className="flex flex-col items-stretch gap-3 border-t p-5">
+                <div
+                    className={cn(
+                        "flex flex-col items-stretch gap-3",
+                        (deleteError ||
+                            listQuery.hasNextPage ||
+                            listQuery.isFetchingNextPage) &&
+                            "border-t p-5",
+                    )}
+                >
                     <div aria-live="assertive">
                         {deleteError ? (
                             <p
@@ -409,25 +419,11 @@ function ReceiptListPage() {
                             </p>
                         ) : null}
                     </div>
-                    <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm text-muted-foreground">
-                            {receipts.length} 件を表示中
-                            {listQuery.hasNextPage ? "" : "（すべて表示）"}
-                        </p>
-                        <Button
-                            disabled={
-                                !listQuery.hasNextPage ||
-                                listQuery.isFetchingNextPage
-                            }
-                            onClick={() => void listQuery.fetchNextPage()}
-                            type="button"
-                            variant="outline"
-                        >
-                            {listQuery.isFetchingNextPage
-                                ? "読み込み中…"
-                                : "続きを読み込む"}
-                        </Button>
-                    </div>
+                    <InfiniteScrollSentinel
+                        hasNextPage={listQuery.hasNextPage}
+                        isFetchingNextPage={listQuery.isFetchingNextPage}
+                        onLoadMore={() => void listQuery.fetchNextPage()}
+                    />
                 </div>
                 <div aria-live="polite" className="sr-only">
                     <span key={copyMessage.seq}>{copyMessage.text}</span>

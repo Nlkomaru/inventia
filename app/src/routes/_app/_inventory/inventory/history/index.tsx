@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { z } from "zod";
+import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
@@ -347,25 +348,11 @@ function StockHistoryPage() {
                         </TableBody>
                     </Table>
                 )}
-                <div className="flex items-center justify-between border-t p-5">
-                    <p className="text-sm text-muted-foreground">
-                        {movements.length} 件を表示中
-                        {historyQuery.hasNextPage ? "" : "（すべて表示）"}
-                    </p>
-                    <Button
-                        disabled={
-                            !historyQuery.hasNextPage ||
-                            historyQuery.isFetchingNextPage
-                        }
-                        onClick={() => void historyQuery.fetchNextPage()}
-                        type="button"
-                        variant="outline"
-                    >
-                        {historyQuery.isFetchingNextPage
-                            ? "読み込み中…"
-                            : "続きを読み込む"}
-                    </Button>
-                </div>
+                <InfiniteScrollSentinel
+                    hasNextPage={historyQuery.hasNextPage}
+                    isFetchingNextPage={historyQuery.isFetchingNextPage}
+                    onLoadMore={() => void historyQuery.fetchNextPage()}
+                />
             </section>
         </main>
     );
