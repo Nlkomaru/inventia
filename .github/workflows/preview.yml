@@ -48,6 +48,9 @@ jobs:
       - name: Check
         run: pnpm run check
 
+      - name: Test
+        run: pnpm run test
+
   deploy-app-preview:
     needs: check
     runs-on: ubuntu-latest

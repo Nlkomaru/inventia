@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
+    locationCreateInputSchema,
     locationDtoSchema,
     locationIdSchema,
     locationListInputSchema,
@@ -8,6 +9,7 @@ import {
     locationTreeOutputSchema,
 } from "../../../domain/location";
 import {
+    createLocation,
     getLocation,
     LocationServiceError,
     listLocations,
@@ -78,6 +80,24 @@ export const registerLocationTools = (
                 return mcpSuccess(await getLocation(db, id));
             } catch (error) {
                 return locationError(error, "location lookup failed");
+            }
+        },
+    );
+
+    server.registerTool(
+        "create_location",
+        {
+            title: "Create storage location",
+            description:
+                "Create one storage location and return it with its generated system ID. name is required. parentId places the location inside an existing location and null, which is the default, creates a root location; a parentId that does not exist is rejected with LOCATION_PARENT_NOT_FOUND, so create the parent first. Names only have to be unique among the siblings of the same parent, including among the root locations, and a duplicate is rejected with LOCATION_NAME_CONFLICT; the same name can therefore be created again under a different parent, which is why a full path needs the ancestors. sortOrder defaults to 0 and orders the location among its siblings, ties being broken by id. Only one location row is created; no item, stock, lot or price data changes. Verify the result with list_locations for the same parentId, or with list_location_tree.",
+            inputSchema: locationCreateInputSchema,
+            outputSchema: locationDtoSchema,
+        },
+        async (input) => {
+            try {
+                return mcpSuccess(await createLocation(db, input));
+            } catch (error) {
+                return locationError(error, "location creation failed");
             }
         },
     );

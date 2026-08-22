@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
+    categoryCreateInputSchema,
     categoryDtoSchema,
     categoryIdSchema,
     categoryListInputSchema,
@@ -10,6 +11,7 @@ import {
 import {
     CategoryServiceError,
     categoryTreeMaxSize,
+    createCategory,
     getCategory,
     listCategories,
     listCategoryTree,
@@ -78,6 +80,24 @@ export const registerCategoryTools = (
                 return mcpSuccess(await getCategory(db, id));
             } catch (error) {
                 return categoryError(error, "category lookup failed");
+            }
+        },
+    );
+
+    server.registerTool(
+        "create_category",
+        {
+            title: "Create category",
+            description:
+                "Create one category and return it with its generated system ID. name is required. parentId places the category under an existing category and null, which is the default, creates a root category; a parentId that does not exist is rejected with CATEGORY_PARENT_NOT_FOUND, so create the parent first. Names only have to be unique among the siblings of the same parent, including among the root categories, and a duplicate is rejected with CATEGORY_NAME_CONFLICT; the same name can therefore be created again under a different parent. kind is the category kind and defaults to null, which makes the category generic and resolves its effective kind by walking up its ancestors, so leave it out to inherit from the parent and send it only to start a new kind at this level. sortOrder defaults to 0 and orders the category among its siblings, ties being broken by id. Only one category row is created; no item, stock, lot or price data changes. Verify the result with list_categories for the same parentId, or with list_category_tree.",
+            inputSchema: categoryCreateInputSchema,
+            outputSchema: categoryDtoSchema,
+        },
+        async (input) => {
+            try {
+                return mcpSuccess(await createCategory(db, input));
+            } catch (error) {
+                return categoryError(error, "category creation failed");
             }
         },
     );
