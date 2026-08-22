@@ -22,7 +22,8 @@ body,
 
 body {
 	margin: 0;
-	background: #f5f7fb;
+	/* @layer base の bg-background より優先されるため、テーマ変数で切り替える */
+	background: var(--app-background);
 	font-family: "Poppins", "Noto Sans JP Variable", sans-serif;
 	-webkit-font-smoothing: antialiased;
 }
@@ -105,6 +106,7 @@ body {
 	--chart-4: oklch(0.378 0.015 216);
 	--chart-5: oklch(0.275 0.011 216.9);
 	--radius: 0.4rem;
+	--app-background: #f5f7fb;
 	--sidebar: oklch(0.987 0.002 197.1);
 	--sidebar-foreground: oklch(0.148 0.004 228.8);
 	--sidebar-primary: oklch(0.218 0.008 223.9);
@@ -139,6 +141,7 @@ body {
 	--chart-3: oklch(0.45 0.017 213.2);
 	--chart-4: oklch(0.378 0.015 216);
 	--chart-5: oklch(0.275 0.011 216.9);
+	--app-background: var(--background);
 	--sidebar: oklch(0.218 0.008 223.9);
 	--sidebar-foreground: oklch(0.987 0.002 197.1);
 	--sidebar-primary: oklch(0.488 0.243 264.376);
