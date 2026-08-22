@@ -183,9 +183,6 @@ function ReceiptDetailPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>明細</CardTitle>
-                    <CardDescription>
-                        解析した明細と、反映先として確定した品目です。
-                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     {receipt.lines.length === 0 ? (

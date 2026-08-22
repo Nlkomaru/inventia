@@ -207,9 +207,6 @@ function CategoryDetailPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>このカテゴリの品目</CardTitle>
-                    <CardDescription>
-                        このカテゴリに直接紐づく品目です。下位カテゴリの分は含みません。
-                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     {items.length === 0 ? (

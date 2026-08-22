@@ -385,9 +385,11 @@ export function InventoryTable({
         <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
             <div className="border-b p-5">
                 <h2 className="font-bold">品目と期限別ロット</h2>
-                <p className="text-xs text-muted-foreground">
-                    {loading ? "在庫を読み込み中…" : `${items.length} 件`}
-                </p>
+                {loading && (
+                    <p className="text-xs text-muted-foreground">
+                        在庫を読み込み中…
+                    </p>
+                )}
             </div>
             <Table
                 aria-busy={loading}
