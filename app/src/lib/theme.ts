@@ -1,42 +1,37 @@
-export const themes = ["light", "dark", "system"] as const;
+export const themes = ["light", "dark"] as const;
 
 export type Theme = (typeof themes)[number];
-export type ResolvedTheme = Exclude<Theme, "system">;
 
 export const themeStorageKey = "inventia-theme";
 
 const darkMediaQuery = "(prefers-color-scheme: dark)";
 
-export function isTheme(value: unknown): value is Theme {
+function isTheme(value: unknown): value is Theme {
     return themes.includes(value as Theme);
 }
 
-function readStoredTheme(): Theme {
+/** 明示的に選ばれたテーマ。未選択なら null */
+function readStoredTheme(): Theme | null {
     try {
         const stored = localStorage.getItem(themeStorageKey);
 
-        return isTheme(stored) ? stored : "system";
+        return isTheme(stored) ? stored : null;
     } catch {
         // Safari のプライベートモードなど localStorage が読めない環境
-        return "system";
+        return null;
     }
 }
 
-export function resolveTheme(theme: Theme): ResolvedTheme {
-    if (theme !== "system") {
-        return theme;
-    }
-
+function preferredTheme(): Theme {
     return window.matchMedia(darkMediaQuery).matches ? "dark" : "light";
 }
 
 function applyTheme(theme: Theme) {
-    const resolved = resolveTheme(theme);
     const root = document.documentElement;
 
-    root.classList.toggle("dark", resolved === "dark");
+    root.classList.toggle("dark", theme === "dark");
     // ネイティブ UI（スクロールバー、フォーム部品）も追従させる
-    root.style.colorScheme = resolved;
+    root.style.colorScheme = theme;
 }
 
 let currentTheme: Theme | null = null;
@@ -44,14 +39,14 @@ const listeners = new Set<() => void>();
 
 /** useSyncExternalStore の getSnapshot。同じ値を返し続ける必要がある */
 export function getTheme(): Theme {
-    currentTheme ??= readStoredTheme();
+    currentTheme ??= readStoredTheme() ?? preferredTheme();
 
     return currentTheme;
 }
 
-/** サーバーには保存値も matchMedia も無いため、既定の system を返す */
+/** サーバーには保存値も matchMedia も無いため、既定の light を返す */
 export function getServerTheme(): Theme {
-    return "system";
+    return "light";
 }
 
 export function setTheme(theme: Theme) {
@@ -70,17 +65,22 @@ export function setTheme(theme: Theme) {
     }
 }
 
+export function toggleTheme() {
+    setTheme(getTheme() === "dark" ? "light" : "dark");
+}
+
 export function subscribeTheme(onStoreChange: () => void) {
     listeners.add(onStoreChange);
 
-    // system のときは OS 側の切り替えに追従する
+    // 未選択のうちは OS 側の切り替えに追従する
     const media = window.matchMedia(darkMediaQuery);
     const handleMediaChange = () => {
-        if (getTheme() !== "system") {
+        if (readStoredTheme() !== null) {
             return;
         }
 
-        applyTheme("system");
+        currentTheme = preferredTheme();
+        applyTheme(currentTheme);
         onStoreChange();
     };
 
@@ -90,7 +90,9 @@ export function subscribeTheme(onStoreChange: () => void) {
             return;
         }
 
-        currentTheme = isTheme(event.newValue) ? event.newValue : "system";
+        currentTheme = isTheme(event.newValue)
+            ? event.newValue
+            : preferredTheme();
         applyTheme(currentTheme);
         onStoreChange();
     };
@@ -112,13 +114,13 @@ export function subscribeTheme(onStoreChange: () => void) {
 export const themeInitScript = `(function () {
 	try {
 		var stored = localStorage.getItem(${JSON.stringify(themeStorageKey)});
-		var resolved =
+		var theme =
 			stored === "light" || stored === "dark"
 				? stored
 				: window.matchMedia(${JSON.stringify(darkMediaQuery)}).matches
 					? "dark"
 					: "light";
-		document.documentElement.classList.toggle("dark", resolved === "dark");
-		document.documentElement.style.colorScheme = resolved;
+		document.documentElement.classList.toggle("dark", theme === "dark");
+		document.documentElement.style.colorScheme = theme;
 	} catch (error) {}
 })();`;

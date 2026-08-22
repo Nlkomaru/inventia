@@ -16,6 +16,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarRail,
+    SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { navigationGroups, navigationResources } from "@/lib/navigation";
 
@@ -137,8 +138,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                             </SidebarMenuItem>
                         );
                     })}
-                    <ThemeToggle />
                 </SidebarMenu>
+                <SidebarSeparator />
+                <ThemeToggle />
                 <div className="px-2 pt-4 text-xs leading-5 text-sidebar-foreground/70">
                     <p>Deployed: {deployedAt.split(".")[0]}</p>
                     <p>No right reserved.</p>

@@ -120,9 +120,9 @@ body {
 .dark {
 	--background: oklch(0.148 0.004 228.8);
 	--foreground: oklch(0.987 0.002 197.1);
-	--card: oklch(0.218 0.008 223.9);
+	--card: oklch(0.205 0.008 223.9);
 	--card-foreground: oklch(0.987 0.002 197.1);
-	--popover: oklch(0.218 0.008 223.9);
+	--popover: oklch(0.205 0.008 223.9);
 	--popover-foreground: oklch(0.987 0.002 197.1);
 	--primary: oklch(0.925 0.005 214.3);
 	--primary-foreground: oklch(0.218 0.008 223.9);
@@ -142,7 +142,7 @@ body {
 	--chart-4: oklch(0.378 0.015 216);
 	--chart-5: oklch(0.275 0.011 216.9);
 	--app-background: var(--background);
-	--sidebar: oklch(0.218 0.008 223.9);
+	--sidebar: oklch(0.205 0.008 223.9);
 	--sidebar-foreground: oklch(0.987 0.002 197.1);
 	--sidebar-primary: oklch(0.488 0.243 264.376);
 	--sidebar-primary-foreground: oklch(0.987 0.002 197.1);
