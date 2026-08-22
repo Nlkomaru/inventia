@@ -241,9 +241,6 @@ export function ItemTable({
 
     return (
         <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-            <div className="border-b p-5">
-                <h2 className="font-bold">登録済み品目</h2>
-            </div>
             <Table className="min-w-[720px]" aria-label="登録済み品目">
                 <TableHeader className="bg-muted/50">
                     {table.getHeaderGroups().map((headerGroup) => (

@@ -183,8 +183,7 @@ function ReceiptListPage() {
             </header>
 
             <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b p-5">
-                    <h2 className="font-bold">取込履歴</h2>
+                <div className="flex flex-wrap items-center justify-end gap-3 border-b p-5">
                     <Field className="sm:max-w-64">
                         <FieldLabel htmlFor="receipt-status">状態</FieldLabel>
                         <Select
@@ -234,7 +233,7 @@ function ReceiptListPage() {
                     </div>
                 ) : null}
 
-                <Table>
+                <Table aria-label="取込履歴">
                     <TableHeader className="bg-muted/50">
                         <TableRow>
                             <TableHead className="px-5" scope="col">

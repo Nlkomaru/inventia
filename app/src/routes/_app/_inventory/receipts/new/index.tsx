@@ -665,10 +665,6 @@ function ReceiptIntakePage() {
                 <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                     <div className="border-b p-5">
                         <h2 className="font-bold">反映しました</h2>
-                        <p className="text-xs text-muted-foreground">
-                            {formatDateTimeOrDash(applyResult.appliedAt)}{" "}
-                            に購入として記録しました。
-                        </p>
                     </div>
                     <Table>
                         <TableHeader className="bg-muted/50">
@@ -754,11 +750,6 @@ function ReceiptIntakePage() {
                 <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                     <div className="border-b p-5">
                         <h2 className="font-bold">反映済みの明細</h2>
-                        <p className="text-xs text-muted-foreground">
-                            このレシートは
-                            {formatDateTimeOrDash(receipt.appliedAt)}
-                            に反映済みです。もう一度反映することはできません。
-                        </p>
                     </div>
                     <Table>
                         <TableHeader className="bg-muted/50">

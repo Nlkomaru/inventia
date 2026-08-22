@@ -132,9 +132,6 @@ export function PriceRecordTable({
 
     return (
         <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-            <div className="border-b p-5">
-                <h2 className="font-bold">記録した価格</h2>
-            </div>
             <Table aria-label="価格一覧" className="min-w-[840px]">
                 <TableHeader className="bg-muted/50">
                     {table.getHeaderGroups().map((headerGroup) => (

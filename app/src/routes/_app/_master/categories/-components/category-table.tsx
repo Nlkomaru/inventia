@@ -297,8 +297,7 @@ export function CategoryTable({
 
     return (
         <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-            <div className="flex items-center justify-between border-b p-5">
-                <h2 className="font-bold">登録済みカテゴリ</h2>
+            <div className="flex items-center justify-end border-b p-5">
                 <label className="relative" htmlFor="category-search">
                     <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                     <span className="sr-only">検索</span>
