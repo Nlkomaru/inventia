@@ -162,7 +162,7 @@ function StockHistoryPage() {
                 <h1 className="mt-1 text-2xl font-bold">在庫履歴</h1>
             </header>
 
-            <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+            <section className="overflow-hidden rounded-2xl border">
                 <div className="flex flex-col gap-4 p-5">
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Field>

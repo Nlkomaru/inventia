@@ -520,7 +520,7 @@ function StocktakePage() {
             </section>
 
             {selectedItem ? (
-                <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <section className="overflow-hidden rounded-2xl border">
                     <div className="border-b p-5">
                         <h2 className="font-bold">確定内容</h2>
                     </div>

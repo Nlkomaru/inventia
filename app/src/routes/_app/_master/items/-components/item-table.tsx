@@ -240,7 +240,7 @@ export function ItemTable({
     const table = useTable({ columns, data: items, features });
 
     return (
-        <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+        <section className="overflow-hidden rounded-2xl border">
             <Table className="min-w-[720px]" aria-label="登録済み品目">
                 <TableHeader className="bg-muted/50">
                     {table.getHeaderGroups().map((headerGroup) => (
