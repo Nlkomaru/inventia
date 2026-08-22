@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { resolveExpirySignal } from "@/components/InventoryTable";
+import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -214,9 +215,6 @@ function ItemDetailPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>在庫</CardTitle>
-                    <CardDescription>
-                        現在庫は数量が残っているロットの合計です。
-                    </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-4">
                     <dl className="grid gap-4 sm:grid-cols-3">
@@ -361,9 +359,6 @@ function ItemDetailPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>価格</CardTitle>
-                    <CardDescription>
-                        この品目の価格記録を新しい順に表示します。単価は内容量で割った比較用の値です。
-                    </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-6">
                     <ItemPriceForm item={item} />
@@ -457,30 +452,18 @@ function ItemDetailPage() {
                             </TableBody>
                         </Table>
                     )}
+
+                    <InfiniteScrollSentinel
+                        hasNextPage={priceQuery.hasNextPage}
+                        isFetchingNextPage={priceQuery.isFetchingNextPage}
+                        onLoadMore={() => void priceQuery.fetchNextPage()}
+                    />
                 </CardContent>
-                <CardFooter className="justify-end">
-                    <Button
-                        disabled={
-                            !priceQuery.hasNextPage ||
-                            priceQuery.isFetchingNextPage
-                        }
-                        onClick={() => void priceQuery.fetchNextPage()}
-                        type="button"
-                        variant="outline"
-                    >
-                        {priceQuery.isFetchingNextPage
-                            ? "読み込み中…"
-                            : "続きを読み込む"}
-                    </Button>
-                </CardFooter>
             </Card>
 
             <Card>
                 <CardHeader>
                     <CardTitle>在庫履歴</CardTitle>
-                    <CardDescription>
-                        この品目の入出庫と棚卸・調整を新しい順に表示します。
-                    </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-4">
                     {historyError ? (
@@ -567,8 +550,14 @@ function ItemDetailPage() {
                             </TableBody>
                         </Table>
                     )}
+
+                    <InfiniteScrollSentinel
+                        hasNextPage={historyQuery.hasNextPage}
+                        isFetchingNextPage={historyQuery.isFetchingNextPage}
+                        onLoadMore={() => void historyQuery.fetchNextPage()}
+                    />
                 </CardContent>
-                <CardFooter className="justify-between gap-4">
+                <CardFooter className="gap-4">
                     <Link
                         className="text-sm underline underline-offset-4"
                         search={{ itemId }}
@@ -576,19 +565,6 @@ function ItemDetailPage() {
                     >
                         履歴の一覧で見る
                     </Link>
-                    <Button
-                        disabled={
-                            !historyQuery.hasNextPage ||
-                            historyQuery.isFetchingNextPage
-                        }
-                        onClick={() => void historyQuery.fetchNextPage()}
-                        type="button"
-                        variant="outline"
-                    >
-                        {historyQuery.isFetchingNextPage
-                            ? "読み込み中…"
-                            : "続きを読み込む"}
-                    </Button>
                 </CardFooter>
             </Card>
         </main>

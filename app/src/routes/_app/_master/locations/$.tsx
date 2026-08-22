@@ -192,9 +192,6 @@ function LocationDetailPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>保管されている品目</CardTitle>
-                    <CardDescription>
-                        この場所に直接置かれている品目です。下位の保管場所の分は含みません。
-                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     {items.length === 0 ? (

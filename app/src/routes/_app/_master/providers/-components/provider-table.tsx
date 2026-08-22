@@ -189,13 +189,7 @@ export function ProviderTable({
 
     return (
         <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-            <div className="flex items-center justify-between border-b p-5">
-                <div>
-                    <h2 className="font-bold">登録済み連携先</h2>
-                    <p className="text-xs text-muted-foreground">
-                        {providers.length} 件
-                    </p>
-                </div>
+            <div className="flex items-center justify-end border-b p-5">
                 <label className="relative" htmlFor="provider-search">
                     <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                     <span className="sr-only">検索</span>

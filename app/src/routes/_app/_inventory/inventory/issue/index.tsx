@@ -700,9 +700,6 @@ function IssueStockPage() {
             </section>
 
             <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                <div className="border-b p-5">
-                    <h2 className="font-bold">引き当てプレビュー</h2>
-                </div>
                 {lotsError ? (
                     <div className="p-5">
                         <div
@@ -740,7 +737,7 @@ function IssueStockPage() {
                             数量を入力すると、引き当てるロットを表示します。
                         </p>
                     ) : (
-                        <Table>
+                        <Table aria-label="引き当てプレビュー">
                             <TableHeader className="bg-muted/50">
                                 <TableRow>
                                     <TableHead className="px-5">期限</TableHead>
