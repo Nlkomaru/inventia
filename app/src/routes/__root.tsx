@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 
+import { themeInitScript } from "@/lib/theme";
 import appCss from "../styles.css?url";
 
 export type RouterContext = {
@@ -46,9 +47,14 @@ function RootLayout() {
 
 function RootDocument({ children }: { children: React.ReactNode }) {
     return (
-        <html lang="ja">
+        // テーマ適用スクリプトが hydration より先に class を書き換える
+        <html lang="ja" suppressHydrationWarning>
             <head>
                 <HeadContent />
+                <script
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: バンドル読み込み前にテーマを当て、初回描画のちらつきを防ぐ
+                    dangerouslySetInnerHTML={{ __html: themeInitScript }}
+                />
             </head>
             <body>
                 {children}
