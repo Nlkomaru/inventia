@@ -131,7 +131,7 @@ export function PriceRecordTable({
     const table = useTable({ columns, data: records, features });
 
     return (
-        <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+        <section className="overflow-hidden rounded-2xl border">
             <Table aria-label="価格一覧" className="min-w-[840px]">
                 <TableHeader className="bg-muted/50">
                     {table.getHeaderGroups().map((headerGroup) => (

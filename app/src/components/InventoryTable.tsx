@@ -382,7 +382,7 @@ export function InventoryTable({
     const rows = table.getRowModel().rows;
 
     return (
-        <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+        <section className="overflow-hidden rounded-2xl border">
             <Table
                 aria-busy={loading}
                 aria-label="在庫一覧"

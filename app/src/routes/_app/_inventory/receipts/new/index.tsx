@@ -534,7 +534,7 @@ function ReceiptIntakePage() {
 
             {receipt !== null && receipt.status === "parsed" ? (
                 <form onSubmit={submitApply}>
-                    <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                    <section className="overflow-hidden rounded-2xl border">
                         <div className="border-b p-5">
                             <h2 className="font-bold">3. 明細を確認して反映</h2>
                         </div>
@@ -662,7 +662,7 @@ function ReceiptIntakePage() {
             ) : null}
 
             {applyResult === null ? null : (
-                <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <section className="overflow-hidden rounded-2xl border">
                     <div className="border-b p-5">
                         <h2 className="font-bold">反映しました</h2>
                     </div>
@@ -747,7 +747,7 @@ function ReceiptIntakePage() {
             {receipt !== null &&
             receipt.status === "applied" &&
             applyResult === null ? (
-                <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <section className="overflow-hidden rounded-2xl border">
                     <div className="border-b p-5">
                         <h2 className="font-bold">反映済みの明細</h2>
                     </div>

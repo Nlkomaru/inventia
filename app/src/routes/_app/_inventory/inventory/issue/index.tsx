@@ -699,7 +699,7 @@ function IssueStockPage() {
                 </form>
             </section>
 
-            <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+            <section className="overflow-hidden rounded-2xl border">
                 {lotsError ? (
                     <div className="p-5">
                         <div

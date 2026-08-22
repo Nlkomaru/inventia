@@ -182,7 +182,7 @@ function ReceiptListPage() {
                 </Button>
             </header>
 
-            <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+            <section className="overflow-hidden rounded-2xl border">
                 <div className="flex flex-wrap items-center justify-end gap-3 border-b p-5">
                     <Field className="sm:max-w-64">
                         <FieldLabel htmlFor="receipt-status">状態</FieldLabel>
