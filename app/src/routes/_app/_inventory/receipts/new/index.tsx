@@ -572,17 +572,25 @@ function ReceiptIntakePage() {
                                     明細がありません。
                                 </p>
                             ) : (
-                                <ReceiptReviewTable
-                                    categoryOptions={categoryOptions}
-                                    disabled={applying}
-                                    issueIndex={issueIndex}
-                                    itemOptions={itemOptions}
-                                    lines={lines}
-                                    locationOptions={locationOptions}
-                                    onChange={updateRow}
-                                    onNewItemChange={updateRowNewItem}
-                                    rows={rows}
-                                />
+                                <>
+                                    {/* 数量欄はレシートが読み取れた単位のまま表示する。
+                                        書き換えなければ反映先の品目の単位へ換算されるため、
+                                        利用者が桁を計算し直さなくてよい */}
+                                    <p className="text-sm text-muted-foreground">
+                                        数量はレシートの単位のまま表示しています。書き換えなければ、反映先の品目の単位へ自動で換算します。
+                                    </p>
+                                    <ReceiptReviewTable
+                                        categoryOptions={categoryOptions}
+                                        disabled={applying}
+                                        issueIndex={issueIndex}
+                                        itemOptions={itemOptions}
+                                        lines={lines}
+                                        locationOptions={locationOptions}
+                                        onChange={updateRow}
+                                        onNewItemChange={updateRowNewItem}
+                                        rows={rows}
+                                    />
+                                </>
                             )}
 
                             <Field>
@@ -874,8 +882,13 @@ const resultNotes = (line: ReceiptApplyResult["lines"][number]): string => {
     if (line.action === "skip") return "取り込みませんでした";
     const notes: string[] = [];
     if (line.itemCreated) notes.push("品目を新規作成");
-    if (line.replayed) notes.push("反映済みのため再計上せず");
-    notes.push(line.priceRecorded ? "価格履歴に記録" : "価格履歴なし");
+    // 再送で在庫が動かなかった行は価格も記録しない。ここで「価格履歴なし」と
+    // 出すと、先の反映が記録した価格まで無いように読めるため触れない
+    if (line.replayed) {
+        notes.push("反映済みのため再計上せず");
+    } else {
+        notes.push(line.priceRecorded ? "価格履歴に記録" : "価格履歴なし");
+    }
     if (line.aliasRegistered) notes.push("表記を辞書へ登録");
     return notes.join(" / ");
 };

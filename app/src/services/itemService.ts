@@ -306,6 +306,16 @@ export const createItem = async (
  * 価格記録の作成は同じ換算を通しているので、ここを塞げば「価格記録がある品目の
  * 基準単位は換算できる」という不変条件が書き込み側で保たれる。個数は基準単位が
  * そのまま最小単位なので、どの表記でも読める。
+ *
+ * getPriceUnitDefinition が大小文字を無視するため、この関数は "l" や "KG" への
+ * つけ替えも通す。綴りの完全一致（canonicalPriceContentUnit(nextUnit) ===
+ * nextUnit）まで求める案は採らなかった。ここが守るのは「つけ替え後も単価を
+ * 導けること」だけで、読み取り側は TS の calculateUnitPrice も priceRepository
+ * の単価式も同じ規則で綴りを畳むため、"l" へ移した品目の単価はどの経路でも
+ * 一致する（priceRepository.test.ts で固定）。読めるのに 409 で拒むと、"L" は
+ * 通って "l" は通らないという利用者に説明できない差になるだけで、レシート解析
+ * 経由で基準単位が "ml" になっている既存品目を救えもしない。表記を揃えるのは
+ * 拒否ではなく正規化の仕事にする。
  */
 const assertRelabelKeepsPricesReadable = async (
     db: D1Database,

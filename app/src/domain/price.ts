@@ -220,11 +220,31 @@ export const priceUnitDefinitions = {
     件: { dimension: "count", factorToSmallest: 1 },
 } as const satisfies Record<PriceContentUnit, PriceUnitDefinition>;
 
+/**
+ * 単位表の表記を大小文字を落とした鍵で引くための索引。表の中に大小文字だけが
+ * 違う組み合わせは無いため、鍵は一意になる。
+ */
+const priceContentUnitByFoldedCase = new Map<string, PriceContentUnit>(
+    priceContentUnits.map((unit) => [unit.toLowerCase(), unit]),
+);
+
+/**
+ * 単位の表記を単位表の綴りへ寄せる（"ml" → "mL"、"l" → "L"、"G" → "g"）。
+ * レシート解析の指示が長く小文字の「ml」を要求していたため、その経路で作られた
+ * 品目の基準単位は "ml" で保存されており、大小文字を区別すると価格の換算表を
+ * 一切引けない。単位表に無い表記（袋、パックなど）は利用者の語彙なので
+ * null を返し、勝手に別の単位へ読み替えない。
+ */
+export const canonicalPriceContentUnit = (
+    unit: string,
+): PriceContentUnit | null =>
+    priceContentUnitByFoldedCase.get(unit.toLowerCase()) ?? null;
+
 export const getPriceUnitDefinition = (
     unit: string,
 ): PriceUnitDefinition | null => {
-    const parsed = priceContentUnitSchema.safeParse(unit);
-    return parsed.success ? priceUnitDefinitions[parsed.data] : null;
+    const canonical = canonicalPriceContentUnit(unit);
+    return canonical === null ? null : priceUnitDefinitions[canonical];
 };
 
 /**

@@ -54,6 +54,15 @@ export const receiptMatchMethods = [
     "manual",
 ] as const;
 
+// 確認画面で承認された操作。domain/receipt.ts の receiptApplyActions と同じ集合だが、
+// schema.ts は domain を読まない（DB 定義が業務型へ依存すると層の向きが逆になる）ため
+// ここへ写しを置く。drizzle の enum は TS の型付けだけで DDL には出ない
+export const receiptApplyActions = [
+    "add_to_item",
+    "create_item",
+    "skip",
+] as const;
+
 export const itemAliasSources = ["receipt", "manual"] as const;
 
 export const storageLocations = sqliteTable(
@@ -725,6 +734,22 @@ export const receiptLines = sqliteTable(
         matchScore: integer("match_score"),
         createdAt: text("created_at").notNull(),
         updatedAt: text("updated_at").notNull(),
+        // 以下 6 列は ALTER ADD COLUMN で末尾に追加されるため宣言順も末尾に合わせる。
+        // 確認画面で承認され、実際に在庫・価格へ反映された内容。解析値
+        // （quantity / price / printed_expiry_date など）は紙との突き合わせに要るため
+        // 温存し、ここには「記録された事実」だけを書く。反映前の行はすべて null。
+        // 「skip の行は数量・金額・期限を持たない」といった整合は table 制約の追加が
+        // テーブル再構築を招くため足さず、services/receiptService.ts で守る
+        appliedAction: text("applied_action", { enum: receiptApplyActions }),
+        // 反映先の品目の基準単位へ換算した後の数量
+        appliedQuantity: integer("applied_quantity"),
+        // 上の数量がどの単位なのかを反映時点で固定する。品目の基準単位は後から
+        // 変わりうるため、表示のたびに品目を引き直すと過去の記録の意味が変わる
+        appliedBaseUnit: text("applied_base_unit"),
+        appliedPrice: integer("applied_price"),
+        // ロットの ISO 8601 UTC ではなく、レシートと同じ日付（YYYY-MM-DD）で残す
+        appliedExpiryDate: text("applied_expiry_date"),
+        appliedAt: text("applied_at"),
     },
     (t) => [
         // 同一レシート内の行番号重複を禁止しつつ、明細取得の索引も兼ねる

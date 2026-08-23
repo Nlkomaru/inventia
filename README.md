@@ -55,10 +55,15 @@ The MCP server exposes these tools through the same services as the HTTP API:
 | Categories | `list_categories`, `list_category_tree`, `get_category`, `create_category` |
 | Locations | `list_locations`, `list_location_tree`, `get_location`, `create_location` |
 | External providers | `list_external_providers`, `create_external_provider`, `update_external_provider`, `delete_external_provider` |
+| Stores | `resolve_stores` |
+| Receipts | `list_receipt_examples` |
 
 Items and prices are read in batches: `get_inventory_items`, `get_price_histories` and
 `compare_unit_prices_across_items` take a list of ids, so reading one item means passing a
-single-element list rather than calling a separate per-item tool.
+single-element list rather than calling a separate per-item tool. Printed names are matched in
+batches the same way: `resolve_inventory_items`, `resolve_stores` and
+`list_receipt_examples` take a list of names and answer them in one call instead of one
+search per name.
 
 ## Verification
 

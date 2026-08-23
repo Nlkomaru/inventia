@@ -242,6 +242,9 @@ const columns = columnHelper.columns([
                 onChange,
             } = row.original;
             const invalid = Boolean(issues.quantity);
+            // 反映済みの行の数量は品目の基準単位へ換算した後の値なので、
+            // レシートから読めた単位ではなく記録された単位を添える
+            const unit = line.applied?.baseUnit ?? line.suggestion.baseUnit;
             return (
                 <div className="flex flex-col gap-1">
                     <div className="flex items-baseline gap-1.5">
@@ -253,8 +256,8 @@ const columns = columnHelper.columns([
                             }
                             aria-invalid={invalid}
                             aria-label={
-                                line.suggestion.baseUnit
-                                    ? `${review.lineNo} 行目の数量（${line.suggestion.baseUnit}）`
+                                unit
+                                    ? `${review.lineNo} 行目の数量（${unit}）`
                                     : `${review.lineNo} 行目の数量`
                             }
                             className="w-24"
@@ -264,16 +267,22 @@ const columns = columnHelper.columns([
                             max={reviewQuantityMax}
                             min={1}
                             onChange={(event) =>
-                                onChange({ quantity: event.target.value })
+                                // 利用者が触った事実を残す。値が解析値と同じでも
+                                // 明示指定として送らないと、換算できない単位の
+                                // 組み合わせで同じエラーから抜け出せない
+                                onChange({
+                                    quantity: event.target.value,
+                                    quantityEdited: true,
+                                })
                             }
                             step={1}
                             type="number"
                             value={review.quantity}
                         />
                         {/* 数量は基準単位での量なので、読み取れた単位を並べて示す */}
-                        {line.suggestion.baseUnit ? (
+                        {unit ? (
                             <span className="text-xs text-muted-foreground">
-                                {line.suggestion.baseUnit}
+                                {unit}
                             </span>
                         ) : null}
                     </div>
