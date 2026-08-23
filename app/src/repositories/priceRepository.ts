@@ -121,11 +121,19 @@ const allPriceRecordSelect = `
 // calculateUnitPrice in the service layer. A count item's base unit is already
 // its smallest unit, so the kg/L factor must stay out of that dimension even
 // when the item happens to be labelled 'kg' or 'L'.
+//
+// 基準単位の綴りは LOWER() で畳んでから判定する。domain の
+// getPriceUnitDefinition が大小文字を無視して単位表を引くのに対し、SQLite の
+// IN は BINARY 照合なので、レシート解析経由で作られた小文字の 'ml' / 'l' や
+// 手入力の 'KG' がここだけ一致せず、同じ 1 件の記録が価格履歴（TS 側）と
+// 価格比較（この式）で 1000 倍ずれる。対象は ASCII の kg / L だけなので
+// LOWER() で足りる。
 const unitPriceExpression = `
     (CAST(p.price AS REAL) /
         (CAST(p.content_amount AS REAL) * CAST(p.set_count AS REAL) *
             CASE
-                WHEN i.base_dimension != 'count' AND i.base_unit IN ('kg', 'L')
+                WHEN i.base_dimension != 'count'
+                    AND LOWER(i.base_unit) IN ('kg', 'l')
                 THEN 1000.0
                 ELSE 1.0
             END)) *
