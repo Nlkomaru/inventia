@@ -3,6 +3,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
 import { dynamicTool, jsonSchema, type ToolSet } from "ai";
 import type { ItemSearchEnv } from "../../services/itemSearchService";
+import type { StoreSearchEnv } from "../../services/storeSearchService";
 import { createMcpServer } from "./server";
 
 /**
@@ -13,6 +14,10 @@ export const receiptParseToolAllowlist = [
     // 明細の表記をまとめて照合する。1 行ずつ search_inventory を呼ばせると
     // 呼び出し回数が明細の行数に比例し、往復上限を使い切る
     "resolve_inventory_items",
+    // 店名も同じ理由でまとめて照合する。読み取った店名を既存店舗の登録名へ
+    // 寄せられれば、反映時の resolveStoreByName が完全一致で当たり、
+    // 同じ店の表記揺れが別の店舗として作られない。読み取り専用で副作用は無い
+    "resolve_stores",
     "search_inventory",
     // レシートの表記（略称やブランド名の前置きなど）は在庫の品目名と語彙が
     // ずれやすく、search_inventory の LIKE 検索だけでは既存品目を見落とす。
@@ -22,6 +27,11 @@ export const receiptParseToolAllowlist = [
     "search_inventory_semantic",
     // 品目の詳細も明細の行数ぶん引かれるため、id をまとめて受ける一括版だけを渡す
     "get_inventory_items",
+    // 過去に利用者が承認して反映した取込結果を実例として引く。同じ商品を毎回
+    // 同じ品目名・単位・カテゴリへ寄せられれば、確認画面での直しが減る。
+    // 表記を 1 回でまとめて渡せるため往復も 1 回で済み、読み取り専用で
+    // 在庫も辞書も動かさない
+    "list_receipt_examples",
     "list_expiring_inventory",
     "get_price_history",
     "compare_unit_prices",
@@ -72,11 +82,11 @@ const flattenToolResult = (result: object): unknown => {
 /**
  * /api/mcp と同じ MCP server をプロセス内で接続し、AI SDK の tool として返す。
  * HTTP を経由しないため Cloudflare Access の資格情報は要らず、tool の説明も
- * MCP の定義をそのまま使う。createMcpServer が ItemSearchEnv を要求するため、
- * ここも D1Database ではなく env を受け取る。
+ * MCP の定義をそのまま使う。createMcpServer が品目と店名それぞれの索引まで
+ * 要求するため、ここも D1Database ではなく env を受け取る。
  */
 export const createInProcessMcpToolSet = async (
-    env: ItemSearchEnv,
+    env: ItemSearchEnv & StoreSearchEnv,
     allowlist: readonly string[] = receiptParseToolAllowlist,
 ): Promise<InProcessMcpToolSet> => {
     const [clientTransport, serverTransport] =

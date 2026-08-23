@@ -6,6 +6,7 @@ import { normalizeContentAmount } from "../domain/price";
 import {
     decodeReceiptCursor,
     encodeReceiptCursor,
+    normalizeSuggestedBaseUnit,
     type ReceiptApplyInput,
     type ReceiptApplyLineInput,
     type ReceiptApplyLineResult,
@@ -13,12 +14,16 @@ import {
     type ReceiptBaseDimension,
     type ReceiptDetailDto,
     type ReceiptDto,
+    type ReceiptExampleDto,
+    type ReceiptExampleListDto,
     type ReceiptLineDto,
     type ReceiptListDto,
     receiptApplyInputSchema,
+    receiptApplyQuantityMax,
     receiptCompletedNameMaxLength,
     receiptContentTypeExtensions,
     receiptContentTypeSchema,
+    receiptExampleQuerySchema,
     receiptListQuerySchema,
     receiptMaxByteSize,
     receiptOcrResultSchema,
@@ -46,6 +51,7 @@ import {
     type ItemPricingRow,
     insertItemAliasIfAbsent,
     insertReceipt,
+    listAppliedReceiptLineExamples,
     listItemAliasesByNormalizedNames,
     listItemNamesByIds,
     listItemPricingContexts,
@@ -55,9 +61,11 @@ import {
     markReceiptApplied,
     type PurchaseRow,
     purchaseBelongsToOtherReceipt,
+    type ReceiptExampleRow,
     type ReceiptLineRow,
     type ReceiptLineWrite,
     type ReceiptRow,
+    recordReceiptLineApplied,
     reserveReceiptLineItemId,
     saveReceiptParseResult,
     setReceiptLineMatch,
@@ -234,9 +242,9 @@ const toReceiptDto = (row: ReceiptRow): ReceiptDto => ({
     updatedAt: row.updatedAt,
 });
 
-// 保存列は 1 行に平たく並ぶが、公開する DTO は期限・提案・照合の 3 つに束ねる。
-// 期限の由来と日付、単位と量の種類のように、片方だけを読むと意味を誤る組み合わせを
-// 同じ入れ物へ置く
+// 保存列は 1 行に平たく並ぶが、公開する DTO は期限・提案・照合・反映実績の 4 つに
+// 束ねる。期限の由来と日付、単位と量の種類のように、片方だけを読むと意味を誤る
+// 組み合わせを同じ入れ物へ置く
 const toLineDto = (
     row: ReceiptLineRow,
     matchedItemName: string | null,
@@ -271,6 +279,19 @@ const toLineDto = (
         score: row.matchScore,
         candidates,
     },
+    // 反映で書かれた列がひとつも無い行は「まだ記録が無い」ため、
+    // 空の入れ物ではなく null にして解析値へフォールバックさせる
+    applied:
+        row.appliedAction === null
+            ? null
+            : {
+                  action: row.appliedAction,
+                  quantity: row.appliedQuantity,
+                  baseUnit: row.appliedBaseUnit,
+                  price: row.appliedPrice,
+                  expiryDate: row.appliedExpiryDate,
+                  appliedAt: row.appliedAt,
+              },
 });
 
 // 金額を読めない行が 1 つでもあれば合計は出せない。0 を代入して
@@ -285,6 +306,20 @@ const linesTotalPrice = (rows: readonly ReceiptLineRow[]): number | null => {
             return null;
         }
         total += row.price;
+    }
+    return total;
+};
+
+// 記録できた金額だけを足す。linesTotalPrice と違い「1 行でも欠ければ null」に
+// しないのは、金額のない行や取り込まなかった行があっても「実際に支出として
+// 記録した額」は確定しているため。1 行も記録が無いときだけ null にする
+const appliedTotalPrice = (rows: readonly ReceiptLineRow[]): number | null => {
+    let total: number | null = null;
+    for (const row of rows) {
+        if (row.appliedPrice === null) {
+            continue;
+        }
+        total = (total ?? 0) + row.appliedPrice;
     }
     return total;
 };
@@ -305,6 +340,7 @@ export const getReceipt = async (
             ...toReceiptDto(receipt),
             lines: [],
             linesTotalPrice: null,
+            appliedTotalPrice: null,
         };
     }
     const unmatched = lines.filter((line) => line.matchedItemId === null);
@@ -347,6 +383,7 @@ export const getReceipt = async (
             ),
         ),
         linesTotalPrice: linesTotalPrice(lines),
+        appliedTotalPrice: appliedTotalPrice(lines),
     };
 };
 
@@ -537,8 +574,12 @@ const toLineWrites = (
             expiryConfidence: line.expiry.confidence,
             expiryEstimateReason: line.expiry.estimateReason,
         });
-        // 単位は表記と量の種類が対でないと品目を作れないため、片方だけの提案は捨てる
-        const baseUnit = line.stocking.baseUnit?.trim().slice(0, 50) ?? "";
+        // 単位は表記と量の種類が対でないと品目を作れないため、片方だけの提案は捨てる。
+        // 表記は単位表の綴りへ寄せる。提案はそのまま新規品目の基準単位になるため、
+        // ここで揃えないと "ml" の品目が作られ続けて価格を換算できなくなる
+        const baseUnit = normalizeSuggestedBaseUnit(
+            line.stocking.baseUnit?.trim().slice(0, 50) ?? "",
+        );
         const unitPaired =
             baseUnit.length > 0 && line.stocking.baseDimension !== null;
         const suggestedCategoryName =
@@ -859,22 +900,28 @@ const mapApplyError = (error: unknown): never => {
 };
 
 // 価格履歴は基準単位あたりで比較するため、内容量を基準単位へ正規化できる行だけ残す。
-// 数量ベースの品目は 1 個 = 内容量 1 とみなせるが、質量・容量の品目は
-// レシートから内容量を読み取れないため、確認画面での指定がなければ記録しない
+// 確認画面は内容量を送らないので、指定が無い行は数量ベースの品目なら 1 個 = 内容量 1、
+// 質量・容量の品目なら明細の数量（品目の基準単位での合計量）を 1 セットの内容量とみなす。
+// 数量をそのまま入れず normalizeContentAmount を通すのは、次元と基準単位が噛み合わない
+// 品目（次元が質量なのに単位が「袋」など）で null に落とすためで、
+// 「円/100g」と表示されるのに中身は袋数、という行を残さない
 const resolvePriceContentAmount = (
     pricing: ItemPricingRow,
     lineInput: ReceiptApplyLineInput,
+    quantity: number,
 ): number | null => {
-    const contentUnit = lineInput.contentUnit ?? pricing.baseUnit;
-    const contentAmount =
-        lineInput.contentAmount ??
-        (pricing.baseDimension === "count" ? 1 : null);
-    if (contentAmount === null) {
-        return null;
+    // 明示指定は換算できないものを黙って読み替えない（createPriceRecord が 400 で拒むのと同じ）
+    if (lineInput.contentAmount !== undefined) {
+        return normalizeContentAmount(
+            lineInput.contentAmount,
+            lineInput.contentUnit ?? pricing.baseUnit,
+            pricing.baseUnit,
+            pricing.baseDimension,
+        );
     }
     return normalizeContentAmount(
-        contentAmount,
-        contentUnit,
+        pricing.baseDimension === "count" ? 1 : quantity,
+        pricing.baseUnit,
         pricing.baseUnit,
         pricing.baseDimension,
     );
@@ -891,7 +938,11 @@ const resolvePriceContent = (
     lineInput: ReceiptApplyLineInput,
     quantity: number,
 ): { contentAmount: number; setCount: number } | null => {
-    const contentAmount = resolvePriceContentAmount(pricing, lineInput);
+    const contentAmount = resolvePriceContentAmount(
+        pricing,
+        lineInput,
+        quantity,
+    );
     if (contentAmount === null) {
         return null;
     }
@@ -909,6 +960,28 @@ const dimensionLabels: Record<ReceiptBaseDimension, string> = {
 };
 
 /**
+ * 導いた数量が反映で受け付ける上限に収まっているか確かめる。解析が返す数量には
+ * 上限が無く（`receiptOcrLineSchema`）、単位換算は桁を 1000 倍まで増やすため、
+ * 「1.5kg」を 1500 kg と読んだ行が g の品目で 1,500,000 になる。この値を
+ * `applied_quantity` へ書いてしまうと、開き直した確認画面が数量の検証
+ * （1 以上 `receiptApplyQuantityMax` 以下）で送信を止め、既に反映を開始した
+ * レシートは削除もできず二度と完了できなくなる。実績を残す前に弾いて、
+ * 数量の明示指定かスキップで抜けられる状態を保つ。
+ */
+const withinQuantityMax = (
+    line: ReceiptLineRow,
+    pricing: ItemPricingRow,
+    quantity: number,
+): number => {
+    if (quantity <= receiptApplyQuantityMax) {
+        return quantity;
+    }
+    throw invalidInput(
+        `${line.lineNo} 行目は品目の単位（${pricing.baseUnit}）で数えると ${quantity.toLocaleString("en-US")} になり、一度に反映できる上限（${receiptApplyQuantityMax.toLocaleString("en-US")}）を超えるため反映できません。数量を品目の単位に直して指定するか、この行は取り込まないでください。`,
+    );
+};
+
+/**
  * 明細の数量を反映先の品目の単位へ揃える。数量は解析時に提案した単位
  * （`suggested_base_unit`）で表されているため、品目が別の単位で在庫を数えて
  * いる場合はそのまま足すと桁が変わる（ml の 1000 を L の品目へ足すなど）。
@@ -923,7 +996,7 @@ const resolveLineQuantity = (
         line.suggestedBaseUnit === null ||
         line.suggestedBaseUnit === pricing.baseUnit
     ) {
-        return line.quantity;
+        return withinQuantityMax(line, pricing, line.quantity);
     }
     // 量の種類が違う行は数量を直しても筋が通らないため、品目の選び直しを促す
     if (
@@ -945,7 +1018,7 @@ const resolveLineQuantity = (
             `${line.lineNo} 行目はレシートの単位（${line.suggestedBaseUnit}）と品目の単位（${pricing.baseUnit}）が違い、換算できないため反映できません。数量を品目の単位に直して指定してください。`,
         );
     }
-    return converted;
+    return withinQuantityMax(line, pricing, converted);
 };
 
 /**
@@ -1082,7 +1155,8 @@ export const applyReceipt = async (
     const purchase = await resolveReceiptPurchase(db, receipt, parsed);
     // 価格履歴を店舗マスタへ結び付ける。購入元は購入 1 件につき 1 つなので、
     // 明細ごとではなくここで 1 回だけ解決する。同じ店舗の表記揺れを新規作成
-    // させないため、完全一致・正規化一致・店名の類似検索の順で既存を探す
+    // させないため、完全一致・正規化一致・支店名を落とした表記・店名の類似検索の
+    // 順で既存を探す
     const store = await resolveStoreByName(searchEnv, purchase.source);
     // 反映の同一性はレシート自身が持つ購入で決まる。利用者が画面を触って
     // 別の key を送っても、最初の適用と同じ key・同じ購入日時へ収束させる
@@ -1103,6 +1177,10 @@ export const applyReceipt = async (
     // ループ中に新規作成した品目 ID。索引更新は品目ごとに直列で OpenRouter を
     // 叩かないよう、ループを抜けた後に indexItems でまとめて 1 回だけ行う
     const createdItemIds: string[] = [];
+    // 行ごとの実績にも押す時刻。再送では最初の反映と同じ時刻へ収束させるため
+    // 受け取り済みの appliedAt を優先する。行とレシートで別の時刻にならないよう
+    // ループより前に 1 回だけ決める
+    const appliedAt = receipt.appliedAt ?? new Date().toISOString();
     try {
         for (const lineInput of parsed.lines) {
             const line = lineById.get(lineInput.lineId);
@@ -1110,6 +1188,42 @@ export const applyReceipt = async (
                 throw invalidInput("明細が見つかりません。");
             }
             if (lineInput.action === "skip") {
+                if (
+                    line.appliedAction !== null &&
+                    line.appliedAction !== "skip"
+                ) {
+                    // 既に在庫が動いた行は、後から取り込まないへ倒しても取り消せない
+                    // （recordReceiptLineApplied の WHERE も実績を守る）。skip 成功として
+                    // 返すと完了画面が「取り込みませんでした」と表示し、報告と在庫が
+                    // 食い違うため、記録済みの実績をそのまま結果にする
+                    results.push({
+                        lineId: line.id,
+                        action: line.appliedAction,
+                        itemId: line.matchedItemId,
+                        itemCreated: false,
+                        // 実績のある行の applied_quantity は必ず埋まっているが、
+                        // 列は null を許すため 0 で受ける（数量なしとして表示される）
+                        quantity: line.appliedQuantity ?? 0,
+                        expiryDate: receiptExpiryDateToLotExpiry(
+                            line.appliedExpiryDate,
+                        ),
+                        // 在庫を動かしたのは先の反映であることを画面へ伝える
+                        replayed: true,
+                        priceRecorded: false,
+                        aliasRegistered: false,
+                    });
+                    continue;
+                }
+                // 取り込まなかったことも記録として残す。数量・金額・期限は
+                // 何も動かしていないため持たせない
+                await recordReceiptLineApplied(db, line.id, {
+                    action: "skip",
+                    quantity: null,
+                    baseUnit: null,
+                    price: null,
+                    expiryDate: null,
+                    appliedAt,
+                });
                 results.push({
                     lineId: line.id,
                     action: "skip",
@@ -1219,6 +1333,19 @@ export const applyReceipt = async (
             });
             const price =
                 lineInput.price !== undefined ? lineInput.price : line.price;
+            // 実際に在庫が動いたときだけ記録する。再送（replayed）で送られた値は
+            // 在庫へ届いていないため、最初の反映が書いた実績を塗り替えない。
+            // 期限はロットの ISO 8601 UTC ではなく、確認画面と同じ日付で残す
+            if (!stock.replayed) {
+                await recordReceiptLineApplied(db, line.id, {
+                    action: lineInput.action,
+                    quantity,
+                    baseUnit: pricing.baseUnit,
+                    price,
+                    expiryDate,
+                    appliedAt,
+                });
+            }
             let priceRecorded = false;
             // 再送では在庫が動いていないため価格も二重に記録しない。
             // movement 確定後に価格記録だけ落ちた場合は再実行でも補えないが、
@@ -1274,7 +1401,6 @@ export const applyReceipt = async (
         // 途中で失敗しても、それまでに作成した品目は finally で索引する
         await indexItems(searchEnv, createdItemIds);
     }
-    const appliedAt = receipt.appliedAt ?? new Date().toISOString();
     if (
         !(await markReceiptApplied(db, receiptId, {
             purchaseId: purchase.id,
@@ -1319,4 +1445,68 @@ export const deleteReceipt = async (
         );
     }
     await env.RECEIPTS.delete(receipt.objectKey).catch(() => undefined);
+};
+
+// SQLite は真偽値を 0/1 で返すため、DTO へ渡す前に真偽値へ直す
+const toReceiptExampleDto = (row: ReceiptExampleRow): ReceiptExampleDto => ({
+    rawName: row.rawName,
+    completedName: row.completedName,
+    normalizedName: row.normalizedName,
+    itemName: row.itemName,
+    baseUnit: row.baseUnit,
+    baseDimension: row.baseDimension,
+    categoryName: row.categoryName,
+    storeName: row.storeName,
+    suggestedBaseUnit: row.suggestedBaseUnit,
+    suggestedBaseDimension: row.suggestedBaseDimension,
+    suggestedCategoryName: row.suggestedCategoryName,
+    corrected: row.corrected === 1,
+    appliedAt: row.appliedAt,
+});
+
+/**
+ * 反映まで終わったレシート明細を、次回以降の解析が参照できる実例として返す。
+ * 表記は行ごとに問い合わせず 1 回でまとめて受け、照合キーは辞書・明細と同じ
+ * 正規化を通す。読み取りだけで、在庫も辞書も動かさない。
+ */
+export const listReceiptExamples = async (
+    db: D1Database,
+    input: unknown,
+): Promise<ReceiptExampleListDto> => {
+    const validated = receiptExampleQuerySchema.safeParse(input);
+    if (!validated.success) {
+        throw invalidInput(validationMessage(validated.error.issues));
+    }
+    const { names, limit, correctedOnly } = validated.data;
+    // 正規化して空になる表記（記号だけの印字など）はどの行とも一致しないため、
+    // 問い合わせからは外しつつ notFound には載せる
+    const normalizedByQuery = new Map(
+        (names ?? []).map((name) => [name, normalizeReceiptName(name)]),
+    );
+    const normalizedNames =
+        names === undefined
+            ? null
+            : [
+                  ...new Set(
+                      [...normalizedByQuery.values()].filter(
+                          (value) => value.length > 0,
+                      ),
+                  ),
+              ];
+    const rows = await listAppliedReceiptLineExamples(db, {
+        normalizedNames,
+        limit,
+        correctedOnly,
+    });
+    const found = new Set(rows.map((row) => row.normalizedName));
+    return {
+        examples: rows.map(toReceiptExampleDto),
+        notFound:
+            names === undefined
+                ? []
+                : names.filter((name) => {
+                      const normalized = normalizedByQuery.get(name);
+                      return normalized === undefined || !found.has(normalized);
+                  }),
+    };
 };

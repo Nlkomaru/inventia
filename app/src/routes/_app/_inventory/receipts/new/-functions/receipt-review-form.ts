@@ -43,6 +43,19 @@ export interface ReceiptReviewRow {
     /** action = add_to_item のときの反映先品目 ID。 */
     itemId: string;
     quantity: string;
+    /**
+     * 数量欄を利用者が触ったか。触っていない行は数量を送らず、レシートの単位から
+     * 反映先の品目の単位へサーバー側で換算させる（ml の 1000 を L の品目へ
+     * そのまま足さない）。
+     *
+     * 初期値との値比較で代用してはいけない。サーバーは換算できない単位の組み合わせ
+     * （個数の「個」と「本」、「個」と「袋」など）で「数量を品目の単位に直して
+     * 指定してください」と返すが、その指示どおり解析値と同じ数を打ち直すと値比較
+     * では未編集になり、数量が省略されて同じエラーが永久に返る。反映は途中で
+     * throw するため先行する行は在庫が動いたままになり、レシートは部分反映のまま
+     * 二度と完了できなくなる。編集したという事実そのものを持たせて脱出口を残す。
+     */
+    quantityEdited: boolean;
     /** 空文字は「金額なし」を表す。0 は 0 円として送る。 */
     price: string;
     expiryMode: ReceiptReviewExpiryMode;
@@ -103,21 +116,46 @@ const resolveInitialAction = (line: ReceiptLineDto): ReceiptReviewAction => {
 /**
  * 明細 1 行分の初期フォーム状態。
  * 類似度だけで自動確定しないため、照合が確定していない行は既存品目へ加算しない。
+ *
+ * 部分反映のまま残ったレシートを「取込を続ける」で開き直した行（applied が非 null）
+ * は、解析値ではなく記録済みの実績を初期値にする。在庫調整の冪等性は数量と期限を
+ * 含めた digest で判定するため、再送で解決される値が 1 回目とずれると
+ * RECEIPT_APPLY_CONFLICT になり、そのレシートは二度と完了できない。
+ * 換算は最初の反映で済んでいる（applied.quantity は品目の基準単位での量）ので、
+ * その行は quantityEdited を true にして常に数量を明示送信し、サーバー側の
+ * 再換算を通さない。
+ * 取り込まないと記録された行は、既定へ戻さず skip のまま復元する。
  */
-export const createReviewRow = (line: ReceiptLineDto): ReceiptReviewRow => ({
-    lineId: line.id,
-    lineNo: line.lineNo,
-    rawName: line.rawName,
-    displayName: line.completedName ?? line.rawName,
-    action: resolveInitialAction(line),
-    itemId: line.match.itemId ?? "",
-    quantity: String(line.quantity),
-    price: line.price === null ? "" : String(line.price),
-    expiryMode: line.expiry.suggestedDate === null ? "none" : "date",
-    expiryDate: line.expiry.suggestedDate ?? "",
-    registerAlias: true,
-    newItem: suggestedNewItem(line),
-});
+export const createReviewRow = (line: ReceiptLineDto): ReceiptReviewRow => {
+    // skip として記録された行は数量・金額・期限を持たないため、解析値の初期値を保つ
+    const applied =
+        line.applied !== null && line.applied.quantity !== null
+            ? line.applied
+            : null;
+    // 取り込まないと利用者が決めた行は、その判断を初期値にする。照合済みの行は
+    // 既定が「既存の品目へ加算」になるため、既定を作り直すと部分反映のレシートを
+    // 開き直しただけで判断が消え、検証も警告も通さずに在庫が増える
+    const skipped = line.applied !== null && line.applied.action === "skip";
+    const quantity = applied?.quantity ?? line.quantity;
+    const price = applied !== null ? applied.price : line.price;
+    const expiryDate =
+        applied !== null ? applied.expiryDate : line.expiry.suggestedDate;
+    return {
+        lineId: line.id,
+        lineNo: line.lineNo,
+        rawName: line.rawName,
+        displayName: line.completedName ?? line.rawName,
+        action: skipped ? "skip" : resolveInitialAction(line),
+        itemId: line.match.itemId ?? "",
+        quantity: String(quantity),
+        quantityEdited: applied !== null,
+        price: price === null ? "" : String(price),
+        expiryMode: expiryDate === null ? "none" : "date",
+        expiryDate: expiryDate ?? "",
+        registerAlias: true,
+        newItem: suggestedNewItem(line),
+    };
+};
 
 export const createReviewRows = (
     lines: readonly ReceiptLineDto[],
@@ -332,6 +370,9 @@ const buildNewItem = (form: ReceiptReviewNewItemForm): ReceiptApplyNewItem => {
  * 承認済みの行を反映入力へ変換する。
  * action ごとに送るキーを変え、前の選択の残骸（itemId / newItem）を持ち越さない。
  * 期限は省略時の既定に頼らず常に明示して送る（画面の表示と反映結果を一致させる）。
+ * 数量だけは触っていない行で省略する。明示した数量は品目の単位での入力として
+ * そのまま使われる決まりなので、常に送るとレシートの単位から品目の単位への
+ * 換算が一度も行われない。
  */
 export const buildApplyLine = (
     row: ReceiptReviewRow,
@@ -348,7 +389,12 @@ export const buildApplyLine = (
     const expiryDate = row.expiryMode === "none" ? null : row.expiryDate;
     const common = {
         lineId: row.lineId,
-        quantity,
+        // 数量欄を触った行だけ送る。初期値との値比較で代用しないのは、
+        // 換算できない単位の組み合わせでサーバーが返す「数量を品目の単位に直して
+        // 指定してください」に従って同じ数を打ち直しても未編集と見なされ、
+        // 同じエラーから永久に抜け出せなくなるため（ReceiptReviewRow の
+        // quantityEdited のコメント参照）
+        ...(row.quantityEdited ? { quantity } : {}),
         price: price.value,
         expiryDate,
         registerAlias: row.registerAlias,

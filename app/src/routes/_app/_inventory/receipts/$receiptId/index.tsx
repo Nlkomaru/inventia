@@ -21,6 +21,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import type { ReceiptLineDto } from "@/domain/receipt";
 import type { BreadcrumbsLoaderData } from "@/lib/breadcrumbs";
 import { receiptDetailQueryOptions } from "../-api/receipt-queries";
 import {
@@ -40,6 +41,29 @@ const receiptImageSrc = (receiptId: string): string =>
 
 const resumeSearch = (receiptId: string) => ({ receiptId }) as const;
 
+/**
+ * 記録した内容を主に、解析値を副として見せる。同じ値なら副行を出さない
+ * （変わった行だけが目に留まるようにする）。
+ */
+function AppliedValue({
+    applied,
+    parsed,
+}: {
+    applied: string;
+    parsed: string;
+}) {
+    return (
+        <>
+            <span>{applied}</span>
+            {applied === parsed ? null : (
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                    解析時: {parsed}
+                </span>
+            )}
+        </>
+    );
+}
+
 export const Route = createFileRoute("/_app/_inventory/receipts/$receiptId/")({
     loader: async ({ context, params }) => {
         const receipt = await context.queryClient.ensureQueryData(
@@ -54,6 +78,34 @@ export const Route = createFileRoute("/_app/_inventory/receipts/$receiptId/")({
     pendingComponent: ReceiptDetailPending,
     errorComponent: ReceiptDetailError,
 });
+
+/**
+ * 反映先の品目。取り込まなかった行は、解析時に照合できていても在庫へ届いて
+ * いないため、照合先ではなく「取り込まない」と伝える。
+ */
+function AppliedItem({ line }: { line: ReceiptLineDto }) {
+    if (line.applied?.action === "skip") {
+        return (
+            <span className="text-sm text-muted-foreground">取り込まない</span>
+        );
+    }
+    if (line.match.itemId === null) {
+        return (
+            <span className="text-sm text-muted-foreground">
+                {line.stockRelevant ? "—" : "在庫に置かない"}
+            </span>
+        );
+    }
+    return (
+        <Link
+            className="text-sm underline-offset-4 hover:underline"
+            params={{ itemId: line.match.itemId }}
+            to="/inventory/items/$itemId"
+        >
+            {line.match.itemName ?? line.match.itemId}
+        </Link>
+    );
+}
 
 function ReceiptDetailPage() {
     const { receiptId } = Route.useParams();
@@ -145,6 +197,14 @@ function ReceiptDetailPage() {
                         </div>
                         <div>
                             <dt className="text-sm text-muted-foreground">
+                                反映した合計
+                            </dt>
+                            <dd className="mt-1 text-sm">
+                                {formatYen(receipt.appliedTotalPrice)}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-sm text-muted-foreground">
                                 解析モデル
                             </dt>
                             <dd className="mt-1 break-words text-sm">
@@ -183,6 +243,9 @@ function ReceiptDetailPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>明細</CardTitle>
+                    <CardDescription>
+                        反映した行は記録した内容を表示しています。解析値と違う行だけ、レシートの解析値を下に添えています。
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     {receipt.lines.length === 0 ? (
@@ -205,55 +268,78 @@ function ReceiptDetailPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {receipt.lines.map((line) => (
-                                    <TableRow key={line.id}>
-                                        <TableCell className="max-w-64 align-top">
-                                            <p className="break-words text-sm font-medium">
-                                                {line.completedName ??
-                                                    line.rawName}
-                                            </p>
-                                            {line.completedName ===
-                                            null ? null : (
-                                                <p className="mt-0.5 break-words text-xs text-muted-foreground">
-                                                    レシート表記: {line.rawName}
+                                {receipt.lines.map((line) => {
+                                    // 取り込まなかった行は在庫にも価格にも届いて
+                                    // いないため、記録値としては扱わず解析値を出す
+                                    const applied =
+                                        line.applied !== null &&
+                                        line.applied.action !== "skip"
+                                            ? line.applied
+                                            : null;
+                                    return (
+                                        <TableRow key={line.id}>
+                                            <TableCell className="max-w-64 align-top">
+                                                <p className="break-words text-sm font-medium">
+                                                    {line.completedName ??
+                                                        line.rawName}
                                                 </p>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right align-top whitespace-nowrap">
-                                            {line.quantity}{" "}
-                                            {line.suggestion.baseUnit ?? ""}
-                                        </TableCell>
-                                        <TableCell className="text-right align-top whitespace-nowrap">
-                                            {formatYen(line.price)}
-                                        </TableCell>
-                                        <TableCell className="align-top whitespace-nowrap">
-                                            {formatExpiryDate(
-                                                line.expiry.suggestedDate,
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="align-top">
-                                            {line.match.itemId === null ? (
-                                                <span className="text-sm text-muted-foreground">
-                                                    {line.stockRelevant
-                                                        ? "—"
-                                                        : "在庫に置かない"}
-                                                </span>
-                                            ) : (
-                                                <Link
-                                                    className="text-sm underline-offset-4 hover:underline"
-                                                    params={{
-                                                        itemId: line.match
-                                                            .itemId,
-                                                    }}
-                                                    to="/inventory/items/$itemId"
-                                                >
-                                                    {line.match.itemName ??
-                                                        line.match.itemId}
-                                                </Link>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                                {line.completedName ===
+                                                null ? null : (
+                                                    <p className="mt-0.5 break-words text-xs text-muted-foreground">
+                                                        レシート表記:{" "}
+                                                        {line.rawName}
+                                                    </p>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right align-top whitespace-nowrap">
+                                                {applied === null ||
+                                                applied.quantity === null ? (
+                                                    `${line.quantity} ${line.suggestion.baseUnit ?? ""}`
+                                                ) : (
+                                                    <AppliedValue
+                                                        applied={`${applied.quantity} ${applied.baseUnit ?? ""}`}
+                                                        parsed={`${line.quantity} ${line.suggestion.baseUnit ?? ""}`}
+                                                    />
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right align-top whitespace-nowrap">
+                                                {applied === null ? (
+                                                    formatYen(line.price)
+                                                ) : (
+                                                    <AppliedValue
+                                                        applied={formatYen(
+                                                            applied.price,
+                                                        )}
+                                                        parsed={formatYen(
+                                                            line.price,
+                                                        )}
+                                                    />
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="align-top whitespace-nowrap">
+                                                {applied === null ? (
+                                                    formatExpiryDate(
+                                                        line.expiry
+                                                            .suggestedDate,
+                                                    )
+                                                ) : (
+                                                    <AppliedValue
+                                                        applied={formatExpiryDate(
+                                                            applied.expiryDate,
+                                                        )}
+                                                        parsed={formatExpiryDate(
+                                                            line.expiry
+                                                                .suggestedDate,
+                                                        )}
+                                                    />
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="align-top">
+                                                <AppliedItem line={line} />
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     )}

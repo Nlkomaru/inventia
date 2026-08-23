@@ -21,8 +21,10 @@ export interface TestMcpClient {
 /**
  * /api/mcp と同じ MCP server をテスト内で接続する。tool は登録された入出力
  * スキーマとハンドラのまま呼ばれるため、service を直接呼ぶのではなく MCP の
- * 契約を検証できる。`env` は ItemSearchEnv を構造的に満たし、D1 以外の binding は
- * カテゴリ・保管場所の tool からは参照されない。
+ * 契約を検証できる。`env` は createMcpServer が求める ItemSearchEnv と
+ * StoreSearchEnv を構造的に満たす。ただし vitest.config.ts は D1 しか binding を
+ * 用意しないため、VECTORIZE / VECTORIZE_STORES / SETTINGS_ENCRYPTION_KEY は実行時に
+ * undefined で、それらを引く tool は索引を使わない経路だけを検証できる。
  */
 export const createTestMcpClient = async (): Promise<TestMcpClient> => {
     const [clientTransport, serverTransport] =

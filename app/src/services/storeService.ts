@@ -18,6 +18,7 @@ import {
     storeNameMaxLength,
     storeUpdateInputSchema,
     storeVectorMatchThreshold,
+    stripStoreBranchSuffix,
 } from "../domain/store";
 import {
     countPriceRecordsByStore,
@@ -357,9 +358,15 @@ const findStoreByVector = async (
  * 店名から店舗を引き、無ければ作る。レシート反映のように利用者が店舗を
  * 選んでいない経路から使うため、名前以外の入力は取らない。
  *
- * 完全一致 → 正規化一致 → 類似検索 の順で既存の店舗を探し、どれにも当たらない
- * ときだけ新規作成する。類似検索を最後に置くのは、同じチェーンの別支店を
- * 取り違えて統合するより、分かれて登録される方が店舗マスタで直せるためである。
+ * 完全一致 → 正規化一致 → 支店名を落とした表記 → 類似検索 の順で既存の店舗を
+ * 探し、どれにも当たらないときだけ新規作成する。支店名の段を挟むのは、
+ * 「イオン 幕張店」と「イオン 稲毛店」が別々の店舗として積み上がると、
+ * 同じチェーンの価格履歴が行ごとに割れて比較できなくなるためである。
+ *
+ * 支店名を落とすのは問い合わせ側だけで、登録済みの店名からは落とさない。
+ * 両側を落とすと「イオン 幕張店」が既存の「イオン 東雲店」に当たり、どの行へ
+ * 価格が付くかが店舗の登録順で決まってしまう。類似検索を最後に置くのも同じ理由で、
+ * どこを落としたか説明できない統合はさせない。
  */
 export const resolveStoreByName = async (
     env: StoreSearchEnv,
@@ -371,19 +378,28 @@ export const resolveStoreByName = async (
     if (normalized.length === 0) {
         throw invalidInput("店名を確認してください");
     }
+    const withoutBranch = stripStoreBranchSuffix(normalized);
     const existing =
         (await findStoreByName(env.DB, normalized)) ??
         (await findStoreByNormalizedName(env.DB, normalized)) ??
-        (await findStoreByVector(env, normalized));
+        (withoutBranch === normalized
+            ? null
+            : ((await findStoreByName(env.DB, withoutBranch)) ??
+              (await findStoreByNormalizedName(env.DB, withoutBranch)))) ??
+        (await findStoreByVector(env, withoutBranch));
     if (existing) {
         return existing;
     }
     const now = new Date().toISOString();
     let row: StoreRow;
     try {
+        // 印字そのままではなく支店名を落とした名前で作る。印字のまま作ると、
+        // 次に別支店のレシートが来ても寄せる先がチェーン名として存在せず、
+        // 結局チェーンが支店ごとの行に割れる。切る位置を誤ったときは
+        // 店舗マスタで名前を直せるが、割れた価格履歴は後から束ねられない
         row = await insertStore(env.DB, {
             id: newId(),
-            name: normalized,
+            name: withoutBranch,
             url: null,
             createdAt: now,
             updatedAt: now,
@@ -393,7 +409,7 @@ export const resolveStoreByName = async (
             throw error;
         }
         // 同時実行が先に同じ名前を作った場合は、その行へ収束させる
-        const concurrent = await findStoreByName(env.DB, normalized);
+        const concurrent = await findStoreByName(env.DB, withoutBranch);
         if (!concurrent) {
             throw error;
         }

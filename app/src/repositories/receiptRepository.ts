@@ -1,5 +1,6 @@
 import { newId } from "../domain/id";
 import type {
+    ReceiptApplyAction,
     ReceiptBaseDimension,
     ReceiptCursor,
     ReceiptExpiryConfidence,
@@ -55,6 +56,14 @@ export interface ReceiptLineRow {
     matchScore: number | null;
     createdAt: string;
     updatedAt: string;
+    // 反映で実際に記録された内容。解析値（quantity・price・期限）は上の列に
+    // 残るため、この 6 つは「承認された事実」だけを持つ。未反映の行はすべて null
+    appliedAction: ReceiptApplyAction | null;
+    appliedQuantity: number | null;
+    appliedBaseUnit: string | null;
+    appliedPrice: number | null;
+    appliedExpiryDate: string | null;
+    appliedAt: string | null;
 }
 
 export interface ReceiptLineWrite {
@@ -158,7 +167,13 @@ const receiptLineColumns = `id,
     match_method AS matchMethod,
     match_score AS matchScore,
     created_at AS createdAt,
-    updated_at AS updatedAt`;
+    updated_at AS updatedAt,
+    applied_action AS appliedAction,
+    applied_quantity AS appliedQuantity,
+    applied_base_unit AS appliedBaseUnit,
+    applied_price AS appliedPrice,
+    applied_expiry_date AS appliedExpiryDate,
+    applied_at AS appliedAt`;
 
 export const findReceipt = async (
     db: D1Database,
@@ -411,6 +426,46 @@ export const setReceiptLineMatch = async (
             input.matchedItemId,
             input.matchMethod,
             input.matchScore,
+            new Date().toISOString(),
+        )
+        .run();
+};
+
+/**
+ * 行に実際に反映された内容を記録する。解析値の列は触らない。
+ * `skip` は在庫を動かさないため、既に実績のある行を後からの `skip` で
+ * 塗り潰さない条件を付ける（部分反映のレシートを送り直したときに、
+ * 既に在庫が動いた行の記録が消えないようにする）。
+ */
+export const recordReceiptLineApplied = async (
+    db: D1Database,
+    lineId: string,
+    input: {
+        action: ReceiptApplyAction;
+        quantity: number | null;
+        baseUnit: string | null;
+        price: number | null;
+        expiryDate: string | null;
+        appliedAt: string;
+    },
+): Promise<void> => {
+    await db
+        .prepare(
+            `UPDATE receipt_lines
+             SET applied_action = ?2, applied_quantity = ?3, applied_base_unit = ?4,
+                 applied_price = ?5, applied_expiry_date = ?6, applied_at = ?7,
+                 updated_at = ?8
+             WHERE id = ?1
+               AND (?2 <> 'skip' OR applied_action IS NULL OR applied_action = 'skip')`,
+        )
+        .bind(
+            lineId,
+            input.action,
+            input.quantity,
+            input.baseUnit,
+            input.price,
+            input.expiryDate,
+            input.appliedAt,
             new Date().toISOString(),
         )
         .run();
@@ -685,4 +740,119 @@ export const listItemPricingContexts = async (
         .bind(...itemIds)
         .all<ItemPricingRow>();
     return new Map(result.results.map((row) => [row.id, row]));
+};
+
+/**
+ * 反映済みレシートから取り出した実例 1 件。`corrected` は SQLite が 0/1 で返すため
+ * 数値で受け、真偽値への変換は service 層で行う。
+ */
+export interface ReceiptExampleRow {
+    rawName: string;
+    completedName: string | null;
+    normalizedName: string;
+    itemName: string;
+    baseUnit: string;
+    baseDimension: ReceiptBaseDimension;
+    categoryName: string;
+    storeName: string | null;
+    suggestedBaseUnit: string | null;
+    suggestedBaseDimension: ReceiptBaseDimension | null;
+    suggestedCategoryName: string | null;
+    corrected: number;
+    appliedAt: string;
+}
+
+export interface ReceiptExampleQueryRow {
+    /** 正規化済みの表記。null は「表記で絞らず最近の例を返す」を意味する */
+    normalizedNames: readonly string[] | null;
+    limit: number;
+    correctedOnly: boolean;
+}
+
+/**
+ * 反映済みレシートの明細を、次回以降の解析が参照できる実例として読む。
+ * `match_method = 'manual'` は反映時に applyReceipt が書く値で「利用者が承認して
+ * 在庫へ反映した行」を表すため、取り込まなかった行と下書きは自然に外れる。
+ * 同じ表記の例が何件も返らないよう、正規化表記ごとに最後に反映した 1 件へ畳む。
+ */
+export const listAppliedReceiptLineExamples = async (
+    db: D1Database,
+    query: ReceiptExampleQueryRow,
+): Promise<ReceiptExampleRow[]> => {
+    if (query.normalizedNames !== null && query.normalizedNames.length === 0) {
+        return [];
+    }
+    const binds: (string | number)[] = [];
+    let nameFilter = "";
+    if (query.normalizedNames !== null) {
+        const placeholders = query.normalizedNames.map(() => "?").join(", ");
+        nameFilter = `AND rl.normalized_name IN (${placeholders})`;
+        binds.push(...query.normalizedNames);
+    }
+    // 表記を指定した呼び出しは正規化表記ごとに 1 件へ畳まれるため件数が表記数を
+    // 超えず、ここで LIMIT を掛けると答えられた表記が黙って落ちて「例が無い」と
+    // 見分けが付かなくなる。上限は表記で絞らない一覧のときだけ効かせる
+    let limitClause = "";
+    if (query.normalizedNames === null) {
+        limitClause = "LIMIT ?";
+        binds.push(query.limit);
+    }
+    const result = await db
+        .prepare(
+            `WITH examples AS (
+                 SELECT rl.raw_name AS rawName,
+                        rl.completed_name AS completedName,
+                        rl.normalized_name AS normalizedName,
+                        i.name AS itemName,
+                        i.base_unit AS baseUnit,
+                        i.base_dimension AS baseDimension,
+                        c.name AS categoryName,
+                        COALESCE(p.source, r.store_name) AS storeName,
+                        rl.suggested_base_unit AS suggestedBaseUnit,
+                        rl.suggested_base_dimension AS suggestedBaseDimension,
+                        rl.suggested_category_name AS suggestedCategoryName,
+                        -- 単位だけは綴りを畳んでから比べる。解析の提案は保存時に
+                        -- 単位表の綴りへ正規化する（ml → mL）のに対し、品目側は
+                        -- 旧表記のまま残るため、素で比べると同じ単位が「訂正された」
+                        -- 例に化けて correctedOnly の枠を埋めてしまう。畳むのは
+                        -- ASCII の大小文字だけで、単位表に無い表記（袋・パック）は
+                        -- どちらの側も変わらない
+                        CASE WHEN (rl.suggested_base_unit IS NOT NULL
+                                     AND LOWER(rl.suggested_base_unit) <> LOWER(i.base_unit))
+                                  OR (rl.suggested_base_dimension IS NOT NULL
+                                     AND rl.suggested_base_dimension <> i.base_dimension)
+                                  OR (rl.suggested_category_id IS NOT NULL
+                                     AND rl.suggested_category_id <> i.category_id)
+                                  OR (rl.completed_name IS NOT NULL
+                                     AND rl.completed_name <> i.name)
+                             THEN 1 ELSE 0 END AS corrected,
+                        r.applied_at AS appliedAt,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY rl.normalized_name
+                            ORDER BY r.applied_at DESC, rl.id DESC
+                        ) AS rn
+                 FROM receipt_lines AS rl
+                 JOIN receipts AS r
+                   ON r.id = rl.receipt_id AND r.applied_at IS NOT NULL
+                 JOIN items AS i ON i.id = rl.matched_item_id
+                 JOIN categories AS c ON c.id = i.category_id
+                 LEFT JOIN purchases AS p ON p.id = r.purchase_id
+                 WHERE rl.match_method = 'manual'
+                   -- 反映実績が skip の行は在庫へ届いていない。列を持たない
+                   -- 移行前の行は NULL のままなので、match_method だけで絞る
+                   AND (rl.applied_action IS NULL OR rl.applied_action <> 'skip')
+                   ${nameFilter}
+             )
+             SELECT rawName, completedName, normalizedName, itemName, baseUnit,
+                    baseDimension, categoryName, storeName, suggestedBaseUnit,
+                    suggestedBaseDimension, suggestedCategoryName, corrected,
+                    appliedAt
+             FROM examples
+             WHERE rn = 1${query.correctedOnly ? " AND corrected = 1" : ""}
+             ORDER BY corrected DESC, appliedAt DESC
+             ${limitClause}`,
+        )
+        .bind(...binds)
+        .all<ReceiptExampleRow>();
+    return result.results;
 };
