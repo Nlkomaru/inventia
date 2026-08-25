@@ -37,7 +37,7 @@ import {
 } from "@/domain/price";
 import type { StockMovementReason } from "@/domain/stock";
 import type { BreadcrumbsLoaderData } from "@/lib/breadcrumbs";
-import { formatDisplayDate, formatDisplayDateTime } from "@/lib/datetime";
+import { formatDisplayMonthDayTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import {
     categoryDetailQueryOptions,
@@ -531,14 +531,14 @@ function ItemDetailPage() {
                                                                     allocation.lotId
                                                                 }
                                                             >
-                                                                {formatExpiryDate(
-                                                                    allocation.expiryDate,
-                                                                )}
-                                                                :{" "}
                                                                 {formatDelta(
                                                                     allocation.delta,
                                                                 )}{" "}
-                                                                {item.baseUnit}
+                                                                {item.baseUnit}{" "}
+                                                                /{" "}
+                                                                {formatExpiryDate(
+                                                                    allocation.expiryDate,
+                                                                )}
                                                             </li>
                                                         ),
                                                     )}
@@ -627,10 +627,10 @@ const formatDelta = (delta: number): string =>
     `${delta > 0 ? "+" : ""}${delta.toLocaleString("ja-JP")}`;
 
 const formatDateTime = (value: string): string =>
-    formatDisplayDateTime(value) ?? value;
+    formatDisplayMonthDayTime(value) ?? value;
 
 const formatExpiryDate = (value: string | null): string =>
-    (value === null ? null : formatDisplayDate(value)) ?? "期限なし";
+    (value === null ? null : formatDisplayMonthDayTime(value)) ?? "期限なし";
 
 /** 店舗マスタを持たない古い行は自由記述の source をそのまま出す。 */
 const formatStoreLabel = (record: PriceRecordDto): string =>

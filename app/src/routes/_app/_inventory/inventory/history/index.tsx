@@ -36,7 +36,7 @@ import {
     stockMovementReasonSchema,
     stockMovementReasons,
 } from "@/domain/stock";
-import { formatDisplayDateTime } from "@/lib/datetime";
+import { formatDisplayMonthDayTime } from "@/lib/datetime";
 // 連携先の表示はマスタ画面と同じ部品を使う
 import { ProviderFavicon } from "@/routes/_app/_master/providers/-components/provider-favicon";
 import {
@@ -310,14 +310,13 @@ function StockHistoryPage() {
                                                                     allocation.lotId
                                                                 }
                                                             >
-                                                                {formatExpiry(
-                                                                    allocation.expiryDate,
-                                                                )}
-                                                                :{" "}
                                                                 {formatDelta(
                                                                     allocation.delta,
                                                                 )}{" "}
-                                                                {unit}
+                                                                {unit} /{" "}
+                                                                {formatExpiry(
+                                                                    allocation.expiryDate,
+                                                                )}
                                                             </li>
                                                         ),
                                                     )}
@@ -427,7 +426,7 @@ const errorMessage = (cause: unknown, fallback: string): string =>
     cause instanceof Error ? cause.message : fallback;
 
 const formatDateTime = (value: string): string =>
-    formatDisplayDateTime(value) ?? value;
+    formatDisplayMonthDayTime(value) ?? value;
 
 const formatExpiry = (value: string | null): string =>
-    (value === null ? null : formatDisplayDateTime(value)) ?? "期限なし";
+    (value === null ? null : formatDisplayMonthDayTime(value)) ?? "期限なし";

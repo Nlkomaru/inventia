@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/table";
 import type { ItemDto } from "@/domain/item";
 import { type ItemLotDto, sortLotsFefo } from "@/domain/lot";
-import { formatDisplayDate } from "@/lib/datetime";
+import { formatDisplayMonthDayTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
 const features = tableFeatures({
@@ -59,7 +59,8 @@ type ExpirySignal = {
     date: string | null;
 };
 
-const formatDate = (value: string): string => formatDisplayDate(value) ?? "—";
+const formatDate = (value: string): string =>
+    formatDisplayMonthDayTime(value) ?? "—";
 
 const formatQuantity = (quantity: number, unit: string): string =>
     `${quantity.toLocaleString("ja-JP")} ${unit}`;
