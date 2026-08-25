@@ -18,7 +18,7 @@ import { ItemMasterPage } from "./-components/item-master-page";
 // 不正値は既定 (絞り込みなし) へ寄せる。
 const itemSearchSchema = z.object({
     category: z.string().min(1).optional().catch(undefined),
-    location: z.string().min(1).optional().catch(undefined),
+    includeCategoryChildren: z.boolean().optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_app/_master/items/")({
@@ -44,6 +44,7 @@ function ItemsPage() {
         <ItemMasterPage
             categories={categories}
             categoryFilter={search.category ?? "all"}
+            includeCategoryChildren={search.includeCategoryChildren === true}
             items={items}
             locationFilter={search.location ?? "all"}
             locations={locations}
@@ -53,6 +54,19 @@ function ItemsPage() {
                     search: (current) => ({
                         ...current,
                         category: value === "all" ? undefined : value,
+                        includeCategoryChildren:
+                            value === "all"
+                                ? undefined
+                                : current.includeCategoryChildren,
+                    }),
+                })
+            }
+            onIncludeCategoryChildrenChange={(checked) =>
+                void navigate({
+                    replace: true,
+                    search: (current) => ({
+                        ...current,
+                        includeCategoryChildren: checked ? true : undefined,
                     }),
                 })
             }
