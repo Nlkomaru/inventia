@@ -1,10 +1,19 @@
 import { Link } from "@tanstack/react-router";
 import {
     createColumnHelper,
+    createSortedRowModel,
+    rowSortingFeature,
     tableFeatures,
     useTable,
 } from "@tanstack/react-table";
-import { Copy, Ellipsis, Pencil, Trash2 } from "lucide-react";
+import {
+    ArrowUpDown,
+    ChevronDown,
+    Copy,
+    Ellipsis,
+    Pencil,
+    Trash2,
+} from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,9 +37,22 @@ import type { CategoryDto } from "@/domain/category";
 import type { ItemDto } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
 import { buildAncestrySplat } from "@/lib/hierarchy";
+import { cn } from "@/lib/utils";
 
-const features = tableFeatures({});
+const features = tableFeatures({
+    rowSortingFeature,
+    sortedRowModel: createSortedRowModel(),
+});
 const columnHelper = createColumnHelper<typeof features, ItemDto>();
+
+const columnLabels: Record<string, string> = {
+    name: "品目名",
+    category: "カテゴリ",
+    location: "保管場所",
+    baseUnit: "単位",
+    inventory: "在庫",
+    actions: "操作",
+};
 type ItemTableProps = {
     items: ItemDto[];
     categories: CategoryDto[];
@@ -84,6 +106,11 @@ export function ItemTable({
         () =>
             columnHelper.columns([
                 columnHelper.accessor("name", {
+                    sortFn: (rowA, rowB) =>
+                        rowA.original.name.localeCompare(
+                            rowB.original.name,
+                            "ja",
+                        ),
                     header: "品目名",
                     // 品目名からはマスタの品目ページへ入る。単位や次元の
                     // つけ替えなど、この一覧が扱う登録内容の変更先に揃える
@@ -97,62 +124,98 @@ export function ItemTable({
                         </Link>
                     ),
                 }),
-                columnHelper.display({
-                    id: "category",
-                    header: "カテゴリ",
-                    cell: ({ row }) => {
-                        const category = categoryById.get(
-                            row.original.categoryId,
-                        );
-                        if (!category) return "—";
-                        return (
-                            <Link
-                                className="underline-offset-4 hover:underline"
-                                params={{
-                                    _splat: buildAncestrySplat(
-                                        categories,
-                                        category.id,
-                                    ),
-                                }}
-                                to="/categories/$"
-                            >
-                                {category.name}
-                            </Link>
-                        );
+                columnHelper.accessor(
+                    (row) => categoryById.get(row.categoryId)?.name ?? null,
+                    {
+                        id: "category",
+                        header: columnLabels.category,
+                        sortFn: (rowA, rowB) => {
+                            const left = categoryById.get(
+                                rowA.original.categoryId,
+                            )?.name;
+                            const right = categoryById.get(
+                                rowB.original.categoryId,
+                            )?.name;
+                            if (left === right) return 0;
+                            if (left === undefined) return 1;
+                            if (right === undefined) return -1;
+                            return left.localeCompare(right, "ja");
+                        },
+                        cell: ({ row }) => {
+                            const category = categoryById.get(
+                                row.original.categoryId,
+                            );
+                            if (!category) return "—";
+                            return (
+                                <Link
+                                    className="underline-offset-4 hover:underline"
+                                    params={{
+                                        _splat: buildAncestrySplat(
+                                            categories,
+                                            category.id,
+                                        ),
+                                    }}
+                                    to="/categories/$"
+                                >
+                                    {category.name}
+                                </Link>
+                            );
+                        },
                     },
-                }),
-                columnHelper.display({
-                    id: "location",
-                    header: "保管場所",
-                    cell: ({ row }) => {
-                        const location = locationById.get(
-                            row.original.locationId,
-                        );
-                        if (!location) return "—";
-                        return (
-                            <Link
-                                className="underline-offset-4 hover:underline"
-                                params={{
-                                    _splat: buildAncestrySplat(
-                                        locations,
-                                        location.id,
-                                    ),
-                                }}
-                                to="/locations/$"
-                            >
-                                {location.name}
-                            </Link>
-                        );
+                ),
+                columnHelper.accessor(
+                    (row) => locationById.get(row.locationId)?.name ?? null,
+                    {
+                        id: "location",
+                        header: columnLabels.location,
+                        sortFn: (rowA, rowB) => {
+                            const left = locationById.get(
+                                rowA.original.locationId,
+                            )?.name;
+                            const right = locationById.get(
+                                rowB.original.locationId,
+                            )?.name;
+                            if (left === right) return 0;
+                            if (left === undefined) return 1;
+                            if (right === undefined) return -1;
+                            return left.localeCompare(right, "ja");
+                        },
+                        cell: ({ row }) => {
+                            const location = locationById.get(
+                                row.original.locationId,
+                            );
+                            if (!location) return "—";
+                            return (
+                                <Link
+                                    className="underline-offset-4 hover:underline"
+                                    params={{
+                                        _splat: buildAncestrySplat(
+                                            locations,
+                                            location.id,
+                                        ),
+                                    }}
+                                    to="/locations/$"
+                                >
+                                    {location.name}
+                                </Link>
+                            );
+                        },
                     },
-                }),
+                ),
                 columnHelper.accessor("baseUnit", {
-                    header: "単位",
+                    header: columnLabels.baseUnit,
+                    sortFn: (rowA, rowB) =>
+                        rowA.original.baseUnit.localeCompare(
+                            rowB.original.baseUnit,
+                            "ja",
+                        ),
                 }),
                 // 品目名のリンク先をマスタへ移した分、在庫・価格・履歴への
                 // 導線をこの列で残す
                 columnHelper.display({
                     id: "inventory",
                     header: "在庫",
+                    enableSorting: false,
                     cell: ({ row }) => (
                         <Link
                             aria-label={`${row.original.name}の在庫詳細`}
@@ -167,6 +230,7 @@ export function ItemTable({
                 columnHelper.display({
                     id: "actions",
                     header: "操作",
+                    enableSorting: false,
                     cell: ({ row }) => (
                         <div className="flex justify-end">
                             <DropdownMenu>
@@ -237,7 +301,12 @@ export function ItemTable({
             onEdit,
         ],
     );
-    const table = useTable({ columns, data: items, features });
+    const table = useTable({
+        columns,
+        data: items,
+        enableSortingRemoval: false,
+        features,
+    });
 
     return (
         <section className="overflow-hidden rounded-2xl border">
@@ -245,21 +314,65 @@ export function ItemTable({
                 <TableHeader className="bg-muted/50">
                     {table.getHeaderGroups().map((headerGroup) => (
                         <TableRow key={headerGroup.id}>
-                            {headerGroup.headers.map((header) => (
-                                <TableHead
-                                    className={
-                                        header.id === "actions"
-                                            ? "px-5 text-right"
-                                            : "px-5"
-                                    }
-                                    key={header.id}
-                                    scope="col"
-                                >
-                                    {header.isPlaceholder
-                                        ? null
-                                        : table.FlexRender({ header })}
-                                </TableHead>
-                            ))}
+                            {headerGroup.headers.map((header) => {
+                                const sortDirection =
+                                    header.column.getIsSorted();
+                                const label =
+                                    columnLabels[header.column.id] ??
+                                    header.column.id;
+
+                                return (
+                                    <TableHead
+                                        aria-sort={
+                                            sortDirection === "asc"
+                                                ? "ascending"
+                                                : sortDirection === "desc"
+                                                  ? "descending"
+                                                  : "none"
+                                        }
+                                        className={cn(
+                                            "px-5",
+                                            header.id === "actions" &&
+                                                "text-right",
+                                        )}
+                                        key={header.id}
+                                        scope="col"
+                                    >
+                                        {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                                            <Button
+                                                aria-label={`${label}で並べ替え`}
+                                                className="-mx-2.5 font-medium"
+                                                onClick={header.column.getToggleSortingHandler()}
+                                                size="sm"
+                                                type="button"
+                                                variant="ghost"
+                                            >
+                                                {table.FlexRender({ header })}
+                                                {sortDirection ? (
+                                                    <ChevronDown
+                                                        aria-hidden="true"
+                                                        className={cn(
+                                                            "transition-transform",
+                                                            sortDirection ===
+                                                                "asc" &&
+                                                                "rotate-180",
+                                                        )}
+                                                        data-icon="inline-end"
+                                                    />
+                                                ) : (
+                                                    <ArrowUpDown
+                                                        aria-hidden="true"
+                                                        className="opacity-50"
+                                                        data-icon="inline-end"
+                                                    />
+                                                )}
+                                            </Button>
+                                        ) : (
+                                            table.FlexRender({ header })
+                                        )}
+                                    </TableHead>
+                                );
+                            })}
                         </TableRow>
                     ))}
                 </TableHeader>
