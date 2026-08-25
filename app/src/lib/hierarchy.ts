@@ -35,6 +35,35 @@ export const buildHierarchyLabels = <T extends HierarchyNode>(
     return labels;
 };
 
+/** 指定したノード自身と配下の子孫を集める。循環していても止まる。 */
+export const collectDescendantIds = <T extends HierarchyNode>(
+    nodes: readonly T[],
+    id: string,
+): Set<string> => {
+    const knownIds = new Set(nodes.map((node) => node.id));
+    if (!knownIds.has(id)) return new Set();
+
+    const childrenByParentId = new Map<string | null, string[]>();
+    for (const node of nodes) {
+        const children = childrenByParentId.get(node.parentId);
+        if (children) {
+            children.push(node.id);
+        } else {
+            childrenByParentId.set(node.parentId, [node.id]);
+        }
+    }
+
+    const descendantIds = new Set<string>();
+    const pendingIds = [id];
+    while (pendingIds.length > 0) {
+        const currentId = pendingIds.pop();
+        if (!currentId || descendantIds.has(currentId)) continue;
+        descendantIds.add(currentId);
+        pendingIds.push(...(childrenByParentId.get(currentId) ?? []));
+    }
+    return descendantIds;
+};
+
 /** 根から対象までの並び。循環していても止まる。対象が無ければ空配列。 */
 export const buildAncestry = <T extends HierarchyNode>(
     nodes: readonly T[],

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,7 +17,7 @@ import type { CategoryDto } from "@/domain/category";
 import type { ItemCreateInput, ItemDto, ItemUpdateInput } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
 import type { ReadingStateUpsertInput } from "@/domain/reading";
-import { buildHierarchyLabels } from "@/lib/hierarchy";
+import { buildHierarchyLabels, collectDescendantIds } from "@/lib/hierarchy";
 import type { ReadingStateChange } from "@/lib/reading-input";
 import {
     clearReadingState,
@@ -44,8 +45,10 @@ type ItemMasterPageProps = {
     categories: CategoryDto[];
     locations: LocationDto[];
     categoryFilter: string;
+    includeCategoryChildren: boolean;
     locationFilter: string;
     onCategoryFilterChange: (value: string) => void;
+    onIncludeCategoryChildrenChange: (checked: boolean) => void;
     onLocationFilterChange: (value: string) => void;
 };
 
@@ -54,8 +57,10 @@ export function ItemMasterPage({
     categories,
     locations,
     categoryFilter,
+    includeCategoryChildren,
     locationFilter,
     onCategoryFilterChange,
+    onIncludeCategoryChildrenChange,
     onLocationFilterChange,
 }: ItemMasterPageProps) {
     const queryClient = useQueryClient();
@@ -117,26 +122,26 @@ export function ItemMasterPage({
         void queryClient.invalidateQueries({ queryKey: locationKeys.all });
     };
 
-    const visibleItems = useMemo(() => {
-        const normalizedQuery = query.trim().toLocaleLowerCase("ja");
-        return items.filter((item) => {
-            if (
-                normalizedQuery &&
-                !item.name.toLocaleLowerCase("ja").includes(normalizedQuery)
-            ) {
-                return false;
-            }
-            if (
-                categoryFilter !== "all" &&
-                item.categoryId !== categoryFilter
-            ) {
-                return false;
-            }
-            return (
-                locationFilter === "all" || item.locationId === locationFilter
-            );
-        });
-    }, [categoryFilter, items, locationFilter, query]);
+    const categoryFilterIds = useMemo(() => {
+        if (categoryFilter === "all") return null;
+        return includeCategoryChildren
+            ? collectDescendantIds(categories, categoryFilter)
+            : new Set([categoryFilter]);
+    }, [categories, categoryFilter, includeCategoryChildren]);
+
+    const normalizedQuery = query.trim().toLocaleLowerCase("ja");
+    const visibleItems = items.filter((item) => {
+        if (
+            normalizedQuery &&
+            !item.name.toLocaleLowerCase("ja").includes(normalizedQuery)
+        ) {
+            return false;
+        }
+        if (categoryFilterIds && !categoryFilterIds.has(item.categoryId)) {
+            return false;
+        }
+        return locationFilter === "all" || item.locationId === locationFilter;
+    });
 
     const openCreate = () => {
         setEditingItem(null);
@@ -300,7 +305,7 @@ export function ItemMasterPage({
             ) : null}
 
             <section aria-label="品目の検索と絞り込み">
-                <FieldGroup className="gap-4 md:grid md:grid-cols-[minmax(0,1.5fr)_minmax(10rem,1fr)_minmax(10rem,1fr)]">
+                <FieldGroup className="gap-4 md:grid md:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_minmax(24rem,1fr)_minmax(10rem,1fr)]">
                     <Field>
                         <FieldLabel htmlFor="item-search">
                             品目を検索
@@ -322,32 +327,55 @@ export function ItemMasterPage({
                         <FieldLabel htmlFor="item-category-filter">
                             カテゴリ
                         </FieldLabel>
-                        <Select
-                            items={categoryItems}
-                            value={categoryFilter}
-                            onValueChange={(value) =>
-                                onCategoryFilterChange(value ?? "all")
-                            }
-                        >
-                            <SelectTrigger
-                                className="w-full"
-                                id="item-category-filter"
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="w-0 min-w-40 flex-1">
+                                <Select
+                                    items={categoryItems}
+                                    value={categoryFilter}
+                                    onValueChange={(value) =>
+                                        onCategoryFilterChange(value ?? "all")
+                                    }
+                                >
+                                    <SelectTrigger
+                                        className="w-full"
+                                        id="item-category-filter"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectGroup>
+                                            {categoryItems.map((option) => (
+                                                <SelectItem
+                                                    key={option.value}
+                                                    value={option.value}
+                                                >
+                                                    {option.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <Field
+                                className="w-auto shrink-0 rounded-md border bg-muted/40 px-2.5 py-2 shadow-xs"
+                                orientation="horizontal"
                             >
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectGroup>
-                                    {categoryItems.map((option) => (
-                                        <SelectItem
-                                            key={option.value}
-                                            value={option.value}
-                                        >
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectGroup>
-                            </SelectContent>
-                        </Select>
+                                <Checkbox
+                                    checked={includeCategoryChildren}
+                                    disabled={categoryFilter === "all"}
+                                    id="item-category-descendants"
+                                    onCheckedChange={
+                                        onIncludeCategoryChildrenChange
+                                    }
+                                />
+                                <FieldLabel
+                                    className="cursor-pointer whitespace-nowrap text-xs font-medium"
+                                    htmlFor="item-category-descendants"
+                                >
+                                    子も表示
+                                </FieldLabel>
+                            </Field>
+                        </div>
                     </Field>
                     <Field>
                         <FieldLabel htmlFor="item-location-filter">

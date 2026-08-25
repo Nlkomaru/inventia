@@ -17,6 +17,7 @@ import {
     resolveExpirySignal,
 } from "@/components/InventoryTable";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,6 +29,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import type { ItemDto } from "@/domain/item";
+import { buildHierarchyLabels, collectDescendantIds } from "@/lib/hierarchy";
 import type { InventoryItemFilters } from "./-api/inventory-api";
 import {
     categoryKeys,
@@ -59,6 +61,7 @@ const isExpiryFilter = (value: string): value is ExpiryFilter =>
 const inventorySearchSchema = z.object({
     q: z.string().max(200).optional().catch(undefined),
     categoryId: z.string().min(1).optional().catch(undefined),
+    includeCategoryChildren: z.boolean().optional().catch(undefined),
     locationId: z.string().min(1).optional().catch(undefined),
     lowStockOnly: z.boolean().optional().catch(undefined),
     expiry: z
@@ -78,7 +81,9 @@ const toItemFilters = (search: InventorySearch): InventoryItemFilters => {
     const q = search.q?.trim();
     return {
         q: q ? q : undefined,
-        categoryId: search.categoryId,
+        categoryId: search.includeCategoryChildren
+            ? undefined
+            : search.categoryId,
         locationId: search.locationId,
         lowStockOnly: search.lowStockOnly === true ? true : undefined,
         // 最短期限が now + n 日以内であることは、期限切れ・期限間近と同じ条件になる
@@ -157,6 +162,9 @@ function InventoryPage() {
     );
 
     const [queryText, setQueryText] = useState(search.q ?? "");
+    const includeCategoryChildren =
+        search.categoryId !== undefined &&
+        search.includeCategoryChildren === true;
     // 自分が押し込んだ値かを見分けて、入力中の文字を URL 側の値で上書きしない
     const pushedQueryRef = useRef(search.q ?? "");
     useEffect(() => {
@@ -182,6 +190,22 @@ function InventoryPage() {
     }, [navigate, queryText, search.q]);
 
     const categoryLabels = useMemo(() => toNameMap(categories), [categories]);
+    const categoryFilterItems = useMemo(() => {
+        const labels = buildHierarchyLabels(categories);
+        return [
+            { label: "すべてのカテゴリ", value: "all" },
+            ...categories.map((category) => ({
+                label: labels.get(category.id) ?? category.name,
+                value: category.id,
+            })),
+        ];
+    }, [categories]);
+    const categoryFilterIds = useMemo(() => {
+        if (!search.categoryId) return null;
+        return includeCategoryChildren
+            ? collectDescendantIds(categories, search.categoryId)
+            : new Set([search.categoryId]);
+    }, [categories, includeCategoryChildren, search.categoryId]);
     const locationLabels = useMemo(() => toNameMap(locations), [locations]);
     const locationItems = useMemo(
         () => [
@@ -194,11 +218,13 @@ function InventoryPage() {
         [locations],
     );
 
-    // service の条件で表現できない絞り込みだけを取得後に適用する
     const visibleItems = useMemo(() => {
-        if (search.expiry !== "none") return items;
+        const categoryItems = categoryFilterIds
+            ? items.filter((item) => categoryFilterIds.has(item.categoryId))
+            : items;
+        if (search.expiry !== "none") return categoryItems;
         const now = Date.now();
-        return items.filter((item) => {
+        return categoryItems.filter((item) => {
             const { state } = resolveExpirySignal(
                 item.earliestExpiryDate,
                 now,
@@ -206,7 +232,7 @@ function InventoryPage() {
             );
             return state === "none";
         });
-    }, [items, search.expiry]);
+    }, [categoryFilterIds, items, search.expiry]);
 
     const reloading = itemsQuery.isFetching || lotsQuery.isFetching;
     const reload = () => {
@@ -231,7 +257,7 @@ function InventoryPage() {
             </header>
 
             <section aria-label="在庫の検索と絞り込み">
-                <FieldGroup className="gap-4 md:grid md:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(9rem,1fr))]">
+                <FieldGroup className="gap-4 md:grid md:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_minmax(24rem,1fr)_repeat(2,minmax(9rem,1fr))]">
                     <Field>
                         <FieldLabel htmlFor="inventory-search">
                             品目を検索
@@ -247,6 +273,81 @@ function InventoryPage() {
                                     setQueryText(event.target.value)
                                 }
                             />
+                        </div>
+                    </Field>
+                    <Field>
+                        <FieldLabel htmlFor="inventory-category-filter">
+                            カテゴリ
+                        </FieldLabel>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="w-0 min-w-40 flex-1">
+                                <Select
+                                    items={categoryFilterItems}
+                                    value={search.categoryId ?? "all"}
+                                    onValueChange={(value) =>
+                                        void navigate({
+                                            search: (prev) => ({
+                                                ...prev,
+                                                categoryId:
+                                                    value && value !== "all"
+                                                        ? value
+                                                        : undefined,
+                                                includeCategoryChildren:
+                                                    value && value !== "all"
+                                                        ? prev.includeCategoryChildren
+                                                        : undefined,
+                                            }),
+                                        })
+                                    }
+                                >
+                                    <SelectTrigger
+                                        className="w-full"
+                                        id="inventory-category-filter"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectGroup>
+                                            {categoryFilterItems.map(
+                                                (option) => (
+                                                    <SelectItem
+                                                        key={option.value}
+                                                        value={option.value}
+                                                    >
+                                                        {option.label}
+                                                    </SelectItem>
+                                                ),
+                                            )}
+                                        </SelectGroup>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <Field
+                                className="w-auto shrink-0 rounded-md border bg-muted/40 px-2.5 py-2 shadow-xs"
+                                orientation="horizontal"
+                            >
+                                <Checkbox
+                                    checked={includeCategoryChildren}
+                                    disabled={!search.categoryId}
+                                    id="inventory-category-descendants"
+                                    onCheckedChange={(checked) =>
+                                        void navigate({
+                                            search: (prev) => ({
+                                                ...prev,
+                                                includeCategoryChildren: checked
+                                                    ? true
+                                                    : undefined,
+                                            }),
+                                        })
+                                    }
+                                />
+                                <FieldLabel
+                                    className="cursor-pointer whitespace-nowrap text-xs font-medium"
+                                    htmlFor="inventory-category-descendants"
+                                >
+                                    子も表示
+                                </FieldLabel>
+                            </Field>
                         </div>
                     </Field>
                     <Field>
