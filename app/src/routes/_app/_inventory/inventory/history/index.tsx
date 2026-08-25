@@ -306,17 +306,22 @@ function StockHistoryPage() {
                                                     {movement.allocations.map(
                                                         (allocation) => (
                                                             <li
+                                                                className="grid grid-cols-[10rem_minmax(0,1fr)] items-baseline gap-x-2"
                                                                 key={
                                                                     allocation.lotId
                                                                 }
                                                             >
-                                                                {formatDelta(
-                                                                    allocation.delta,
-                                                                )}{" "}
-                                                                {unit} /{" "}
-                                                                {formatExpiry(
-                                                                    allocation.expiryDate,
-                                                                )}
+                                                                <span className="whitespace-nowrap">
+                                                                    {formatExpiry(
+                                                                        allocation.expiryDate,
+                                                                    )}
+                                                                </span>
+                                                                <span className="font-mono whitespace-nowrap tabular-nums">
+                                                                    {formatDelta(
+                                                                        allocation.delta,
+                                                                    )}{" "}
+                                                                    {unit}
+                                                                </span>
                                                             </li>
                                                         ),
                                                     )}

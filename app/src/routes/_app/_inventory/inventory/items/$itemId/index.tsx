@@ -527,18 +527,24 @@ function ItemDetailPage() {
                                                     {movement.allocations.map(
                                                         (allocation) => (
                                                             <li
+                                                                className="grid grid-cols-[10rem_minmax(0,1fr)] items-baseline gap-x-2"
                                                                 key={
                                                                     allocation.lotId
                                                                 }
                                                             >
-                                                                {formatDelta(
-                                                                    allocation.delta,
-                                                                )}{" "}
-                                                                {item.baseUnit}{" "}
-                                                                /{" "}
-                                                                {formatExpiryDate(
-                                                                    allocation.expiryDate,
-                                                                )}
+                                                                <span className="whitespace-nowrap">
+                                                                    {formatExpiryDate(
+                                                                        allocation.expiryDate,
+                                                                    )}
+                                                                </span>
+                                                                <span className="font-mono whitespace-nowrap tabular-nums">
+                                                                    {formatDelta(
+                                                                        allocation.delta,
+                                                                    )}{" "}
+                                                                    {
+                                                                        item.baseUnit
+                                                                    }
+                                                                </span>
                                                             </li>
                                                         ),
                                                     )}

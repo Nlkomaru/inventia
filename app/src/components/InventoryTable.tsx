@@ -202,12 +202,9 @@ function LotBreakdownCell({
                 );
                 return (
                     <li
-                        className="flex items-baseline gap-1.5 whitespace-nowrap text-xs"
+                        className="grid grid-cols-[10rem_minmax(0,1fr)] items-baseline gap-x-2 whitespace-nowrap text-xs"
                         key={line.key}
                     >
-                        <span className="font-mono font-medium tabular-nums">
-                            {formatQuantity(line.quantity, item.baseUnit)}
-                        </span>
                         <span
                             className={cn(
                                 "text-muted-foreground",
@@ -215,7 +212,10 @@ function LotBreakdownCell({
                                     "font-semibold text-destructive",
                             )}
                         >
-                            / {signal.date ?? "期限なし"}
+                            {signal.date ?? "期限なし"}
+                        </span>
+                        <span className="font-mono font-medium tabular-nums">
+                            {formatQuantity(line.quantity, item.baseUnit)}
                         </span>
                     </li>
                 );
