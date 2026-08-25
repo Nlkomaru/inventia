@@ -14,7 +14,13 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import type { CategoryDto } from "@/domain/category";
-import type { ItemCreateInput, ItemDto, ItemUpdateInput } from "@/domain/item";
+import type {
+    ItemCreateInput,
+    ItemDto,
+    ItemListSort,
+    ItemSortDirection,
+    ItemUpdateInput,
+} from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
 import type { ReadingStateUpsertInput } from "@/domain/reading";
 import { buildHierarchyLabels, collectDescendantIds } from "@/lib/hierarchy";
@@ -40,6 +46,8 @@ import { ItemTable } from "./item-table";
 const errorMessage = (cause: unknown, fallback: string): string =>
     cause instanceof Error ? cause.message : fallback;
 
+type ItemMasterSort = Exclude<ItemListSort, "expiry">;
+
 type ItemMasterPageProps = {
     items: ItemDto[];
     categories: CategoryDto[];
@@ -47,9 +55,15 @@ type ItemMasterPageProps = {
     categoryFilter: string;
     includeCategoryChildren: boolean;
     locationFilter: string;
+    sort: ItemMasterSort | null;
+    sortDirection: ItemSortDirection;
     onCategoryFilterChange: (value: string) => void;
     onIncludeCategoryChildrenChange: (checked: boolean) => void;
     onLocationFilterChange: (value: string) => void;
+    onSortChange: (
+        sort: ItemMasterSort | null,
+        sortDirection: ItemSortDirection,
+    ) => void;
 };
 
 export function ItemMasterPage({
@@ -62,6 +76,9 @@ export function ItemMasterPage({
     onCategoryFilterChange,
     onIncludeCategoryChildrenChange,
     onLocationFilterChange,
+    sort,
+    sortDirection,
+    onSortChange,
 }: ItemMasterPageProps) {
     const queryClient = useQueryClient();
     const [error, setError] = useState<string | null>(null);
@@ -416,6 +433,9 @@ export function ItemMasterPage({
                 deletingId={deletingId}
                 items={visibleItems}
                 locations={locations}
+                sort={sort}
+                sortDirection={sortDirection}
+                onSortChange={onSortChange}
                 onDelete={(item) => void remove(item)}
                 onEdit={openEdit}
             />

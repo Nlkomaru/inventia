@@ -2,6 +2,8 @@ import { newId } from "../domain/id";
 import type {
     ItemCreateInput,
     ItemListQuery,
+    ItemListSort,
+    ItemSortDirection,
     ItemUpdateInput,
 } from "../domain/item";
 import type { BookReadingListQuery } from "../domain/reading";
@@ -22,6 +24,8 @@ export interface ItemRow {
     memo: string | null;
     createdAt: string;
     updatedAt: string;
+    // listItems だけが投影する並べ替えキー。DTO 変換では外へ出さない
+    sortValue?: string | null;
 }
 
 export interface ItemListResult {
@@ -46,33 +50,62 @@ export class InvalidItemCursorError extends Error {
     }
 }
 
-// 並び順ごとにキーが違うため cursor も分ける。`sort` を持たない cursor は
-// 名前順しか存在しなかった頃に発行したものとして受け、期限順の要求には使わせない
-// （並び順の違う cursor を流用すると位置がずれたページを返す）
-type NameCursor = { sort?: "name"; name: string; id: string };
-type ExpiryCursor = { sort: "expiry"; expiry: string | null; id: string };
-type Cursor = NameCursor | ExpiryCursor;
+// cursor は並び順と方向を持つ。旧形式の名前順・期限順 cursor は、それぞれ従来どおり
+// 昇順の要求でだけ受け入れる。別の並び順や方向で流用するとページ境界がずれるため拒否する。
+type LegacyNameCursor = { sort?: "name"; name: string; id: string };
+type LegacyExpiryCursor = { sort: "expiry"; expiry: string | null; id: string };
+type ItemCursor = {
+    sort: ItemListSort;
+    sortDirection: ItemSortDirection;
+    value: string | null;
+    id: string;
+};
 
-const encodeCursor = (cursor: Cursor): string =>
+const encodeCursor = (cursor: ItemCursor): string =>
     btoa(encodeURIComponent(JSON.stringify(cursor)))
         .replaceAll("+", "-")
         .replaceAll("/", "_")
         .replaceAll("=", "");
 
-const isNameCursor = (value: Record<string, unknown>): boolean =>
+const isItemListSort = (value: unknown): value is ItemListSort =>
+    value === "name" ||
+    value === "category" ||
+    value === "location" ||
+    value === "baseUnit" ||
+    value === "expiry";
+
+const isItemSortDirection = (value: unknown): value is ItemSortDirection =>
+    value === "asc" || value === "desc";
+
+const isLegacyNameCursor = (
+    value: Record<string, unknown>,
+): value is Record<string, unknown> & LegacyNameCursor =>
     (value.sort === undefined || value.sort === "name") &&
     typeof value.name === "string" &&
     value.name.length > 0 &&
     typeof value.id === "string" &&
     value.id.length > 0;
 
-const isExpiryCursor = (value: Record<string, unknown>): boolean =>
+const isLegacyExpiryCursor = (
+    value: Record<string, unknown>,
+): value is Record<string, unknown> & LegacyExpiryCursor =>
     value.sort === "expiry" &&
     (value.expiry === null || typeof value.expiry === "string") &&
     typeof value.id === "string" &&
-    (value.id as string).length > 0;
+    value.id.length > 0;
 
-const decodeCursor = (value: string, sort: "name" | "expiry"): Cursor => {
+const isItemCursor = (value: Record<string, unknown>): value is ItemCursor =>
+    isItemListSort(value.sort) &&
+    isItemSortDirection(value.sortDirection) &&
+    (value.value === null || typeof value.value === "string") &&
+    typeof value.id === "string" &&
+    value.id.length > 0;
+
+const decodeCursor = (
+    value: string,
+    sort: ItemListSort,
+    sortDirection: ItemSortDirection,
+): ItemCursor => {
     try {
         const padded = value.replaceAll("-", "+").replaceAll("_", "/");
         const decoded = decodeURIComponent(atob(padded));
@@ -81,10 +114,38 @@ const decodeCursor = (value: string, sort: "name" | "expiry"): Cursor => {
             throw new Error("invalid cursor");
         }
         const record = parsed as Record<string, unknown>;
-        if (sort === "name" ? !isNameCursor(record) : !isExpiryCursor(record)) {
-            throw new Error("invalid cursor");
+        if (
+            isItemCursor(record) &&
+            record.sort === sort &&
+            record.sortDirection === sortDirection
+        ) {
+            return record;
         }
-        return parsed as Cursor;
+        if (
+            sort === "name" &&
+            sortDirection === "asc" &&
+            isLegacyNameCursor(record)
+        ) {
+            return {
+                sort,
+                sortDirection,
+                value: record.name,
+                id: record.id,
+            };
+        }
+        if (
+            sort === "expiry" &&
+            sortDirection === "asc" &&
+            isLegacyExpiryCursor(record)
+        ) {
+            return {
+                sort,
+                sortDirection,
+                value: record.expiry,
+                id: record.id,
+            };
+        }
+        throw new Error("invalid cursor");
     } catch {
         throw new InvalidItemCursorError();
     }
@@ -104,25 +165,43 @@ const dayInMilliseconds = 24 * 60 * 60 * 1000;
 // 品目を返す他 repository の query（棚卸しが古い品目の一覧など）が同じ射影を
 // 重複定義しないよう export する。相関サブクエリは items を明示参照するため、
 // items へ別名を付けない query で使うこと
-export const itemColumns = `id, name, category_id AS categoryId, location_id AS locationId,
-		base_unit AS baseUnit, base_dimension AS baseDimension,
-		current_quantity AS currentQuantity,
+export const itemColumns = `items.id, items.name,
+		items.category_id AS categoryId, items.location_id AS locationId,
+		items.base_unit AS baseUnit, items.base_dimension AS baseDimension,
+		items.current_quantity AS currentQuantity,
 		(SELECT MIN(expiry_date) FROM item_lots
 			WHERE item_id = items.id AND quantity > 0 AND expiry_date IS NOT NULL)
 			AS earliestExpiryDate,
 		(SELECT COUNT(*) FROM item_lots
 			WHERE item_id = items.id AND quantity > 0) AS lotCount,
-		low_stock_threshold AS lowStockThreshold, memo,
-		created_at AS createdAt, updated_at AS updatedAt`;
+		items.low_stock_threshold AS lowStockThreshold, items.memo,
+		items.created_at AS createdAt, items.updated_at AS updatedAt`;
 
 // 期限順の並び替えと keyset 条件で使う式。`itemColumns` の earliestExpiryDate と
 // 同じ定義で、SELECT の別名は WHERE では参照できないため式を再掲する
 const earliestExpiryExpression = `(SELECT MIN(expiry_date) FROM item_lots
 		WHERE item_id = items.id AND quantity > 0 AND expiry_date IS NOT NULL)`;
 
-// 期限が早い順。期限なしは最後に置き、同じ期限は id で一意に安定させる
-const expiryOrder = `ORDER BY (${earliestExpiryExpression} IS NULL) ASC,
-		${earliestExpiryExpression} ASC, id ASC`;
+const itemSortExpressions: Record<ItemListSort, string> = {
+    name: "items.name COLLATE NOCASE",
+    category: "item_categories.name COLLATE NOCASE",
+    location: "item_locations.name COLLATE NOCASE",
+    baseUnit: "items.base_unit COLLATE NOCASE",
+    expiry: earliestExpiryExpression,
+};
+
+const itemListOrder = (
+    sort: ItemListSort,
+    sortDirection: ItemSortDirection,
+): string => {
+    const direction = sortDirection.toUpperCase();
+    if (sort === "expiry") {
+        // 期限なしは向きにかかわらず最後。id も同じ向きにそろえて keyset を安定させる
+        return `ORDER BY (${earliestExpiryExpression} IS NULL) ASC,
+			${earliestExpiryExpression} ${direction}, items.id ${direction}`;
+    }
+    return `ORDER BY ${itemSortExpressions[sort]} ${direction}, items.id ${direction}`;
+};
 
 // 読書状態は品目と 1:1 の別テーブルにあるため EXISTS で絞る。
 // 行が無い品目はどの状態にも一致しない
@@ -194,22 +273,24 @@ export const listItems = async (
 ): Promise<ItemListResult> => {
     const where: string[] = [];
     const bindings: unknown[] = [];
+    const sortExpression = itemSortExpressions[query.sort];
+    const comparison = query.sortDirection === "asc" ? ">" : "<";
 
     if (query.q) {
-        where.push("name LIKE ? ESCAPE char(92) COLLATE NOCASE");
+        where.push("items.name LIKE ? ESCAPE char(92) COLLATE NOCASE");
         bindings.push(`%${escapeLike(query.q)}%`);
     }
     if (query.categoryId) {
-        where.push("category_id = ?");
+        where.push("items.category_id = ?");
         bindings.push(query.categoryId);
     }
     if (query.locationId) {
-        where.push("location_id = ?");
+        where.push("items.location_id = ?");
         bindings.push(query.locationId);
     }
     if (query.lowStockOnly) {
         where.push(
-            "low_stock_threshold IS NOT NULL AND current_quantity <= low_stock_threshold",
+            "items.low_stock_threshold IS NOT NULL AND items.current_quantity <= items.low_stock_threshold",
         );
     }
     if (query.expiringWithinDays !== undefined) {
@@ -230,30 +311,42 @@ export const listItems = async (
         bindings.push(query.readingStatus);
     }
     if (query.cursor) {
-        const cursor = decodeCursor(query.cursor, query.sort);
-        if ("expiry" in cursor) {
+        const cursor = decodeCursor(
+            query.cursor,
+            query.sort,
+            query.sortDirection,
+        );
+        if (query.sort === "expiry") {
             // 期限なしのグループは末尾にあるため、そこから先は id だけで進む
-            if (cursor.expiry === null) {
-                where.push(`${earliestExpiryExpression} IS NULL AND id > ?`);
+            if (cursor.value === null) {
+                where.push(
+                    `${earliestExpiryExpression} IS NULL AND items.id ${comparison} ?`,
+                );
                 bindings.push(cursor.id);
             } else {
                 where.push(`(${earliestExpiryExpression} IS NULL
-					OR ${earliestExpiryExpression} > ?
-					OR (${earliestExpiryExpression} = ? AND id > ?))`);
-                bindings.push(cursor.expiry, cursor.expiry, cursor.id);
+					OR ${earliestExpiryExpression} ${comparison} ?
+					OR (${earliestExpiryExpression} = ? AND items.id ${comparison} ?))`);
+                bindings.push(cursor.value, cursor.value, cursor.id);
             }
-        } else {
+        } else if (cursor.value !== null) {
             where.push(
-                "(name COLLATE NOCASE > ? OR (name COLLATE NOCASE = ? AND id > ?))",
+                `(${sortExpression} ${comparison} ? OR (${sortExpression} = ? AND items.id ${comparison} ?))`,
             );
-            bindings.push(cursor.name, cursor.name, cursor.id);
+            bindings.push(cursor.value, cursor.value, cursor.id);
+        } else {
+            throw new InvalidItemCursorError();
         }
     }
 
     const limit = query.limit;
-    const sql = `SELECT ${itemColumns}
-		FROM items${where.length > 0 ? ` WHERE ${where.join(" AND ")}` : ""}
-		${query.sort === "expiry" ? expiryOrder : "ORDER BY name COLLATE NOCASE ASC, id ASC"} LIMIT ?`;
+    const sql = `SELECT ${itemColumns}, ${sortExpression} AS sortValue
+		FROM items
+		LEFT JOIN categories AS item_categories ON item_categories.id = items.category_id
+		LEFT JOIN storage_locations AS item_locations ON item_locations.id = items.location_id${
+            where.length > 0 ? ` WHERE ${where.join(" AND ")}` : ""
+        }
+		${itemListOrder(query.sort, query.sortDirection)} LIMIT ?`;
     const result = await db
         .prepare(sql)
         .bind(...bindings, limit + 1)
@@ -262,19 +355,24 @@ export const listItems = async (
     const hasMore = rows.length > limit;
     const items = hasMore ? rows.slice(0, limit) : rows;
     const last = items.at(-1);
+    const lastSortValue =
+        query.sort === "expiry"
+            ? (last?.earliestExpiryDate ?? null)
+            : query.sort === "name"
+              ? (last?.name ?? null)
+              : query.sort === "baseUnit"
+                ? (last?.baseUnit ?? null)
+                : (last?.sortValue ?? null);
     return {
         items,
         nextCursor:
             hasMore && last
-                ? encodeCursor(
-                      query.sort === "expiry"
-                          ? {
-                                sort: "expiry",
-                                expiry: last.earliestExpiryDate,
-                                id: last.id,
-                            }
-                          : { sort: "name", name: last.name, id: last.id },
-                  )
+                ? encodeCursor({
+                      sort: query.sort,
+                      sortDirection: query.sortDirection,
+                      value: lastSortValue,
+                      id: last.id,
+                  })
                 : null,
     };
 };
@@ -289,7 +387,9 @@ export const listBookItems = async (
     db: D1Database,
     query: BookReadingListQuery,
 ): Promise<ItemListResult> => {
-    const where: string[] = ["category_id IN (SELECT id FROM book_categories)"];
+    const where: string[] = [
+        "items.category_id IN (SELECT id FROM book_categories)",
+    ];
     const bindings: unknown[] = [];
 
     if (query.status) {
@@ -297,13 +397,14 @@ export const listBookItems = async (
         bindings.push(query.status);
     }
     if (query.cursor) {
-        const cursor = decodeCursor(query.cursor, "name");
-        if ("name" in cursor) {
-            where.push(
-                "(name COLLATE NOCASE > ? OR (name COLLATE NOCASE = ? AND id > ?))",
-            );
-            bindings.push(cursor.name, cursor.name, cursor.id);
+        const cursor = decodeCursor(query.cursor, "name", "asc");
+        if (cursor.value === null) {
+            throw new InvalidItemCursorError();
         }
+        where.push(
+            "(items.name COLLATE NOCASE > ? OR (items.name COLLATE NOCASE = ? AND items.id > ?))",
+        );
+        bindings.push(cursor.value, cursor.value, cursor.id);
     }
 
     const limit = query.limit;
@@ -312,7 +413,7 @@ export const listBookItems = async (
             `${bookCategoriesCte}
 			SELECT ${itemColumns}
 			FROM items WHERE ${where.join(" AND ")}
-			ORDER BY name COLLATE NOCASE ASC, id ASC LIMIT ?`,
+			ORDER BY items.name COLLATE NOCASE ASC, items.id ASC LIMIT ?`,
         )
         .bind(...bindings, limit + 1)
         .all<ItemRow>();
@@ -324,7 +425,12 @@ export const listBookItems = async (
         items,
         nextCursor:
             hasMore && last
-                ? encodeCursor({ name: last.name, id: last.id })
+                ? encodeCursor({
+                      sort: "name",
+                      sortDirection: "asc",
+                      value: last.name,
+                      id: last.id,
+                  })
                 : null,
     };
 };

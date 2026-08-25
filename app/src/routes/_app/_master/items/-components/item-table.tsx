@@ -1,8 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import {
     createColumnHelper,
-    createSortedRowModel,
-    rowSortingFeature,
     tableFeatures,
     useTable,
 } from "@tanstack/react-table";
@@ -34,16 +32,25 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import type { CategoryDto } from "@/domain/category";
-import type { ItemDto } from "@/domain/item";
+import type { ItemDto, ItemListSort, ItemSortDirection } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
 import { buildAncestrySplat } from "@/lib/hierarchy";
 import { cn } from "@/lib/utils";
 
-const features = tableFeatures({
-    rowSortingFeature,
-    sortedRowModel: createSortedRowModel(),
-});
+const features = tableFeatures({});
 const columnHelper = createColumnHelper<typeof features, ItemDto>();
+
+type ItemMasterSort = Exclude<ItemListSort, "expiry">;
+
+const sortableColumns: Record<ItemMasterSort, true> = {
+    name: true,
+    category: true,
+    location: true,
+    baseUnit: true,
+};
+
+const isItemMasterSort = (columnId: string): columnId is ItemMasterSort =>
+    Object.hasOwn(sortableColumns, columnId);
 
 const columnLabels: Record<string, string> = {
     name: "品目名",
@@ -58,8 +65,14 @@ type ItemTableProps = {
     categories: CategoryDto[];
     locations: LocationDto[];
     deletingId: string | null;
+    sort: ItemMasterSort | null;
+    sortDirection: ItemSortDirection;
     onEdit: (item: ItemDto) => void;
     onDelete: (item: ItemDto) => void;
+    onSortChange: (
+        sort: ItemMasterSort | null,
+        sortDirection: ItemSortDirection,
+    ) => void;
 };
 
 export function ItemTable({
@@ -69,6 +82,9 @@ export function ItemTable({
     deletingId,
     onEdit,
     onDelete,
+    sort,
+    sortDirection,
+    onSortChange,
 }: ItemTableProps) {
     // トーストを持たないので、コピー結果は読み上げ専用の領域だけで伝える。
     // 同じ文言でも読み上げ直すよう、連番を key にして要素ごと差し替える
@@ -106,12 +122,7 @@ export function ItemTable({
         () =>
             columnHelper.columns([
                 columnHelper.accessor("name", {
-                    sortFn: (rowA, rowB) =>
-                        rowA.original.name.localeCompare(
-                            rowB.original.name,
-                            "ja",
-                        ),
-                    header: "品目名",
+                    header: columnLabels.name,
                     // 品目名からはマスタの品目ページへ入る。単位や次元の
                     // つけ替えなど、この一覧が扱う登録内容の変更先に揃える
                     cell: ({ getValue, row }) => (
@@ -124,98 +135,62 @@ export function ItemTable({
                         </Link>
                     ),
                 }),
-                columnHelper.accessor(
-                    (row) => categoryById.get(row.categoryId)?.name ?? null,
-                    {
-                        id: "category",
-                        header: columnLabels.category,
-                        sortFn: (rowA, rowB) => {
-                            const left = categoryById.get(
-                                rowA.original.categoryId,
-                            )?.name;
-                            const right = categoryById.get(
-                                rowB.original.categoryId,
-                            )?.name;
-                            if (left === right) return 0;
-                            if (left === undefined) return 1;
-                            if (right === undefined) return -1;
-                            return left.localeCompare(right, "ja");
-                        },
-                        cell: ({ row }) => {
-                            const category = categoryById.get(
-                                row.original.categoryId,
-                            );
-                            if (!category) return "—";
-                            return (
-                                <Link
-                                    className="underline-offset-4 hover:underline"
-                                    params={{
-                                        _splat: buildAncestrySplat(
-                                            categories,
-                                            category.id,
-                                        ),
-                                    }}
-                                    to="/categories/$"
-                                >
-                                    {category.name}
-                                </Link>
-                            );
-                        },
+                columnHelper.display({
+                    id: "category",
+                    header: columnLabels.category,
+                    cell: ({ row }) => {
+                        const category = categoryById.get(
+                            row.original.categoryId,
+                        );
+                        if (!category) return "—";
+                        return (
+                            <Link
+                                className="underline-offset-4 hover:underline"
+                                params={{
+                                    _splat: buildAncestrySplat(
+                                        categories,
+                                        category.id,
+                                    ),
+                                }}
+                                to="/categories/$"
+                            >
+                                {category.name}
+                            </Link>
+                        );
                     },
-                ),
-                columnHelper.accessor(
-                    (row) => locationById.get(row.locationId)?.name ?? null,
-                    {
-                        id: "location",
-                        header: columnLabels.location,
-                        sortFn: (rowA, rowB) => {
-                            const left = locationById.get(
-                                rowA.original.locationId,
-                            )?.name;
-                            const right = locationById.get(
-                                rowB.original.locationId,
-                            )?.name;
-                            if (left === right) return 0;
-                            if (left === undefined) return 1;
-                            if (right === undefined) return -1;
-                            return left.localeCompare(right, "ja");
-                        },
-                        cell: ({ row }) => {
-                            const location = locationById.get(
-                                row.original.locationId,
-                            );
-                            if (!location) return "—";
-                            return (
-                                <Link
-                                    className="underline-offset-4 hover:underline"
-                                    params={{
-                                        _splat: buildAncestrySplat(
-                                            locations,
-                                            location.id,
-                                        ),
-                                    }}
-                                    to="/locations/$"
-                                >
-                                    {location.name}
-                                </Link>
-                            );
-                        },
+                }),
+                columnHelper.display({
+                    id: "location",
+                    header: columnLabels.location,
+                    cell: ({ row }) => {
+                        const location = locationById.get(
+                            row.original.locationId,
+                        );
+                        if (!location) return "—";
+                        return (
+                            <Link
+                                className="underline-offset-4 hover:underline"
+                                params={{
+                                    _splat: buildAncestrySplat(
+                                        locations,
+                                        location.id,
+                                    ),
+                                }}
+                                to="/locations/$"
+                            >
+                                {location.name}
+                            </Link>
+                        );
                     },
-                ),
+                }),
                 columnHelper.accessor("baseUnit", {
                     header: columnLabels.baseUnit,
-                    sortFn: (rowA, rowB) =>
-                        rowA.original.baseUnit.localeCompare(
-                            rowB.original.baseUnit,
-                            "ja",
-                        ),
                 }),
                 // 品目名のリンク先をマスタへ移した分、在庫・価格・履歴への
                 // 導線をこの列で残す
                 columnHelper.display({
                     id: "inventory",
                     header: "在庫",
-                    enableSorting: false,
                     cell: ({ row }) => (
                         <Link
                             aria-label={`${row.original.name}の在庫詳細`}
@@ -230,7 +205,6 @@ export function ItemTable({
                 columnHelper.display({
                     id: "actions",
                     header: "操作",
-                    enableSorting: false,
                     cell: ({ row }) => (
                         <div className="flex justify-end">
                             <DropdownMenu>
@@ -301,12 +275,7 @@ export function ItemTable({
             onEdit,
         ],
     );
-    const table = useTable({
-        columns,
-        data: items,
-        enableSortingRemoval: false,
-        features,
-    });
+    const table = useTable({ columns, data: items, features });
 
     return (
         <section className="overflow-hidden rounded-2xl border">
@@ -315,18 +284,26 @@ export function ItemTable({
                     {table.getHeaderGroups().map((headerGroup) => (
                         <TableRow key={headerGroup.id}>
                             {headerGroup.headers.map((header) => {
-                                const sortDirection =
-                                    header.column.getIsSorted();
                                 const label =
                                     columnLabels[header.column.id] ??
                                     header.column.id;
+                                const sortableColumn = isItemMasterSort(
+                                    header.column.id,
+                                )
+                                    ? header.column.id
+                                    : null;
+                                const activeSortDirection =
+                                    sortableColumn !== null &&
+                                    sort === sortableColumn
+                                        ? sortDirection
+                                        : null;
 
                                 return (
                                     <TableHead
                                         aria-sort={
-                                            sortDirection === "asc"
+                                            activeSortDirection === "asc"
                                                 ? "ascending"
-                                                : sortDirection === "desc"
+                                                : activeSortDirection === "desc"
                                                   ? "descending"
                                                   : "none"
                                         }
@@ -338,22 +315,33 @@ export function ItemTable({
                                         key={header.id}
                                         scope="col"
                                     >
-                                        {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                                        {header.isPlaceholder ? null : sortableColumn ? (
                                             <Button
                                                 aria-label={`${label}で並べ替え`}
                                                 className="-mx-2.5 font-medium"
-                                                onClick={header.column.getToggleSortingHandler()}
+                                                onClick={() =>
+                                                    onSortChange(
+                                                        activeSortDirection ===
+                                                            "desc"
+                                                            ? null
+                                                            : sortableColumn,
+                                                        activeSortDirection ===
+                                                            "asc"
+                                                            ? "desc"
+                                                            : "asc",
+                                                    )
+                                                }
                                                 size="sm"
                                                 type="button"
                                                 variant="ghost"
                                             >
                                                 {table.FlexRender({ header })}
-                                                {sortDirection ? (
+                                                {activeSortDirection ? (
                                                     <ChevronDown
                                                         aria-hidden="true"
                                                         className={cn(
                                                             "transition-transform",
-                                                            sortDirection ===
+                                                            activeSortDirection ===
                                                                 "asc" &&
                                                                 "rotate-180",
                                                         )}

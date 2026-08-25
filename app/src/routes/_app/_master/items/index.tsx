@@ -11,21 +11,28 @@ import {
 } from "./-api/item-queries";
 import { ItemMasterPage } from "./-components/item-master-page";
 
-// 絞り込みは取得済みの一覧に対する画面側の処理のため loaderDeps へは渡さない。
-// URL に持たせるのは共有・再訪時に同じ絞り込みへ戻すため。
-// 既定値を schema に持たせると /items が正規化 URL へ redirect されるため、
-// 未指定は optional のままにして画面側で "all" として扱う。
-// 不正値は既定 (絞り込みなし) へ寄せる。
+// 絞り込みと並べ替えは URL に残し、共有・再訪時に同じ表示へ戻す。
+// `sort` 未指定は品目名の昇順で読むが、表では「並べ替えなし」として表示する。
 const itemSearchSchema = z.object({
     category: z.string().min(1).optional().catch(undefined),
     includeCategoryChildren: z.boolean().optional().catch(undefined),
+    location: z.string().min(1).optional().catch(undefined),
+    sort: z
+        .enum(["name", "category", "location", "baseUnit"])
+        .optional()
+        .catch(undefined),
+    sortDirection: z.enum(["asc", "desc"]).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_app/_master/items/")({
     validateSearch: itemSearchSchema,
-    loader: ({ context }) =>
+    loaderDeps: ({ search }) => ({
+        sort: search.sort ?? "name",
+        sortDirection: search.sortDirection ?? "asc",
+    }),
+    loader: ({ context, deps }) =>
         Promise.all([
-            context.queryClient.ensureQueryData(itemListQueryOptions()),
+            context.queryClient.ensureQueryData(itemListQueryOptions(deps)),
             context.queryClient.ensureQueryData(categoryListQueryOptions()),
             context.queryClient.ensureQueryData(locationListQueryOptions()),
         ]),
@@ -35,10 +42,14 @@ export const Route = createFileRoute("/_app/_master/items/")({
 });
 
 function ItemsPage() {
-    const { data: items } = useSuspenseQuery(itemListQueryOptions());
+    const search = Route.useSearch();
+    const sorting = {
+        sort: search.sort ?? "name",
+        sortDirection: search.sortDirection ?? "asc",
+    };
+    const { data: items } = useSuspenseQuery(itemListQueryOptions(sorting));
     const { data: categories } = useSuspenseQuery(categoryListQueryOptions());
     const { data: locations } = useSuspenseQuery(locationListQueryOptions());
-    const search = Route.useSearch();
     const navigate = Route.useNavigate();
     return (
         <ItemMasterPage
@@ -76,6 +87,21 @@ function ItemsPage() {
                     search: (current) => ({
                         ...current,
                         location: value === "all" ? undefined : value,
+                    }),
+                })
+            }
+            sort={search.sort ?? null}
+            sortDirection={search.sortDirection ?? "asc"}
+            onSortChange={(sort, sortDirection) =>
+                void navigate({
+                    replace: true,
+                    search: (current) => ({
+                        ...current,
+                        sort: sort ?? undefined,
+                        sortDirection:
+                            sort === null || sortDirection === "asc"
+                                ? undefined
+                                : sortDirection,
                     }),
                 })
             }

@@ -8,6 +8,7 @@ import {
     type ItemUpdateInput,
     itemCreateSchema,
     itemDtoSchema,
+    itemListQuerySchema,
     itemUpdateSchema,
 } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
@@ -28,6 +29,11 @@ const apiErrorSchema = z.object({
 
 const itemDeleteOutputSchema = z.object({
     deleted: z.literal(true),
+});
+
+const itemMasterListInputSchema = itemListQuerySchema.pick({
+    sort: true,
+    sortDirection: true,
 });
 
 const request = async <T>(
@@ -68,8 +74,9 @@ const requestEmpty = async (url: string, init: RequestInit): Promise<void> => {
 // Cloudflare Access が公開 URL に掛かるため、読み取りは server function から
 // service を直接呼ぶ。cloudflare:workers と services はクライアントバンドルへ
 // 漏らさないよう handler 内で動的 import する。
-export const listAllItems = createServerFn({ method: "GET" }).handler(
-    async () => {
+export const listAllItems = createServerFn({ method: "GET" })
+    .validator(itemMasterListInputSchema)
+    .handler(async ({ data }) => {
         const [{ env }, { listItems }] = await Promise.all([
             import("cloudflare:workers"),
             import("@/services/itemService"),
@@ -77,13 +84,16 @@ export const listAllItems = createServerFn({ method: "GET" }).handler(
         const result: ItemDto[] = [];
         let cursor: string | undefined;
         do {
-            const page = await listItems(env.DB, { limit: 100, cursor });
+            const page = await listItems(env.DB, {
+                ...data,
+                limit: 100,
+                cursor,
+            });
             result.push(...page.items);
             cursor = page.nextCursor ?? undefined;
         } while (cursor);
         return result;
-    },
-);
+    });
 
 export const listCategoryTree = createServerFn({ method: "GET" }).handler(
     async () => {
