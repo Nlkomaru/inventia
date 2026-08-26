@@ -1,9 +1,15 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import {
+    keepPreviousData,
+    useQuery,
+    useSuspenseQuery,
+} from "@tanstack/react-query";
 import {
     createFileRoute,
     type ErrorComponentProps,
 } from "@tanstack/react-router";
+import { useState } from "react";
 import { z } from "zod";
+import type { ItemListSort, ItemSortDirection } from "@/domain/item";
 import {
     categoryListQueryOptions,
     itemListQueryOptions,
@@ -11,28 +17,19 @@ import {
 } from "./-api/item-queries";
 import { ItemMasterPage } from "./-components/item-master-page";
 
-// 絞り込みと並べ替えは URL に残し、共有・再訪時に同じ表示へ戻す。
-// `sort` 未指定は品目名の昇順で読むが、表では「並べ替えなし」として表示する。
+// 絞り込みは URL に残し、共有・再訪時に同じ表示へ戻す。
+// 並べ替えは画面内の query だけを差し替え、route loader を再実行しない。
 const itemSearchSchema = z.object({
     category: z.string().min(1).optional().catch(undefined),
     includeCategoryChildren: z.boolean().optional().catch(undefined),
     location: z.string().min(1).optional().catch(undefined),
-    sort: z
-        .enum(["name", "category", "location", "baseUnit"])
-        .optional()
-        .catch(undefined),
-    sortDirection: z.enum(["asc", "desc"]).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_app/_master/items/")({
     validateSearch: itemSearchSchema,
-    loaderDeps: ({ search }) => ({
-        sort: search.sort ?? "name",
-        sortDirection: search.sortDirection ?? "asc",
-    }),
-    loader: ({ context, deps }) =>
+    loader: ({ context }) =>
         Promise.all([
-            context.queryClient.ensureQueryData(itemListQueryOptions(deps)),
+            context.queryClient.ensureQueryData(itemListQueryOptions()),
             context.queryClient.ensureQueryData(categoryListQueryOptions()),
             context.queryClient.ensureQueryData(locationListQueryOptions()),
         ]),
@@ -41,13 +38,22 @@ export const Route = createFileRoute("/_app/_master/items/")({
     errorComponent: ItemsError,
 });
 
+type ItemMasterSort = Exclude<ItemListSort, "expiry">;
+
 function ItemsPage() {
     const search = Route.useSearch();
-    const sorting = {
-        sort: search.sort ?? "name",
-        sortDirection: search.sortDirection ?? "asc",
-    };
-    const { data: items } = useSuspenseQuery(itemListQueryOptions(sorting));
+    const [sorting, setSorting] = useState<{
+        sort: ItemMasterSort | null;
+        sortDirection: ItemSortDirection;
+    }>({ sort: null, sortDirection: "asc" });
+    const itemQuery = useQuery({
+        ...itemListQueryOptions({
+            sort: sorting.sort ?? "name",
+            sortDirection:
+                sorting.sort === null ? "asc" : sorting.sortDirection,
+        }),
+        placeholderData: keepPreviousData,
+    });
     const { data: categories } = useSuspenseQuery(categoryListQueryOptions());
     const { data: locations } = useSuspenseQuery(locationListQueryOptions());
     const navigate = Route.useNavigate();
@@ -56,7 +62,7 @@ function ItemsPage() {
             categories={categories}
             categoryFilter={search.category ?? "all"}
             includeCategoryChildren={search.includeCategoryChildren === true}
-            items={items}
+            items={itemQuery.data ?? []}
             locationFilter={search.location ?? "all"}
             locations={locations}
             onCategoryFilterChange={(value) =>
@@ -90,20 +96,10 @@ function ItemsPage() {
                     }),
                 })
             }
-            sort={search.sort ?? null}
-            sortDirection={search.sortDirection ?? "asc"}
+            sort={sorting.sort}
+            sortDirection={sorting.sortDirection}
             onSortChange={(sort, sortDirection) =>
-                void navigate({
-                    replace: true,
-                    search: (current) => ({
-                        ...current,
-                        sort: sort ?? undefined,
-                        sortDirection:
-                            sort === null || sortDirection === "asc"
-                                ? undefined
-                                : sortDirection,
-                    }),
-                })
+                setSorting({ sort, sortDirection })
             }
         />
     );

@@ -4,15 +4,9 @@ import {
     tableFeatures,
     useTable,
 } from "@tanstack/react-table";
-import {
-    ArrowUpDown,
-    ChevronDown,
-    Copy,
-    Ellipsis,
-    Pencil,
-    Trash2,
-} from "lucide-react";
+import { Copy, Ellipsis, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import { SortableTableHead } from "@/components/sortable-table-head";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -298,15 +292,37 @@ export function ItemTable({
                                         ? sortDirection
                                         : null;
 
+                                if (
+                                    !header.isPlaceholder &&
+                                    sortableColumn !== null
+                                ) {
+                                    return (
+                                        <SortableTableHead
+                                            direction={
+                                                activeSortDirection ?? false
+                                            }
+                                            key={header.id}
+                                            label={label}
+                                            onClick={() =>
+                                                onSortChange(
+                                                    activeSortDirection ===
+                                                        "asc"
+                                                        ? null
+                                                        : sortableColumn,
+                                                    activeSortDirection ===
+                                                        "desc"
+                                                        ? "asc"
+                                                        : "desc",
+                                                )
+                                            }
+                                        >
+                                            {table.FlexRender({ header })}
+                                        </SortableTableHead>
+                                    );
+                                }
+
                                 return (
                                     <TableHead
-                                        aria-sort={
-                                            activeSortDirection === "asc"
-                                                ? "ascending"
-                                                : activeSortDirection === "desc"
-                                                  ? "descending"
-                                                  : "none"
-                                        }
                                         className={cn(
                                             "px-5",
                                             header.id === "actions" &&
@@ -315,49 +331,9 @@ export function ItemTable({
                                         key={header.id}
                                         scope="col"
                                     >
-                                        {header.isPlaceholder ? null : sortableColumn ? (
-                                            <Button
-                                                aria-label={`${label}で並べ替え`}
-                                                className="-mx-2.5 font-medium"
-                                                onClick={() =>
-                                                    onSortChange(
-                                                        activeSortDirection ===
-                                                            "asc"
-                                                            ? null
-                                                            : sortableColumn,
-                                                        activeSortDirection ===
-                                                            "desc"
-                                                            ? "asc"
-                                                            : "desc",
-                                                    )
-                                                }
-                                                size="sm"
-                                                type="button"
-                                                variant="ghost"
-                                            >
-                                                {table.FlexRender({ header })}
-                                                {activeSortDirection ? (
-                                                    <ChevronDown
-                                                        aria-hidden="true"
-                                                        className={cn(
-                                                            "transition-transform",
-                                                            activeSortDirection ===
-                                                                "asc" &&
-                                                                "rotate-180",
-                                                        )}
-                                                        data-icon="inline-end"
-                                                    />
-                                                ) : (
-                                                    <ArrowUpDown
-                                                        aria-hidden="true"
-                                                        className="opacity-50"
-                                                        data-icon="inline-end"
-                                                    />
-                                                )}
-                                            </Button>
-                                        ) : (
-                                            table.FlexRender({ header })
-                                        )}
+                                        {header.isPlaceholder
+                                            ? null
+                                            : table.FlexRender({ header })}
                                     </TableHead>
                                 );
                             })}

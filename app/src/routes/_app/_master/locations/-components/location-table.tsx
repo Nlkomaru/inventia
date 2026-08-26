@@ -16,6 +16,11 @@ import {
     Trash2,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import {
+    nextTableSortDirection,
+    SortableTableHead,
+    type TableSortDirection,
+} from "@/components/sortable-table-head";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -59,6 +64,17 @@ type LocationTableRow = {
 const features = tableFeatures({});
 const columnHelper = createColumnHelper<typeof features, LocationTableRow>();
 
+type LocationSortColumn = "name" | "itemCount";
+
+const locationColumnLabels: Record<LocationSortColumn, string> = {
+    name: "場所名",
+    itemCount: "アイテム数",
+};
+
+const isLocationSortColumn = (
+    columnId: string,
+): columnId is LocationSortColumn => columnId in locationColumnLabels;
+
 export function LocationTable({
     locations,
     itemCounts,
@@ -76,6 +92,10 @@ export function LocationTable({
     // トーストを持たないので、コピー結果は読み上げ専用の領域だけで伝える。
     // 同じ文言でも読み上げ直すよう、連番を key にして要素ごと差し替える
     const [copyMessage, setCopyMessage] = useState({ seq: 0, text: "" });
+    const [sorting, setSorting] = useState<{
+        column: LocationSortColumn;
+        direction: Exclude<TableSortDirection, false>;
+    } | null>(null);
     const announce = useCallback(
         (text: string) =>
             setCopyMessage((current) => ({ seq: current.seq + 1, text })),
@@ -131,28 +151,45 @@ export function LocationTable({
             ),
             itemCount: totalItemCounts.get(item.id) ?? 0,
         });
+        const sortRows = (rows: LocationTableRow[]): LocationTableRow[] => {
+            if (sorting === null) return rows;
+            const direction = sorting.direction === "asc" ? 1 : -1;
+            return [...rows].sort((left, right) => {
+                if (sorting.column === "itemCount") {
+                    return (left.itemCount - right.itemCount) * direction;
+                }
+                return (
+                    left.item.name.localeCompare(right.item.name, "ja") *
+                    direction
+                );
+            });
+        };
         const normalized = query.trim().toLocaleLowerCase("ja");
         if (normalized) {
-            return locations
-                .filter((item) =>
-                    item.name.toLocaleLowerCase("ja").includes(normalized),
-                )
-                .map((item) => toRow(item, 0));
+            return sortRows(
+                locations
+                    .filter((item) =>
+                        item.name.toLocaleLowerCase("ja").includes(normalized),
+                    )
+                    .map((item) => toRow(item, 0)),
+            );
         }
 
         const result: LocationTableRow[] = [];
         const visit = (parentId: string | null, depth: number) => {
-            for (const item of locations.filter(
-                (candidate) => candidate.parentId === parentId,
-            )) {
-                const row = toRow(item, depth);
+            const siblings = locations
+                .filter((candidate) => candidate.parentId === parentId)
+                .map((item) => toRow(item, depth));
+            for (const row of sortRows(siblings)) {
                 result.push(row);
-                if (expanded.has(item.id)) visit(item.id, depth + 1);
+                if (expanded.has(row.item.id)) {
+                    visit(row.item.id, depth + 1);
+                }
             }
         };
         visit(null, 0);
         return result;
-    }, [expanded, locations, query, totalItemCounts]);
+    }, [expanded, locations, query, sorting, totalItemCounts]);
     const columns = useMemo(
         () =>
             columnHelper.columns([
@@ -322,20 +359,65 @@ export function LocationTable({
                 <TableHeader className="bg-muted/50">
                     {table.getHeaderGroups().map((headerGroup) => (
                         <TableRow key={headerGroup.id}>
-                            {headerGroup.headers.map((header) => (
-                                <TableHead
-                                    className={cn(
-                                        "px-5",
-                                        header.id === "actions" && "text-right",
-                                    )}
-                                    key={header.id}
-                                    scope="col"
-                                >
-                                    {header.isPlaceholder
-                                        ? null
-                                        : table.FlexRender({ header })}
-                                </TableHead>
-                            ))}
+                            {headerGroup.headers.map((header) => {
+                                const sortableColumn = isLocationSortColumn(
+                                    header.column.id,
+                                )
+                                    ? header.column.id
+                                    : null;
+                                if (
+                                    sortableColumn !== null &&
+                                    !header.isPlaceholder
+                                ) {
+                                    const direction =
+                                        sorting?.column === sortableColumn
+                                            ? sorting.direction
+                                            : false;
+                                    return (
+                                        <SortableTableHead
+                                            direction={direction}
+                                            key={header.id}
+                                            label={
+                                                locationColumnLabels[
+                                                    sortableColumn
+                                                ]
+                                            }
+                                            onClick={() => {
+                                                const nextDirection =
+                                                    nextTableSortDirection(
+                                                        direction,
+                                                    );
+                                                setSorting(
+                                                    nextDirection === false
+                                                        ? null
+                                                        : {
+                                                              column: sortableColumn,
+                                                              direction:
+                                                                  nextDirection,
+                                                          },
+                                                );
+                                            }}
+                                        >
+                                            {table.FlexRender({ header })}
+                                        </SortableTableHead>
+                                    );
+                                }
+                                return (
+                                    <TableHead
+                                        className={cn(
+                                            "px-5",
+                                            header.id === "actions" &&
+                                                "text-right",
+                                        )}
+                                        key={header.id}
+                                        scope="col"
+                                    >
+                                        {header.isPlaceholder
+                                            ? null
+                                            : table.FlexRender({ header })}
+                                    </TableHead>
+                                );
+                            })}
                         </TableRow>
                     ))}
                 </TableHeader>

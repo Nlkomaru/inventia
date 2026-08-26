@@ -19,6 +19,11 @@ import {
 import { useCallback, useMemo, useState } from "react";
 import { z } from "zod";
 import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
+import {
+    nextTableSortDirection,
+    SortableTableHead,
+    type TableSortDirection,
+} from "@/components/sortable-table-head";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -90,6 +95,14 @@ const receiptLabel = (receipt: ReceiptDto): string =>
 const isStatus = (value: string): value is ReceiptStatus =>
     receiptStatuses.some((status) => status === value);
 
+type ReceiptSortColumn =
+    | "createdAt"
+    | "status"
+    | "store"
+    | "purchasedAt"
+    | "totalPrice"
+    | "lineCount";
+
 function ReceiptListPage() {
     const navigate = Route.useNavigate();
     const search = Route.useSearch();
@@ -103,6 +116,10 @@ function ReceiptListPage() {
     // トーストを持たないので、コピー結果は読み上げ専用の領域だけで伝える。
     // 同じ文言でも読み上げ直すよう、連番を key にして要素ごと差し替える
     const [copyMessage, setCopyMessage] = useState({ seq: 0, text: "" });
+    const [sorting, setSorting] = useState<{
+        column: ReceiptSortColumn;
+        direction: Exclude<TableSortDirection, false>;
+    } | null>(null);
     const announce = useCallback(
         (text: string) =>
             setCopyMessage((current) => ({ seq: current.seq + 1, text })),
@@ -145,6 +162,61 @@ function ReceiptListPage() {
     const error = listQuery.error
         ? errorMessage(listQuery.error, "取込履歴を読み込めませんでした")
         : null;
+    const sortedReceipts = useMemo(() => {
+        if (sorting === null) return receipts;
+        const direction = sorting.direction === "asc" ? 1 : -1;
+        return [...receipts].sort((left, right) => {
+            if (
+                sorting.column === "totalPrice" ||
+                sorting.column === "lineCount"
+            ) {
+                const leftValue =
+                    sorting.column === "totalPrice"
+                        ? left.totalPrice
+                        : left.lineCount;
+                const rightValue =
+                    sorting.column === "totalPrice"
+                        ? right.totalPrice
+                        : right.lineCount;
+                if (leftValue === rightValue) return 0;
+                if (leftValue === null) return 1;
+                if (rightValue === null) return -1;
+                return (leftValue - rightValue) * direction;
+            }
+            const leftValue =
+                sorting.column === "createdAt"
+                    ? left.createdAt
+                    : sorting.column === "status"
+                      ? receiptStatusLabels[left.status]
+                      : sorting.column === "store"
+                        ? left.storeName
+                        : left.purchasedAt;
+            const rightValue =
+                sorting.column === "createdAt"
+                    ? right.createdAt
+                    : sorting.column === "status"
+                      ? receiptStatusLabels[right.status]
+                      : sorting.column === "store"
+                        ? right.storeName
+                        : right.purchasedAt;
+            if (leftValue === rightValue) return 0;
+            if (leftValue === null) return 1;
+            if (rightValue === null) return -1;
+            return leftValue.localeCompare(rightValue, "ja") * direction;
+        });
+    }, [receipts, sorting]);
+    const toggleSorting = (column: ReceiptSortColumn) => {
+        const direction =
+            sorting?.column === column ? sorting.direction : false;
+        const nextDirection = nextTableSortDirection(direction);
+        setSorting(
+            nextDirection === false
+                ? null
+                : { column, direction: nextDirection },
+        );
+    };
+    const sortDirection = (column: ReceiptSortColumn): TableSortDirection =>
+        sorting?.column === column ? sorting.direction : false;
 
     const statusFilter = search.status ?? allFilterValue;
     const statusOptions = [
@@ -236,24 +308,50 @@ function ReceiptListPage() {
                 <Table aria-label="取込履歴">
                     <TableHeader className="bg-muted/50">
                         <TableRow>
-                            <TableHead className="px-5" scope="col">
+                            <SortableTableHead
+                                direction={sortDirection("createdAt")}
+                                label="取込日時"
+                                onClick={() => toggleSorting("createdAt")}
+                            >
                                 取込日時
-                            </TableHead>
-                            <TableHead className="px-5" scope="col">
+                            </SortableTableHead>
+                            <SortableTableHead
+                                direction={sortDirection("status")}
+                                label="状態"
+                                onClick={() => toggleSorting("status")}
+                            >
                                 状態
-                            </TableHead>
-                            <TableHead className="px-5" scope="col">
+                            </SortableTableHead>
+                            <SortableTableHead
+                                direction={sortDirection("store")}
+                                label="店舗"
+                                onClick={() => toggleSorting("store")}
+                            >
                                 店舗
-                            </TableHead>
-                            <TableHead className="px-5" scope="col">
+                            </SortableTableHead>
+                            <SortableTableHead
+                                direction={sortDirection("purchasedAt")}
+                                label="購入日時"
+                                onClick={() => toggleSorting("purchasedAt")}
+                            >
                                 購入日時
-                            </TableHead>
-                            <TableHead className="px-5 text-right" scope="col">
+                            </SortableTableHead>
+                            <SortableTableHead
+                                direction={sortDirection("totalPrice")}
+                                label="合計"
+                                numeric
+                                onClick={() => toggleSorting("totalPrice")}
+                            >
                                 合計
-                            </TableHead>
-                            <TableHead className="px-5 text-right" scope="col">
+                            </SortableTableHead>
+                            <SortableTableHead
+                                direction={sortDirection("lineCount")}
+                                label="明細"
+                                numeric
+                                onClick={() => toggleSorting("lineCount")}
+                            >
                                 明細
-                            </TableHead>
+                            </SortableTableHead>
                             <TableHead className="px-5 text-right" scope="col">
                                 操作
                             </TableHead>
@@ -271,7 +369,7 @@ function ReceiptListPage() {
                                 </TableCell>
                             </TableRow>
                         ) : null}
-                        {receipts.map((receipt) => (
+                        {sortedReceipts.map((receipt) => (
                             <TableRow key={receipt.id}>
                                 <TableCell className="px-5 py-3 align-top whitespace-nowrap">
                                     {formatDateTimeOrDash(receipt.createdAt)}

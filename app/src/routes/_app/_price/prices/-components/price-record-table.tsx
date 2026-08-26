@@ -6,14 +6,12 @@ import {
     tableFeatures,
     useTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown } from "lucide-react";
 import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
-import { Button } from "@/components/ui/button";
+import { SortableTableHead } from "@/components/sortable-table-head";
 import {
     Table,
     TableBody,
     TableCell,
-    TableHead,
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
@@ -23,7 +21,6 @@ import {
     priceComparisonUnit,
 } from "@/domain/price";
 import { formatDisplayMonthDayTime } from "@/lib/datetime";
-import { cn } from "@/lib/utils";
 
 const features = tableFeatures({
     rowSortingFeature,
@@ -168,59 +165,24 @@ export function PriceRecordTable({
                                     header.column.id,
                                 );
 
-                                return (
-                                    <TableHead
-                                        aria-sort={
-                                            sortDirection === "asc"
-                                                ? "ascending"
-                                                : sortDirection === "desc"
-                                                  ? "descending"
-                                                  : "none"
-                                        }
-                                        className={cn(
-                                            "px-5",
-                                            numeric && "text-right",
-                                        )}
-                                        key={header.id}
-                                        scope="col"
-                                    >
-                                        {header.isPlaceholder ? null : header.column.getCanSort() ? (
-                                            <Button
-                                                aria-label={`${label}で並べ替え`}
-                                                className={cn(
-                                                    "-mx-2.5 font-medium",
-                                                    numeric && "ml-auto",
-                                                )}
-                                                onClick={header.column.getToggleSortingHandler()}
-                                                size="sm"
-                                                type="button"
-                                                variant="ghost"
-                                            >
-                                                {table.FlexRender({ header })}
-                                                {sortDirection ? (
-                                                    <ChevronDown
-                                                        aria-hidden="true"
-                                                        className={cn(
-                                                            "transition-transform",
-                                                            sortDirection ===
-                                                                "asc" &&
-                                                                "rotate-180",
-                                                        )}
-                                                        data-icon="inline-end"
-                                                    />
-                                                ) : (
-                                                    <ArrowUpDown
-                                                        aria-hidden="true"
-                                                        className="opacity-50"
-                                                        data-icon="inline-end"
-                                                    />
-                                                )}
-                                            </Button>
-                                        ) : (
-                                            table.FlexRender({ header })
-                                        )}
-                                    </TableHead>
-                                );
+                                if (
+                                    !header.isPlaceholder &&
+                                    header.column.getCanSort()
+                                ) {
+                                    return (
+                                        <SortableTableHead
+                                            direction={sortDirection}
+                                            key={header.id}
+                                            label={label}
+                                            numeric={numeric}
+                                            onClick={header.column.getToggleSortingHandler()}
+                                        >
+                                            {table.FlexRender({ header })}
+                                        </SortableTableHead>
+                                    );
+                                }
+
+                                return null;
                             })}
                         </TableRow>
                     ))}
