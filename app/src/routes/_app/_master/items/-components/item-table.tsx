@@ -322,13 +322,13 @@ export function ItemTable({
                                                 onClick={() =>
                                                     onSortChange(
                                                         activeSortDirection ===
-                                                            "desc"
+                                                            "asc"
                                                             ? null
                                                             : sortableColumn,
                                                         activeSortDirection ===
-                                                            "asc"
-                                                            ? "desc"
-                                                            : "asc",
+                                                            "desc"
+                                                            ? "asc"
+                                                            : "desc",
                                                     )
                                                 }
                                                 size="sm"

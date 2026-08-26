@@ -1,10 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import {
     createColumnHelper,
+    createSortedRowModel,
+    rowSortingFeature,
     tableFeatures,
     useTable,
 } from "@tanstack/react-table";
+import { ArrowUpDown, ChevronDown } from "lucide-react";
 import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
+import { Button } from "@/components/ui/button";
 import {
     Table,
     TableBody,
@@ -21,11 +25,23 @@ import {
 import { formatDisplayMonthDayTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
-const features = tableFeatures({});
+const features = tableFeatures({
+    rowSortingFeature,
+    sortedRowModel: createSortedRowModel(),
+});
 const columnHelper = createColumnHelper<typeof features, AllPriceRecordDto>();
 
 // 金額の列は見出しと本文の両方を右へ寄せる
 const numericColumnIds = new Set(["price", "unitPrice"]);
+
+const columnLabels: Record<string, string> = {
+    recordedAt: "日時",
+    itemName: "品物",
+    store: "Store",
+    content: "内容量",
+    price: "価格",
+    unitPrice: "単価",
+};
 
 /** 内容量は 1 個あたり × 個数で示し、包装があれば併記する。 */
 const formatContent = (record: AllPriceRecordDto): string => {
@@ -128,7 +144,13 @@ export function PriceRecordTable({
     isFetchingNextPage: boolean;
     onLoadMore: () => void;
 }) {
-    const table = useTable({ columns, data: records, features });
+    const table = useTable({
+        columns,
+        data: records,
+        enableSortingRemoval: true,
+        features,
+        sortDescFirst: true,
+    });
 
     return (
         <section className="overflow-hidden rounded-2xl border">
@@ -136,22 +158,70 @@ export function PriceRecordTable({
                 <TableHeader className="bg-muted/50">
                     {table.getHeaderGroups().map((headerGroup) => (
                         <TableRow key={headerGroup.id}>
-                            {headerGroup.headers.map((header) => (
-                                <TableHead
-                                    className={cn(
-                                        "px-5",
-                                        numericColumnIds.has(
-                                            header.column.id,
-                                        ) && "text-right",
-                                    )}
-                                    key={header.id}
-                                    scope="col"
-                                >
-                                    {header.isPlaceholder
-                                        ? null
-                                        : table.FlexRender({ header })}
-                                </TableHead>
-                            ))}
+                            {headerGroup.headers.map((header) => {
+                                const sortDirection =
+                                    header.column.getIsSorted();
+                                const label =
+                                    columnLabels[header.column.id] ??
+                                    header.column.id;
+                                const numeric = numericColumnIds.has(
+                                    header.column.id,
+                                );
+
+                                return (
+                                    <TableHead
+                                        aria-sort={
+                                            sortDirection === "asc"
+                                                ? "ascending"
+                                                : sortDirection === "desc"
+                                                  ? "descending"
+                                                  : "none"
+                                        }
+                                        className={cn(
+                                            "px-5",
+                                            numeric && "text-right",
+                                        )}
+                                        key={header.id}
+                                        scope="col"
+                                    >
+                                        {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                                            <Button
+                                                aria-label={`${label}で並べ替え`}
+                                                className={cn(
+                                                    "-mx-2.5 font-medium",
+                                                    numeric && "ml-auto",
+                                                )}
+                                                onClick={header.column.getToggleSortingHandler()}
+                                                size="sm"
+                                                type="button"
+                                                variant="ghost"
+                                            >
+                                                {table.FlexRender({ header })}
+                                                {sortDirection ? (
+                                                    <ChevronDown
+                                                        aria-hidden="true"
+                                                        className={cn(
+                                                            "transition-transform",
+                                                            sortDirection ===
+                                                                "asc" &&
+                                                                "rotate-180",
+                                                        )}
+                                                        data-icon="inline-end"
+                                                    />
+                                                ) : (
+                                                    <ArrowUpDown
+                                                        aria-hidden="true"
+                                                        className="opacity-50"
+                                                        data-icon="inline-end"
+                                                    />
+                                                )}
+                                            </Button>
+                                        ) : (
+                                            table.FlexRender({ header })
+                                        )}
+                                    </TableHead>
+                                );
+                            })}
                         </TableRow>
                     ))}
                 </TableHeader>
