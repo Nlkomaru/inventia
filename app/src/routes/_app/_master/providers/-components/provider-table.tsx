@@ -1,11 +1,14 @@
 import {
     createColumnHelper,
+    createSortedRowModel,
+    rowSortingFeature,
     tableFeatures,
     useTable,
 } from "@tanstack/react-table";
 import { useAtom, useSetAtom } from "jotai";
 import { Copy, Ellipsis, Pencil, Search, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import { SortableTableHead } from "@/components/sortable-table-head";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -31,7 +34,10 @@ import { cn } from "@/lib/utils";
 import { providerQueryAtom, startProviderEditAtom } from "./provider-atoms";
 import { ProviderFavicon } from "./provider-favicon";
 
-const features = tableFeatures({});
+const features = tableFeatures({
+    rowSortingFeature,
+    sortedRowModel: createSortedRowModel(),
+});
 const columnHelper = createColumnHelper<typeof features, ExternalProviderDto>();
 
 export function ProviderTable({
@@ -185,7 +191,13 @@ export function ProviderTable({
             ]),
         [copyProviderId, onDelete, startEdit],
     );
-    const table = useTable({ columns, data, features });
+    const table = useTable({
+        columns,
+        data,
+        enableSortingRemoval: true,
+        features,
+        sortDescFirst: true,
+    });
 
     return (
         <section className="overflow-hidden rounded-2xl border">
@@ -205,20 +217,42 @@ export function ProviderTable({
                 <TableHeader className="bg-muted/50">
                     {table.getHeaderGroups().map((headerGroup) => (
                         <TableRow key={headerGroup.id}>
-                            {headerGroup.headers.map((header) => (
-                                <TableHead
-                                    className={cn(
-                                        "px-5",
-                                        header.id === "actions" && "text-right",
-                                    )}
-                                    key={header.id}
-                                    scope="col"
-                                >
-                                    {header.isPlaceholder
-                                        ? null
-                                        : table.FlexRender({ header })}
-                                </TableHead>
-                            ))}
+                            {headerGroup.headers.map((header) => {
+                                const sortDirection =
+                                    header.column.getIsSorted();
+                                if (
+                                    !header.isPlaceholder &&
+                                    header.column.getCanSort()
+                                ) {
+                                    return (
+                                        <SortableTableHead
+                                            direction={sortDirection}
+                                            key={header.id}
+                                            label={String(
+                                                table.FlexRender({ header }),
+                                            )}
+                                            onClick={header.column.getToggleSortingHandler()}
+                                        >
+                                            {table.FlexRender({ header })}
+                                        </SortableTableHead>
+                                    );
+                                }
+                                return (
+                                    <TableHead
+                                        className={cn(
+                                            "px-5",
+                                            header.id === "actions" &&
+                                                "text-right",
+                                        )}
+                                        key={header.id}
+                                        scope="col"
+                                    >
+                                        {header.isPlaceholder
+                                            ? null
+                                            : table.FlexRender({ header })}
+                                    </TableHead>
+                                );
+                            })}
                         </TableRow>
                     ))}
                 </TableHeader>

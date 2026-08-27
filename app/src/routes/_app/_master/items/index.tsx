@@ -1,9 +1,15 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import {
+    keepPreviousData,
+    useQuery,
+    useSuspenseQuery,
+} from "@tanstack/react-query";
 import {
     createFileRoute,
     type ErrorComponentProps,
 } from "@tanstack/react-router";
+import { useState } from "react";
 import { z } from "zod";
+import type { ItemListSort, ItemSortDirection } from "@/domain/item";
 import {
     categoryListQueryOptions,
     itemListQueryOptions,
@@ -11,14 +17,12 @@ import {
 } from "./-api/item-queries";
 import { ItemMasterPage } from "./-components/item-master-page";
 
-// 絞り込みは取得済みの一覧に対する画面側の処理のため loaderDeps へは渡さない。
-// URL に持たせるのは共有・再訪時に同じ絞り込みへ戻すため。
-// 既定値を schema に持たせると /items が正規化 URL へ redirect されるため、
-// 未指定は optional のままにして画面側で "all" として扱う。
-// 不正値は既定 (絞り込みなし) へ寄せる。
+// 絞り込みは URL に残し、共有・再訪時に同じ表示へ戻す。
+// 並べ替えは画面内の query だけを差し替え、route loader を再実行しない。
 const itemSearchSchema = z.object({
     category: z.string().min(1).optional().catch(undefined),
     includeCategoryChildren: z.boolean().optional().catch(undefined),
+    location: z.string().min(1).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_app/_master/items/")({
@@ -34,18 +38,31 @@ export const Route = createFileRoute("/_app/_master/items/")({
     errorComponent: ItemsError,
 });
 
+type ItemMasterSort = Exclude<ItemListSort, "expiry">;
+
 function ItemsPage() {
-    const { data: items } = useSuspenseQuery(itemListQueryOptions());
+    const search = Route.useSearch();
+    const [sorting, setSorting] = useState<{
+        sort: ItemMasterSort | null;
+        sortDirection: ItemSortDirection;
+    }>({ sort: null, sortDirection: "asc" });
+    const itemQuery = useQuery({
+        ...itemListQueryOptions({
+            sort: sorting.sort ?? "name",
+            sortDirection:
+                sorting.sort === null ? "asc" : sorting.sortDirection,
+        }),
+        placeholderData: keepPreviousData,
+    });
     const { data: categories } = useSuspenseQuery(categoryListQueryOptions());
     const { data: locations } = useSuspenseQuery(locationListQueryOptions());
-    const search = Route.useSearch();
     const navigate = Route.useNavigate();
     return (
         <ItemMasterPage
             categories={categories}
             categoryFilter={search.category ?? "all"}
             includeCategoryChildren={search.includeCategoryChildren === true}
-            items={items}
+            items={itemQuery.data ?? []}
             locationFilter={search.location ?? "all"}
             locations={locations}
             onCategoryFilterChange={(value) =>
@@ -78,6 +95,11 @@ function ItemsPage() {
                         location: value === "all" ? undefined : value,
                     }),
                 })
+            }
+            sort={sorting.sort}
+            sortDirection={sorting.sortDirection}
+            onSortChange={(sort, sortDirection) =>
+                setSorting({ sort, sortDirection })
             }
         />
     );

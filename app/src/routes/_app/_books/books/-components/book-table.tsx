@@ -6,8 +6,9 @@ import {
     tableFeatures,
     useTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, BookOpen, ChevronDown, Pencil } from "lucide-react";
+import { BookOpen, Pencil } from "lucide-react";
 import { useMemo } from "react";
+import { SortableTableHead } from "@/components/sortable-table-head";
 import { Button } from "@/components/ui/button";
 import {
     Table,
@@ -194,8 +195,9 @@ export function BookTable({ books, totalCount, onEdit }: BookTableProps) {
     const table = useTable({
         columns,
         data: books,
-        enableSortingRemoval: false,
+        enableSortingRemoval: true,
         features,
+        sortDescFirst: true,
     });
     const rows = table.getRowModel().rows;
 
@@ -218,15 +220,23 @@ export function BookTable({ books, totalCount, onEdit }: BookTableProps) {
                                     columnLabels[header.column.id] ??
                                     header.column.id;
 
+                                if (
+                                    !header.isPlaceholder &&
+                                    header.column.getCanSort()
+                                ) {
+                                    return (
+                                        <SortableTableHead
+                                            direction={sortDirection}
+                                            key={header.id}
+                                            label={label}
+                                            onClick={header.column.getToggleSortingHandler()}
+                                        >
+                                            {table.FlexRender({ header })}
+                                        </SortableTableHead>
+                                    );
+                                }
                                 return (
                                     <TableHead
-                                        aria-sort={
-                                            sortDirection === "asc"
-                                                ? "ascending"
-                                                : sortDirection === "desc"
-                                                  ? "descending"
-                                                  : "none"
-                                        }
                                         className={cn(
                                             "px-5",
                                             header.column.id === "actions" &&
@@ -235,39 +245,9 @@ export function BookTable({ books, totalCount, onEdit }: BookTableProps) {
                                         key={header.id}
                                         scope="col"
                                     >
-                                        {header.isPlaceholder ? null : header.column.getCanSort() ? (
-                                            <Button
-                                                aria-label={`${label}で並べ替え`}
-                                                // 見出しの文字色は TableHead の text-foreground を保つ
-                                                className="-mx-2.5 font-medium"
-                                                onClick={header.column.getToggleSortingHandler()}
-                                                size="sm"
-                                                type="button"
-                                                variant="ghost"
-                                            >
-                                                {table.FlexRender({ header })}
-                                                {sortDirection ? (
-                                                    <ChevronDown
-                                                        aria-hidden="true"
-                                                        className={cn(
-                                                            "transition-transform",
-                                                            sortDirection ===
-                                                                "asc" &&
-                                                                "rotate-180",
-                                                        )}
-                                                        data-icon="inline-end"
-                                                    />
-                                                ) : (
-                                                    <ArrowUpDown
-                                                        aria-hidden="true"
-                                                        className="opacity-50"
-                                                        data-icon="inline-end"
-                                                    />
-                                                )}
-                                            </Button>
-                                        ) : (
-                                            table.FlexRender({ header })
-                                        )}
+                                        {header.isPlaceholder
+                                            ? null
+                                            : table.FlexRender({ header })}
                                     </TableHead>
                                 );
                             })}

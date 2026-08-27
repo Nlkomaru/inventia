@@ -115,6 +115,15 @@ export const itemUpdateSchema = z
 
 // 未知のキーは拒否する。綴りを誤った絞り込みが黙って無視されると、
 // 呼び出し側は絞り込み済みだと思ったまま全件を受け取ってしまう
+export const itemListSortSchema = z.enum([
+    "name",
+    "category",
+    "location",
+    "baseUnit",
+    "expiry",
+]);
+export const itemSortDirectionSchema = z.enum(["asc", "desc"]);
+
 export const itemListQuerySchema = z
     .object({
         q: z.string().trim().max(200).optional(),
@@ -137,9 +146,11 @@ export const itemListQuerySchema = z
         // 指定した読書状態が保存されている品目だけに絞る。読書状態を持たない品目は
         // どの値にも一致しない（未設定を unread とみなさない）
         readingStatus: readingStatusSchema.optional(),
-        // 並び順。expiry は期限が早い順（期限なしは最後）で、期限の近い在庫を
-        // 先頭のページで答えられるようにする。既定は従来どおり名前順
-        sort: z.enum(["name", "expiry"]).default("name"),
+        // category と location は関連マスタの名前、baseUnit は品目の基準単位で並べる。
+        // expiry は期限が近い在庫を先頭ページで返すために残し、期限なしは向きに
+        // かかわらず最後へ置く。既定は従来どおり名前の昇順
+        sort: itemListSortSchema.default("name"),
+        sortDirection: itemSortDirectionSchema.default("asc"),
         limit: z.coerce.number().int().min(1).max(100).default(50),
         cursor: z.string().min(1).optional(),
     })
@@ -238,9 +249,11 @@ export const itemBatchOutputSchema = z
 
 export type ItemBatchInput = z.infer<typeof itemBatchInputSchema>;
 export type ItemBatchOutput = z.infer<typeof itemBatchOutputSchema>;
-
 export type ItemCreateInput = z.infer<typeof itemCreateSchema>;
 export type ItemUpdateInput = z.infer<typeof itemUpdateSchema>;
+
+export type ItemListSort = z.infer<typeof itemListSortSchema>;
+export type ItemSortDirection = z.infer<typeof itemSortDirectionSchema>;
 export type ItemListQuery = z.infer<typeof itemListQuerySchema>;
 export type ItemSemanticSearchQuery = z.infer<
     typeof itemSemanticSearchQuerySchema

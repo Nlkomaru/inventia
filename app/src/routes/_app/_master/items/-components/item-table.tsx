@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-table";
 import { Copy, Ellipsis, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import { SortableTableHead } from "@/components/sortable-table-head";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -25,19 +26,47 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import type { CategoryDto } from "@/domain/category";
-import type { ItemDto } from "@/domain/item";
+import type { ItemDto, ItemListSort, ItemSortDirection } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
 import { buildAncestrySplat } from "@/lib/hierarchy";
+import { cn } from "@/lib/utils";
 
 const features = tableFeatures({});
 const columnHelper = createColumnHelper<typeof features, ItemDto>();
+
+type ItemMasterSort = Exclude<ItemListSort, "expiry">;
+
+const sortableColumns: Record<ItemMasterSort, true> = {
+    name: true,
+    category: true,
+    location: true,
+    baseUnit: true,
+};
+
+const isItemMasterSort = (columnId: string): columnId is ItemMasterSort =>
+    Object.hasOwn(sortableColumns, columnId);
+
+const columnLabels: Record<string, string> = {
+    name: "品目名",
+    category: "カテゴリ",
+    location: "保管場所",
+    baseUnit: "単位",
+    inventory: "在庫",
+    actions: "操作",
+};
 type ItemTableProps = {
     items: ItemDto[];
     categories: CategoryDto[];
     locations: LocationDto[];
     deletingId: string | null;
+    sort: ItemMasterSort | null;
+    sortDirection: ItemSortDirection;
     onEdit: (item: ItemDto) => void;
     onDelete: (item: ItemDto) => void;
+    onSortChange: (
+        sort: ItemMasterSort | null,
+        sortDirection: ItemSortDirection,
+    ) => void;
 };
 
 export function ItemTable({
@@ -47,6 +76,9 @@ export function ItemTable({
     deletingId,
     onEdit,
     onDelete,
+    sort,
+    sortDirection,
+    onSortChange,
 }: ItemTableProps) {
     // トーストを持たないので、コピー結果は読み上げ専用の領域だけで伝える。
     // 同じ文言でも読み上げ直すよう、連番を key にして要素ごと差し替える
@@ -84,7 +116,7 @@ export function ItemTable({
         () =>
             columnHelper.columns([
                 columnHelper.accessor("name", {
-                    header: "品目名",
+                    header: columnLabels.name,
                     // 品目名からはマスタの品目ページへ入る。単位や次元の
                     // つけ替えなど、この一覧が扱う登録内容の変更先に揃える
                     cell: ({ getValue, row }) => (
@@ -99,7 +131,7 @@ export function ItemTable({
                 }),
                 columnHelper.display({
                     id: "category",
-                    header: "カテゴリ",
+                    header: columnLabels.category,
                     cell: ({ row }) => {
                         const category = categoryById.get(
                             row.original.categoryId,
@@ -123,7 +155,7 @@ export function ItemTable({
                 }),
                 columnHelper.display({
                     id: "location",
-                    header: "保管場所",
+                    header: columnLabels.location,
                     cell: ({ row }) => {
                         const location = locationById.get(
                             row.original.locationId,
@@ -146,7 +178,7 @@ export function ItemTable({
                     },
                 }),
                 columnHelper.accessor("baseUnit", {
-                    header: "単位",
+                    header: columnLabels.baseUnit,
                 }),
                 // 品目名のリンク先をマスタへ移した分、在庫・価格・履歴への
                 // 導線をこの列で残す
@@ -245,21 +277,66 @@ export function ItemTable({
                 <TableHeader className="bg-muted/50">
                     {table.getHeaderGroups().map((headerGroup) => (
                         <TableRow key={headerGroup.id}>
-                            {headerGroup.headers.map((header) => (
-                                <TableHead
-                                    className={
-                                        header.id === "actions"
-                                            ? "px-5 text-right"
-                                            : "px-5"
-                                    }
-                                    key={header.id}
-                                    scope="col"
-                                >
-                                    {header.isPlaceholder
-                                        ? null
-                                        : table.FlexRender({ header })}
-                                </TableHead>
-                            ))}
+                            {headerGroup.headers.map((header) => {
+                                const label =
+                                    columnLabels[header.column.id] ??
+                                    header.column.id;
+                                const sortableColumn = isItemMasterSort(
+                                    header.column.id,
+                                )
+                                    ? header.column.id
+                                    : null;
+                                const activeSortDirection =
+                                    sortableColumn !== null &&
+                                    sort === sortableColumn
+                                        ? sortDirection
+                                        : null;
+
+                                if (
+                                    !header.isPlaceholder &&
+                                    sortableColumn !== null
+                                ) {
+                                    return (
+                                        <SortableTableHead
+                                            direction={
+                                                activeSortDirection ?? false
+                                            }
+                                            key={header.id}
+                                            label={label}
+                                            onClick={() =>
+                                                onSortChange(
+                                                    activeSortDirection ===
+                                                        "asc"
+                                                        ? null
+                                                        : sortableColumn,
+                                                    activeSortDirection ===
+                                                        "desc"
+                                                        ? "asc"
+                                                        : "desc",
+                                                )
+                                            }
+                                        >
+                                            {table.FlexRender({ header })}
+                                        </SortableTableHead>
+                                    );
+                                }
+
+                                return (
+                                    <TableHead
+                                        className={cn(
+                                            "px-5",
+                                            header.id === "actions" &&
+                                                "text-right",
+                                        )}
+                                        key={header.id}
+                                        scope="col"
+                                    >
+                                        {header.isPlaceholder
+                                            ? null
+                                            : table.FlexRender({ header })}
+                                    </TableHead>
+                                );
+                            })}
                         </TableRow>
                     ))}
                 </TableHeader>

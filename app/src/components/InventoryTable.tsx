@@ -5,16 +5,10 @@ import {
     tableFeatures,
     useTable,
 } from "@tanstack/react-table";
-import {
-    ArrowUpDown,
-    ChevronDown,
-    Clock,
-    MapPin,
-    TriangleAlert,
-} from "lucide-react";
+import { Clock, MapPin, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
-import { Button } from "@/components/ui/button";
+import { SortableTableHead } from "@/components/sortable-table-head";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     Table,
@@ -26,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import type { ItemDto } from "@/domain/item";
 import { type ItemLotDto, sortLotsFefo } from "@/domain/lot";
-import { formatDisplayDate } from "@/lib/datetime";
+import { formatDisplayMonthDayTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
 const features = tableFeatures({
@@ -59,7 +53,8 @@ type ExpirySignal = {
     date: string | null;
 };
 
-const formatDate = (value: string): string => formatDisplayDate(value) ?? "—";
+const formatDate = (value: string): string =>
+    formatDisplayMonthDayTime(value) ?? "—";
 
 const formatQuantity = (quantity: number, unit: string): string =>
     `${quantity.toLocaleString("ja-JP")} ${unit}`;
@@ -201,12 +196,9 @@ function LotBreakdownCell({
                 );
                 return (
                     <li
-                        className="flex items-baseline gap-1.5 whitespace-nowrap text-xs"
+                        className="grid grid-cols-[10rem_minmax(0,1fr)] items-baseline gap-x-2 whitespace-nowrap text-xs"
                         key={line.key}
                     >
-                        <span className="font-mono font-medium tabular-nums">
-                            {formatQuantity(line.quantity, item.baseUnit)}
-                        </span>
                         <span
                             className={cn(
                                 "text-muted-foreground",
@@ -214,7 +206,10 @@ function LotBreakdownCell({
                                     "font-semibold text-destructive",
                             )}
                         >
-                            / {signal.date ?? "期限なし"}
+                            {signal.date ?? "期限なし"}
+                        </span>
+                        <span className="font-mono font-medium tabular-nums">
+                            {formatQuantity(line.quantity, item.baseUnit)}
                         </span>
                     </li>
                 );
@@ -376,8 +371,9 @@ export function InventoryTable({
     const table = useTable({
         columns,
         data: items,
-        enableSortingRemoval: false,
+        enableSortingRemoval: true,
         features,
+        sortDescFirst: true,
     });
     const rows = table.getRowModel().rows;
 
@@ -400,61 +396,31 @@ export function InventoryTable({
                                 const numeric =
                                     header.column.id === "currentQuantity";
 
+                                if (
+                                    !header.isPlaceholder &&
+                                    header.column.getCanSort()
+                                ) {
+                                    return (
+                                        <SortableTableHead
+                                            direction={sortDirection}
+                                            key={header.id}
+                                            label={label}
+                                            numeric={numeric}
+                                            onClick={header.column.getToggleSortingHandler()}
+                                        >
+                                            {table.FlexRender({ header })}
+                                        </SortableTableHead>
+                                    );
+                                }
                                 return (
                                     <TableHead
-                                        aria-sort={
-                                            sortDirection === "asc"
-                                                ? "ascending"
-                                                : sortDirection === "desc"
-                                                  ? "descending"
-                                                  : "none"
-                                        }
-                                        className={cn(
-                                            "px-5",
-                                            numeric && "text-right",
-                                        )}
+                                        className="px-5"
                                         key={header.id}
                                         scope="col"
                                     >
-                                        {header.isPlaceholder ? null : header.column.getCanSort() ? (
-                                            <Button
-                                                aria-label={`${label}で並べ替え`}
-                                                className={cn(
-                                                    // 見出しの文字色は TableHead の text-foreground を保つ。
-                                                    // muted へ落とすとヘッダー背景との比が 4.5:1 を下回る
-                                                    "-mx-2.5 font-medium",
-                                                    numeric && "ml-auto",
-                                                )}
-                                                onClick={header.column.getToggleSortingHandler()}
-                                                size="sm"
-                                                type="button"
-                                                variant="ghost"
-                                            >
-                                                {table.FlexRender({
-                                                    header,
-                                                })}
-                                                {sortDirection ? (
-                                                    <ChevronDown
-                                                        aria-hidden="true"
-                                                        className={cn(
-                                                            "transition-transform",
-                                                            sortDirection ===
-                                                                "asc" &&
-                                                                "rotate-180",
-                                                        )}
-                                                        data-icon="inline-end"
-                                                    />
-                                                ) : (
-                                                    <ArrowUpDown
-                                                        aria-hidden="true"
-                                                        className="opacity-50"
-                                                        data-icon="inline-end"
-                                                    />
-                                                )}
-                                            </Button>
-                                        ) : (
-                                            table.FlexRender({ header })
-                                        )}
+                                        {header.isPlaceholder
+                                            ? null
+                                            : table.FlexRender({ header })}
                                     </TableHead>
                                 );
                             })}

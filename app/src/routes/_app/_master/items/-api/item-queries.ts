@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import type { ItemListQuery } from "@/domain/item";
 import {
     getItemDetail,
     getItemRelabelImpact,
@@ -7,11 +8,19 @@ import {
     listLocationTree,
 } from "./item-api";
 
+type ItemMasterListSorting = Pick<ItemListQuery, "sort" | "sortDirection">;
+
+const defaultItemMasterListSorting: ItemMasterListSorting = {
+    sort: "name",
+    sortDirection: "asc",
+};
+
 // 先頭要素はデータセット名で揃える。保管場所マスタ側の
 // invalidateQueries({ queryKey: ["locations"] }) がここのキャッシュも流せる。
 export const itemKeys = {
     all: ["items"] as const,
-    list: () => [...itemKeys.all, "list"] as const,
+    list: (sorting: ItemMasterListSorting) =>
+        [...itemKeys.all, "list", sorting] as const,
     detail: (itemId: string) => [...itemKeys.all, "detail", itemId] as const,
     // 入出庫履歴・価格記録の有無。読み取り先は別の名前空間だが、品目ページの
     // 警告にしか使わないため品目の無効化（["items"]）へ相乗りさせる
@@ -41,10 +50,12 @@ export const bookKeys = {
     all: ["books"] as const,
 };
 
-export const itemListQueryOptions = () =>
+export const itemListQueryOptions = (
+    sorting: ItemMasterListSorting = defaultItemMasterListSorting,
+) =>
     queryOptions({
-        queryKey: itemKeys.list(),
-        queryFn: () => listAllItems(),
+        queryKey: itemKeys.list(sorting),
+        queryFn: () => listAllItems({ data: sorting }),
     });
 
 export const itemDetailQueryOptions = (itemId: string) =>

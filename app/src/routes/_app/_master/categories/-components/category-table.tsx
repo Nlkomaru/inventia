@@ -16,6 +16,11 @@ import {
     Trash2,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import {
+    nextTableSortDirection,
+    SortableTableHead,
+    type TableSortDirection,
+} from "@/components/sortable-table-head";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -72,6 +77,18 @@ type CategoryTableRow = {
 
 const features = tableFeatures({});
 const columnHelper = createColumnHelper<typeof features, CategoryTableRow>();
+
+type CategorySortColumn = "name" | "kind" | "sortOrder";
+
+const categoryColumnLabels: Record<CategorySortColumn, string> = {
+    name: "カテゴリ名",
+    kind: "種別",
+    sortOrder: "並び順",
+};
+
+const isCategorySortColumn = (
+    columnId: string,
+): columnId is CategorySortColumn => columnId in categoryColumnLabels;
 
 const columns = columnHelper.columns([
     columnHelper.display({
@@ -206,6 +223,10 @@ export function CategoryTable({
     // トーストを持たないので、コピー結果は読み上げ専用の領域だけで伝える。
     // 同じ文言でも読み上げ直すよう、連番を key にして要素ごと差し替える
     const [copyMessage, setCopyMessage] = useState({ seq: 0, text: "" });
+    const [sorting, setSorting] = useState<{
+        column: CategorySortColumn;
+        direction: Exclude<TableSortDirection, false>;
+    } | null>(null);
     const announce = useCallback(
         (text: string) =>
             setCopyMessage((current) => ({ seq: current.seq + 1, text })),
@@ -264,21 +285,46 @@ export function CategoryTable({
                 onDelete: () => void onDelete(item.id),
             };
         };
+        const sortRows = (rows: CategoryTableRow[]): CategoryTableRow[] => {
+            if (sorting === null) return rows;
+            const direction = sorting.direction === "asc" ? 1 : -1;
+            return [...rows].sort((left, right) => {
+                if (sorting.column === "sortOrder") {
+                    return (
+                        (left.item.sortOrder - right.item.sortOrder) * direction
+                    );
+                }
+                const leftValue =
+                    sorting.column === "name"
+                        ? left.item.name
+                        : formatEffectiveCategoryKind(left.effectiveKind);
+                const rightValue =
+                    sorting.column === "name"
+                        ? right.item.name
+                        : formatEffectiveCategoryKind(right.effectiveKind);
+                return leftValue.localeCompare(rightValue, "ja") * direction;
+            });
+        };
         if (filtering) {
-            return categories
-                .filter((item) =>
-                    item.name.toLocaleLowerCase("ja").includes(normalized),
-                )
-                .map((item) => toRow(item, 0));
+            return sortRows(
+                categories
+                    .filter((item) =>
+                        item.name.toLocaleLowerCase("ja").includes(normalized),
+                    )
+                    .map((item) => toRow(item, 0)),
+            );
         }
 
         const result: CategoryTableRow[] = [];
         const visit = (parentId: string | null, depth: number) => {
-            for (const item of categories.filter(
-                (candidate) => candidate.parentId === parentId,
-            )) {
-                result.push(toRow(item, depth));
-                if (expanded.has(item.id)) visit(item.id, depth + 1);
+            const siblings = categories
+                .filter((candidate) => candidate.parentId === parentId)
+                .map((item) => toRow(item, depth));
+            for (const row of sortRows(siblings)) {
+                result.push(row);
+                if (expanded.has(row.item.id)) {
+                    visit(row.item.id, depth + 1);
+                }
             }
         };
         visit(null, 0);
@@ -288,6 +334,7 @@ export function CategoryTable({
         copyCategoryId,
         expanded,
         onDelete,
+        sorting,
         query,
         setExpanded,
         startChild,
@@ -313,20 +360,65 @@ export function CategoryTable({
                 <TableHeader className="bg-muted/50">
                     {table.getHeaderGroups().map((headerGroup) => (
                         <TableRow key={headerGroup.id}>
-                            {headerGroup.headers.map((header) => (
-                                <TableHead
-                                    className={cn(
-                                        "px-5",
-                                        header.id === "actions" && "text-right",
-                                    )}
-                                    key={header.id}
-                                    scope="col"
-                                >
-                                    {header.isPlaceholder
-                                        ? null
-                                        : table.FlexRender({ header })}
-                                </TableHead>
-                            ))}
+                            {headerGroup.headers.map((header) => {
+                                const sortableColumn = isCategorySortColumn(
+                                    header.column.id,
+                                )
+                                    ? header.column.id
+                                    : null;
+                                if (
+                                    sortableColumn !== null &&
+                                    !header.isPlaceholder
+                                ) {
+                                    const direction =
+                                        sorting?.column === sortableColumn
+                                            ? sorting.direction
+                                            : false;
+                                    return (
+                                        <SortableTableHead
+                                            direction={direction}
+                                            key={header.id}
+                                            label={
+                                                categoryColumnLabels[
+                                                    sortableColumn
+                                                ]
+                                            }
+                                            onClick={() => {
+                                                const nextDirection =
+                                                    nextTableSortDirection(
+                                                        direction,
+                                                    );
+                                                setSorting(
+                                                    nextDirection === false
+                                                        ? null
+                                                        : {
+                                                              column: sortableColumn,
+                                                              direction:
+                                                                  nextDirection,
+                                                          },
+                                                );
+                                            }}
+                                        >
+                                            {table.FlexRender({ header })}
+                                        </SortableTableHead>
+                                    );
+                                }
+                                return (
+                                    <TableHead
+                                        className={cn(
+                                            "px-5",
+                                            header.id === "actions" &&
+                                                "text-right",
+                                        )}
+                                        key={header.id}
+                                        scope="col"
+                                    >
+                                        {header.isPlaceholder
+                                            ? null
+                                            : table.FlexRender({ header })}
+                                    </TableHead>
+                                );
+                            })}
                         </TableRow>
                     ))}
                 </TableHeader>

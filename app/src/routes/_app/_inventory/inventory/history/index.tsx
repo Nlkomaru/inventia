@@ -9,9 +9,14 @@ import {
     redirect,
     useRouter,
 } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { z } from "zod";
 import { InfiniteScrollSentinel } from "@/components/infinite-scroll-sentinel";
+import {
+    nextTableSortDirection,
+    SortableTableHead,
+    type TableSortDirection,
+} from "@/components/sortable-table-head";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
@@ -36,7 +41,7 @@ import {
     stockMovementReasonSchema,
     stockMovementReasons,
 } from "@/domain/stock";
-import { formatDisplayDateTime } from "@/lib/datetime";
+import { formatDisplayMonthDayTime } from "@/lib/datetime";
 // 連携先の表示はマスタ画面と同じ部品を使う
 import { ProviderFavicon } from "@/routes/_app/_master/providers/-components/provider-favicon";
 import {
@@ -95,6 +100,8 @@ const allFilterValue = "all";
 const isReason = (value: string): value is StockMovementReason =>
     stockMovementReasons.some((reason) => reason === value);
 
+type HistorySortColumn = "occurredAt" | "item" | "reason" | "delta";
+
 function StockHistoryPage() {
     const navigate = Route.useNavigate();
     const search = Route.useSearch();
@@ -102,6 +109,10 @@ function StockHistoryPage() {
     const historyQuery = useSuspenseInfiniteQuery(
         stockHistoryQueryOptions(search),
     );
+    const [sorting, setSorting] = useState<{
+        column: HistorySortColumn;
+        direction: Exclude<TableSortDirection, false>;
+    } | null>(null);
     const movements = useMemo(
         () => historyQuery.data.pages.flatMap((page) => page.movements),
         [historyQuery.data],
@@ -118,6 +129,40 @@ function StockHistoryPage() {
         () => new Map(items.map((item) => [item.id, item.baseUnit])),
         [items],
     );
+    const sortedMovements = useMemo(() => {
+        if (sorting === null) return movements;
+        const direction = sorting.direction === "asc" ? 1 : -1;
+        return [...movements].sort((left, right) => {
+            if (sorting.column === "delta") {
+                return (left.delta - right.delta) * direction;
+            }
+            const leftValue =
+                sorting.column === "occurredAt"
+                    ? left.occurredAt
+                    : sorting.column === "item"
+                      ? (itemNames.get(left.itemId) ?? left.itemId)
+                      : reasonLabels[left.reason];
+            const rightValue =
+                sorting.column === "occurredAt"
+                    ? right.occurredAt
+                    : sorting.column === "item"
+                      ? (itemNames.get(right.itemId) ?? right.itemId)
+                      : reasonLabels[right.reason];
+            return leftValue.localeCompare(rightValue, "ja") * direction;
+        });
+    }, [itemNames, movements, sorting]);
+    const toggleSorting = (column: HistorySortColumn) => {
+        const direction =
+            sorting?.column === column ? sorting.direction : false;
+        const nextDirection = nextTableSortDirection(direction);
+        setSorting(
+            nextDirection === false
+                ? null
+                : { column, direction: nextDirection },
+        );
+    };
+    const sortDirection = (column: HistorySortColumn): TableSortDirection =>
+        sorting?.column === column ? sorting.direction : false;
 
     const itemFilter = search.itemId ?? allFilterValue;
     const reasonFilter = search.reason ?? allFilterValue;
@@ -253,12 +298,35 @@ function StockHistoryPage() {
                     <Table aria-label="在庫履歴">
                         <TableHeader className="bg-muted/50">
                             <TableRow>
-                                <TableHead className="px-5">日時</TableHead>
-                                <TableHead className="px-5">品目</TableHead>
-                                <TableHead className="px-5">理由</TableHead>
-                                <TableHead className="px-5 text-right">
+                                <SortableTableHead
+                                    direction={sortDirection("occurredAt")}
+                                    label="日時"
+                                    onClick={() => toggleSorting("occurredAt")}
+                                >
+                                    日時
+                                </SortableTableHead>
+                                <SortableTableHead
+                                    direction={sortDirection("item")}
+                                    label="品目"
+                                    onClick={() => toggleSorting("item")}
+                                >
+                                    品目
+                                </SortableTableHead>
+                                <SortableTableHead
+                                    direction={sortDirection("reason")}
+                                    label="理由"
+                                    onClick={() => toggleSorting("reason")}
+                                >
+                                    理由
+                                </SortableTableHead>
+                                <SortableTableHead
+                                    direction={sortDirection("delta")}
+                                    label="差分"
+                                    numeric
+                                    onClick={() => toggleSorting("delta")}
+                                >
                                     差分
-                                </TableHead>
+                                </SortableTableHead>
                                 <TableHead className="px-5">
                                     ロット内訳
                                 </TableHead>
@@ -267,7 +335,7 @@ function StockHistoryPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {movements.map((movement) => {
+                            {sortedMovements.map((movement) => {
                                 const unit =
                                     itemUnits.get(movement.itemId) ?? "";
                                 return (
@@ -306,18 +374,22 @@ function StockHistoryPage() {
                                                     {movement.allocations.map(
                                                         (allocation) => (
                                                             <li
+                                                                className="grid grid-cols-[10rem_minmax(0,1fr)] items-baseline gap-x-2"
                                                                 key={
                                                                     allocation.lotId
                                                                 }
                                                             >
-                                                                {formatExpiry(
-                                                                    allocation.expiryDate,
-                                                                )}
-                                                                :{" "}
-                                                                {formatDelta(
-                                                                    allocation.delta,
-                                                                )}{" "}
-                                                                {unit}
+                                                                <span className="whitespace-nowrap">
+                                                                    {formatExpiry(
+                                                                        allocation.expiryDate,
+                                                                    )}
+                                                                </span>
+                                                                <span className="font-mono whitespace-nowrap tabular-nums">
+                                                                    {formatDelta(
+                                                                        allocation.delta,
+                                                                    )}{" "}
+                                                                    {unit}
+                                                                </span>
                                                             </li>
                                                         ),
                                                     )}
@@ -427,7 +499,7 @@ const errorMessage = (cause: unknown, fallback: string): string =>
     cause instanceof Error ? cause.message : fallback;
 
 const formatDateTime = (value: string): string =>
-    formatDisplayDateTime(value) ?? value;
+    formatDisplayMonthDayTime(value) ?? value;
 
 const formatExpiry = (value: string | null): string =>
-    (value === null ? null : formatDisplayDateTime(value)) ?? "期限なし";
+    (value === null ? null : formatDisplayMonthDayTime(value)) ?? "期限なし";
