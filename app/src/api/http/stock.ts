@@ -6,11 +6,14 @@ import {
     stockAdjustmentSchema,
     stockHistoryQuerySchema,
     stockHistoryResultSchema,
+    stockMovementDtoSchema,
+    stockMovementNoteCorrectionSchema,
     stockOperationResultSchema,
     stocktakeSchema,
 } from "../../domain/stock";
 import {
     adjustStock,
+    correctStockMovementNote,
     listStaleStocktakeItems,
     listStockHistory,
     StockServiceError,
@@ -41,6 +44,15 @@ const itemIdParameter = z
     .max(128)
     .openapi({
         param: { name: "itemId", in: "path" },
+        example: "019fecc7-da09-768f-b6e8-45904d46b277",
+    });
+const movementIdParameter = z
+    .string()
+    .trim()
+    .min(1)
+    .max(128)
+    .openapi({
+        param: { name: "movementId", in: "path" },
         example: "019fecc7-da09-768f-b6e8-45904d46b277",
     });
 
@@ -162,7 +174,7 @@ stockItemsApp.openAPIRegistry.registerPath({
     summary: "List an item's stock history",
     operationId: "listItemStockHistory",
     description:
-        "Lists immutable stock movements for one item in reverse chronological order with scoped cursor pagination. Each movement carries its per-lot allocations; the expiry date in an allocation is the value recorded at the time of the movement, so later expiry corrections never rewrite history. Movements recorded before lot tracking existed have an empty allocations array. Each movement also carries note, the free-text purpose recorded with it, and externalProvider, the external app the stock went to resolved to its current name, faviconUrl, and url; both are null when the movement records neither. externalId is the external app's own identifier and is returned as stored without being interpreted.",
+        "Lists stock movements for one item in reverse chronological order with scoped cursor pagination. Movement quantities and per-lot allocations are immutable. note can be corrected through PATCH /api/inventory/movements/{movementId}; revisions contains the before value, after value, and correction time for every note correction. The expiry date in an allocation is the value recorded at movement time, so later expiry corrections never rewrite history. Movements recorded before lot tracking have an empty allocations array.",
     request: {
         params: z.object({ itemId: itemIdParameter }),
         query: stockHistoryItemQuerySchema,
@@ -181,13 +193,44 @@ stockItemsApp.openAPIRegistry.registerPath({
 });
 
 stockInventoryApp.openAPIRegistry.registerPath({
+    method: "patch",
+    path: "/movements/{movementId}",
+    tags: ["Inventory"],
+    summary: "Correct a stock movement note",
+    operationId: "correctStockMovementNote",
+    description:
+        "Corrects only the note metadata of the stock movement named by movementId. Send note as a non-empty string, or null to clear it. Quantity, reason, occurrence time, idempotency identity, and lot allocations are never changed or re-applied. A changed value appends an audit revision with the before value, after value, and correction time; replaying the same value does not duplicate the audit entry.",
+    request: {
+        params: z.object({ movementId: movementIdParameter }),
+        body: {
+            required: true,
+            content: responseContent(stockMovementNoteCorrectionSchema),
+        },
+    },
+    responses: {
+        200: {
+            description:
+                "The corrected movement, including all note revisions in chronological order.",
+            content: responseContent(stockMovementDtoSchema),
+        },
+        400: jsonError(
+            "The request is invalid; correct the reported input. Codes: VALIDATION_ERROR, INVALID_JSON, INVALID_ID.",
+        ),
+        404: jsonError(
+            "The requested stock movement does not exist: MOVEMENT_NOT_FOUND.",
+        ),
+        ...serverErrorResponses,
+    },
+});
+
+stockInventoryApp.openAPIRegistry.registerPath({
     method: "get",
     path: "/history",
     tags: ["Inventory"],
     summary: "List stock history",
     operationId: "listStockHistory",
     description:
-        "Lists immutable stock movements across inventory, optionally filtered by item or reason. Each movement carries its per-lot allocations; the expiry date in an allocation is the value recorded at the time of the movement, so later expiry corrections never rewrite history. Movements recorded before lot tracking existed have an empty allocations array. Each movement also carries note, the free-text purpose recorded with it, and externalProvider, the external app the stock went to resolved to its current name, faviconUrl, and url; both are null when the movement records neither. externalId is the external app's own identifier and is returned as stored without being interpreted.",
+        "Lists stock movements across inventory, optionally filtered by item or reason. Movement quantities and per-lot allocations are immutable. note can be corrected through PATCH /api/inventory/movements/{movementId}; revisions contains the before value, after value, and correction time for every note correction. The expiry date in an allocation is the value recorded at movement time, so later expiry corrections never rewrite history. Movements recorded before lot tracking have an empty allocations array.",
     request: { query: stockHistoryQuerySchema },
     responses: {
         200: {
@@ -298,6 +341,21 @@ stockItemsApp.get("/:itemId/history", async (c) => {
                 // The path is authoritative; query strings cannot override it.
                 itemId: c.req.param("itemId"),
             }),
+            200,
+        );
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+stockInventoryApp.patch("/movements/:movementId", async (c) => {
+    try {
+        return c.json(
+            await correctStockMovementNote(
+                c.env.DB,
+                c.req.param("movementId"),
+                await parseJson(c),
+            ),
             200,
         );
     } catch (error) {

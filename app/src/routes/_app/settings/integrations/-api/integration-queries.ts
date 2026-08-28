@@ -1,5 +1,9 @@
 import { queryOptions } from "@tanstack/react-query";
-import { getOpenRouterStatus, listOpenRouterModels } from "./integration-api";
+import {
+    getOpenRouterStatus,
+    getOpenRouterUsage,
+    listOpenRouterModels,
+} from "./integration-api";
 
 export const integrationKeys = {
     all: ["integrations"] as const,
@@ -7,6 +11,8 @@ export const integrationKeys = {
         [...integrationKeys.all, "openrouter", "status"] as const,
     openRouterModels: () =>
         [...integrationKeys.all, "openrouter", "models"] as const,
+    openRouterUsage: () =>
+        [...integrationKeys.all, "openrouter", "usage"] as const,
 };
 
 export const openRouterStatusQueryOptions = () =>
@@ -24,4 +30,11 @@ export const openRouterModelsQueryOptions = () =>
         retry: false,
         // OpenRouter のモデル一覧はほとんど変化せず、上流への往復も重いため既定より長く保つ。
         staleTime: 5 * 60_000,
+    });
+
+export const openRouterUsageQueryOptions = () =>
+    queryOptions({
+        queryKey: integrationKeys.openRouterUsage(),
+        queryFn: () => getOpenRouterUsage(),
+        retry: false,
     });

@@ -46,7 +46,9 @@ import {
     itemStockHistoryQueryOptions,
     locationDetailQueryOptions,
 } from "./-api/item-detail-queries";
+import { ItemIssueForm } from "./-components/item-issue-form";
 import { ItemLotExpiryForm } from "./-components/item-lot-expiry-form";
+import { ItemMovementNoteEditor } from "./-components/item-movement-note-editor";
 import { ItemPriceForm } from "./-components/item-price-form";
 import { ItemReceiveForm } from "./-components/item-receive-form";
 
@@ -355,6 +357,17 @@ function ItemDetailPage() {
                     <ItemReceiveForm item={item} />
                 </CardContent>
             </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>出庫</CardTitle>
+                    <CardDescription>
+                        消費・廃棄などで在庫を減らします。期限の近いロットから自動で配分します。
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ItemIssueForm item={item} />
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>
@@ -501,6 +514,10 @@ function ItemDetailPage() {
                                         差分
                                     </TableHead>
                                     <TableHead>ロット内訳</TableHead>
+                                    <TableHead>メモ</TableHead>
+                                    <TableHead className="text-right">
+                                        操作
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -550,6 +567,55 @@ function ItemDetailPage() {
                                                     )}
                                                 </ul>
                                             )}
+                                        </TableCell>
+                                        <TableCell className="max-w-80 align-top">
+                                            <span className="whitespace-pre-wrap">
+                                                {movement.note ?? "—"}
+                                            </span>
+                                            {movement.revisions.length > 0 ? (
+                                                <details className="mt-2 text-xs text-muted-foreground">
+                                                    <summary className="cursor-pointer">
+                                                        訂正履歴（
+                                                        {
+                                                            movement.revisions
+                                                                .length
+                                                        }
+                                                        件）
+                                                    </summary>
+                                                    <ul className="mt-2 flex flex-col gap-2">
+                                                        {movement.revisions.map(
+                                                            (revision) => (
+                                                                <li
+                                                                    key={
+                                                                        revision.id
+                                                                    }
+                                                                >
+                                                                    <time
+                                                                        dateTime={
+                                                                            revision.correctedAt
+                                                                        }
+                                                                    >
+                                                                        {formatDateTime(
+                                                                            revision.correctedAt,
+                                                                        )}
+                                                                    </time>
+                                                                    :{" "}
+                                                                    {revision.beforeNote ??
+                                                                        "（メモなし）"}{" "}
+                                                                    →{" "}
+                                                                    {revision.afterNote ??
+                                                                        "（メモなし）"}
+                                                                </li>
+                                                            ),
+                                                        )}
+                                                    </ul>
+                                                </details>
+                                            ) : null}
+                                        </TableCell>
+                                        <TableCell className="align-top text-right">
+                                            <ItemMovementNoteEditor
+                                                movement={movement}
+                                            />
                                         </TableCell>
                                     </TableRow>
                                 ))}

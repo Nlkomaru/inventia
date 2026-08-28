@@ -3,6 +3,8 @@ import {
     type OpenRouterChatModelList,
     type OpenRouterChatModelOption,
     type OpenRouterIntegrationStatus,
+    type OpenRouterUsageByModel,
+    type OpenRouterUsageSummary,
     openRouterApiKeySchema,
     openRouterChatModelSchema,
     openRouterDefaultChatModel,
@@ -23,12 +25,16 @@ import {
 export type IntegrationServiceErrorCode =
     | "INTEGRATION_INVALID_INPUT"
     | "INTEGRATION_PROVIDER_ERROR"
-    | "INTEGRATION_ENCRYPTION_UNAVAILABLE";
+    | "INTEGRATION_ENCRYPTION_UNAVAILABLE"
+    | "INTEGRATION_MANAGEMENT_KEY_UNAVAILABLE"
+    | "INTEGRATION_WORKSPACE_UNAVAILABLE";
 
 const statusByCode: Record<IntegrationServiceErrorCode, 400 | 502 | 503> = {
     INTEGRATION_INVALID_INPUT: 400,
     INTEGRATION_PROVIDER_ERROR: 502,
     INTEGRATION_ENCRYPTION_UNAVAILABLE: 503,
+    INTEGRATION_MANAGEMENT_KEY_UNAVAILABLE: 503,
+    INTEGRATION_WORKSPACE_UNAVAILABLE: 503,
 };
 
 export class IntegrationServiceError extends Error {
@@ -74,7 +80,7 @@ const importEncryptionKey = async (secret: string | undefined) => {
     if (!keyBytes || keyBytes.byteLength !== 32) {
         throw new IntegrationServiceError(
             "INTEGRATION_ENCRYPTION_UNAVAILABLE",
-            "連携設定を保存できません。管理者が SETTINGS_ENCRYPTION_KEY を設定してください。",
+            "連携設定を保存できません。SETTINGS_ENCRYPTION_KEY が未設定または32バイトのBase64形式ではありません。",
         );
     }
     return crypto.subtle.importKey(
@@ -310,6 +316,172 @@ export const listOpenRouterVisionModels = async (
             left.id.localeCompare(right.id, "en"),
     );
     return { models };
+};
+
+export interface OpenRouterUsageEnv {
+    // Wrangler secret。生成型は wrangler.jsonc の binding だけを表すため、
+    // service が必要とする任意の構造型で受ける
+    OPENROUTER_MANAGEMENT_KEY?: string;
+}
+
+const openRouterWorkspaceSchema = z.object({
+    id: z.string().uuid(),
+    name: z.string().min(1),
+    slug: z.string().min(1),
+});
+
+const openRouterWorkspaceEnvelopeSchema = z.object({
+    data: z.array(openRouterWorkspaceSchema),
+});
+
+const openRouterActivityEntrySchema = z.object({
+    model: z.string().min(1),
+    provider_name: z.string().min(1),
+    requests: z.int().nonnegative(),
+    prompt_tokens: z.int().nonnegative(),
+    completion_tokens: z.int().nonnegative(),
+    reasoning_tokens: z.int().nonnegative().optional().default(0),
+    usage: z.number().nonnegative(),
+});
+
+const openRouterActivityEnvelopeSchema = z.object({
+    data: z.array(openRouterActivityEntrySchema),
+});
+
+const managementKeyUnavailable = () =>
+    new IntegrationServiceError(
+        "INTEGRATION_MANAGEMENT_KEY_UNAVAILABLE",
+        "OpenRouter の利用量を取得できません。管理者が OPENROUTER_MANAGEMENT_KEY を設定してください。",
+    );
+
+const workspaceUnavailable = () =>
+    new IntegrationServiceError(
+        "INTEGRATION_WORKSPACE_UNAVAILABLE",
+        "OpenRouter に inventia workspace が見つかりません。",
+    );
+
+const usageProviderError = () =>
+    new IntegrationServiceError(
+        "INTEGRATION_PROVIDER_ERROR",
+        "OpenRouter から利用量を取得できませんでした。時間をおいて再試行してください。",
+    );
+
+const fetchOpenRouterJson = async (
+    url: string,
+    managementKey: string,
+    fetcher: typeof fetch,
+): Promise<unknown> => {
+    let response: Response;
+    try {
+        response = await fetcher(url, {
+            headers: {
+                accept: "application/json",
+                authorization: `Bearer ${managementKey}`,
+            },
+            signal: AbortSignal.timeout(10_000),
+        });
+        if (!response.ok) {
+            throw usageProviderError();
+        }
+        return await response.json();
+    } catch (error) {
+        if (error instanceof IntegrationServiceError) {
+            throw error;
+        }
+        throw usageProviderError();
+    }
+};
+
+/**
+ * OpenRouter Activity API の inventia workspace における直近 30 完了 UTC 日を、
+ * モデルと provider 単位に集約する。
+ * management key は Worker secret だけで使い、ブラウザや API 応答へ返さない。
+ */
+export const getOpenRouterUsage = async (
+    env: OpenRouterUsageEnv,
+    fetcher: typeof fetch = fetch,
+): Promise<OpenRouterUsageSummary> => {
+    const managementKey = env.OPENROUTER_MANAGEMENT_KEY;
+    if (!managementKey) {
+        throw managementKeyUnavailable();
+    }
+    const workspacePayload = await fetchOpenRouterJson(
+        "https://openrouter.ai/api/v1/workspaces?limit=100",
+        managementKey,
+        fetcher,
+    );
+    const workspaces =
+        openRouterWorkspaceEnvelopeSchema.safeParse(workspacePayload);
+    if (!workspaces.success) {
+        throw usageProviderError();
+    }
+    const workspace = workspaces.data.data.find(
+        (candidate) =>
+            candidate.slug.toLowerCase() === "inventia" ||
+            candidate.name.toLowerCase() === "inventia",
+    );
+    if (!workspace) {
+        throw workspaceUnavailable();
+    }
+    const activityPayload = await fetchOpenRouterJson(
+        `https://openrouter.ai/api/v1/activity?group_by=workspace&workspace_id=${encodeURIComponent(workspace.id)}`,
+        managementKey,
+        fetcher,
+    );
+    const activity =
+        openRouterActivityEnvelopeSchema.safeParse(activityPayload);
+    if (!activity.success) {
+        throw usageProviderError();
+    }
+
+    const modelsByName = new Map<string, Map<string, OpenRouterUsageByModel>>();
+    for (const entry of activity.data.data) {
+        const providers = modelsByName.get(entry.model) ?? new Map();
+        const existing = providers.get(entry.provider_name);
+        providers.set(entry.provider_name, {
+            model: entry.model,
+            providerName: entry.provider_name,
+            requestCount: (existing?.requestCount ?? 0) + entry.requests,
+            promptTokens: (existing?.promptTokens ?? 0) + entry.prompt_tokens,
+            completionTokens:
+                (existing?.completionTokens ?? 0) + entry.completion_tokens,
+            reasoningTokens:
+                (existing?.reasoningTokens ?? 0) + entry.reasoning_tokens,
+            totalTokens:
+                (existing?.totalTokens ?? 0) +
+                entry.prompt_tokens +
+                entry.completion_tokens,
+            cost: (existing?.cost ?? 0) + entry.usage,
+        });
+        modelsByName.set(entry.model, providers);
+    }
+    const models = [...modelsByName.values()]
+        .flatMap((providers) => [...providers.values()])
+        .sort(
+            (left, right) =>
+                right.totalTokens - left.totalTokens ||
+                left.model.localeCompare(right.model) ||
+                left.providerName.localeCompare(right.providerName),
+        );
+    const summary: OpenRouterUsageSummary = {
+        periodDays: 30,
+        requestCount: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        reasoningTokens: 0,
+        totalTokens: 0,
+        cost: 0,
+        models,
+    };
+    for (const model of models) {
+        summary.requestCount += model.requestCount;
+        summary.promptTokens += model.promptTokens;
+        summary.completionTokens += model.completionTokens;
+        summary.reasoningTokens += model.reasoningTokens;
+        summary.totalTokens += model.totalTokens;
+        summary.cost += model.cost;
+    }
+    return summary;
 };
 
 /** Returns the credential only to server-side callers that invoke OpenRouter. */

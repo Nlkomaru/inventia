@@ -74,6 +74,33 @@ export const openRouterChatModelListSchema = z
         models: z.array(openRouterChatModelOptionSchema),
     })
     .strict();
+export const openRouterUsageByModelSchema = z
+    .object({
+        model: z.string().min(1),
+        providerName: z.string().min(1),
+        requestCount: z.int().nonnegative(),
+        promptTokens: z.int().nonnegative(),
+        completionTokens: z.int().nonnegative(),
+        reasoningTokens: z.int().nonnegative(),
+        // reasoning token は completion token に含まれるため二重計上しない
+        totalTokens: z.int().nonnegative(),
+        cost: z.number().nonnegative(),
+    })
+    .strict();
+
+export const openRouterUsageSummarySchema = z
+    .object({
+        // OpenRouter Activity API が返す直近の完了済み UTC 日数
+        periodDays: z.literal(30),
+        requestCount: z.int().nonnegative(),
+        promptTokens: z.int().nonnegative(),
+        completionTokens: z.int().nonnegative(),
+        reasoningTokens: z.int().nonnegative(),
+        totalTokens: z.int().nonnegative(),
+        cost: z.number().nonnegative(),
+        models: z.array(openRouterUsageByModelSchema),
+    })
+    .strict();
 
 export type OpenRouterIntegrationUpdate = z.infer<
     typeof openRouterIntegrationUpdateSchema
@@ -86,4 +113,10 @@ export type OpenRouterChatModelOption = z.infer<
 >;
 export type OpenRouterChatModelList = z.infer<
     typeof openRouterChatModelListSchema
+>;
+export type OpenRouterUsageByModel = z.infer<
+    typeof openRouterUsageByModelSchema
+>;
+export type OpenRouterUsageSummary = z.infer<
+    typeof openRouterUsageSummarySchema
 >;

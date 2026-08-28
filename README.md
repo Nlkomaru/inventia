@@ -106,11 +106,17 @@ Store production secrets with
 variables and bindings in `app/wrangler.jsonc`.
 
 The OpenRouter settings page stores its API key encrypted in D1. Production
-deployments sync the repository Actions secret `SETTINGS_ENCRYPTION_KEY` to the
-Worker through `cloudflare/wrangler-action`. For local development, set a
-32-byte base64 value in the same variable in an untracked `app/.dev.vars` file.
-Never commit either value. Keep this encryption key stable; after rotating it,
-save the OpenRouter API key again from the settings page.
+deployments sync the repository Actions secrets `SETTINGS_ENCRYPTION_KEY` and
+`OPENROUTER_MANAGEMENT_KEY` to the Worker through `cloudflare/wrangler-action`.
+For local development, set both variables in an untracked `app/.dev.vars` file:
+
+```dotenv
+SETTINGS_ENCRYPTION_KEY=<32-byte-base64-value>
+OPENROUTER_MANAGEMENT_KEY=<OpenRouter-management-key>
+```
+
+Never commit either value. Keep `SETTINGS_ENCRYPTION_KEY` stable; after rotating
+it, save the OpenRouter API key again from the settings page.
 
 The settings API changes a shared application-wide credential. Keep the Worker
 and `/api/settings/integrations/*` behind the existing Cloudflare Access
