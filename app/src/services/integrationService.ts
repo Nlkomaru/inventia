@@ -26,13 +26,15 @@ export type IntegrationServiceErrorCode =
     | "INTEGRATION_INVALID_INPUT"
     | "INTEGRATION_PROVIDER_ERROR"
     | "INTEGRATION_ENCRYPTION_UNAVAILABLE"
-    | "INTEGRATION_MANAGEMENT_KEY_UNAVAILABLE";
+    | "INTEGRATION_MANAGEMENT_KEY_UNAVAILABLE"
+    | "INTEGRATION_WORKSPACE_UNAVAILABLE";
 
 const statusByCode: Record<IntegrationServiceErrorCode, 400 | 502 | 503> = {
     INTEGRATION_INVALID_INPUT: 400,
     INTEGRATION_PROVIDER_ERROR: 502,
     INTEGRATION_ENCRYPTION_UNAVAILABLE: 503,
     INTEGRATION_MANAGEMENT_KEY_UNAVAILABLE: 503,
+    INTEGRATION_WORKSPACE_UNAVAILABLE: 503,
 };
 
 export class IntegrationServiceError extends Error {
@@ -78,7 +80,7 @@ const importEncryptionKey = async (secret: string | undefined) => {
     if (!keyBytes || keyBytes.byteLength !== 32) {
         throw new IntegrationServiceError(
             "INTEGRATION_ENCRYPTION_UNAVAILABLE",
-            "連携設定を保存できません。管理者が SETTINGS_ENCRYPTION_KEY を設定してください。",
+            "連携設定を保存できません。SETTINGS_ENCRYPTION_KEY が未設定または32バイトのBase64形式ではありません。",
         );
     }
     return crypto.subtle.importKey(
@@ -322,6 +324,16 @@ export interface OpenRouterUsageEnv {
     OPENROUTER_MANAGEMENT_KEY?: string;
 }
 
+const openRouterWorkspaceSchema = z.object({
+    id: z.string().uuid(),
+    name: z.string().min(1),
+    slug: z.string().min(1),
+});
+
+const openRouterWorkspaceEnvelopeSchema = z.object({
+    data: z.array(openRouterWorkspaceSchema),
+});
+
 const openRouterActivityEntrySchema = z.object({
     model: z.string().min(1),
     provider_name: z.string().min(1),
@@ -342,14 +354,47 @@ const managementKeyUnavailable = () =>
         "OpenRouter の利用量を取得できません。管理者が OPENROUTER_MANAGEMENT_KEY を設定してください。",
     );
 
+const workspaceUnavailable = () =>
+    new IntegrationServiceError(
+        "INTEGRATION_WORKSPACE_UNAVAILABLE",
+        "OpenRouter に inventia workspace が見つかりません。",
+    );
+
 const usageProviderError = () =>
     new IntegrationServiceError(
         "INTEGRATION_PROVIDER_ERROR",
         "OpenRouter から利用量を取得できませんでした。時間をおいて再試行してください。",
     );
 
+const fetchOpenRouterJson = async (
+    url: string,
+    managementKey: string,
+    fetcher: typeof fetch,
+): Promise<unknown> => {
+    let response: Response;
+    try {
+        response = await fetcher(url, {
+            headers: {
+                accept: "application/json",
+                authorization: `Bearer ${managementKey}`,
+            },
+            signal: AbortSignal.timeout(10_000),
+        });
+        if (!response.ok) {
+            throw usageProviderError();
+        }
+        return await response.json();
+    } catch (error) {
+        if (error instanceof IntegrationServiceError) {
+            throw error;
+        }
+        throw usageProviderError();
+    }
+};
+
 /**
- * OpenRouter Activity API の直近 30 完了 UTC 日を、モデルと provider 単位に集約する。
+ * OpenRouter Activity API の inventia workspace における直近 30 完了 UTC 日を、
+ * モデルと provider 単位に集約する。
  * management key は Worker secret だけで使い、ブラウザや API 応答へ返さない。
  */
 export const getOpenRouterUsage = async (
@@ -360,26 +405,31 @@ export const getOpenRouterUsage = async (
     if (!managementKey) {
         throw managementKeyUnavailable();
     }
-    let payload: unknown;
-    try {
-        const response = await fetcher(
-            "https://openrouter.ai/api/v1/activity",
-            {
-                headers: {
-                    accept: "application/json",
-                    authorization: `Bearer ${managementKey}`,
-                },
-                signal: AbortSignal.timeout(10_000),
-            },
-        );
-        if (!response.ok) {
-            throw usageProviderError();
-        }
-        payload = await response.json();
-    } catch {
+    const workspacePayload = await fetchOpenRouterJson(
+        "https://openrouter.ai/api/v1/workspaces?limit=100",
+        managementKey,
+        fetcher,
+    );
+    const workspaces =
+        openRouterWorkspaceEnvelopeSchema.safeParse(workspacePayload);
+    if (!workspaces.success) {
         throw usageProviderError();
     }
-    const activity = openRouterActivityEnvelopeSchema.safeParse(payload);
+    const workspace = workspaces.data.data.find(
+        (candidate) =>
+            candidate.slug.toLowerCase() === "inventia" ||
+            candidate.name.toLowerCase() === "inventia",
+    );
+    if (!workspace) {
+        throw workspaceUnavailable();
+    }
+    const activityPayload = await fetchOpenRouterJson(
+        `https://openrouter.ai/api/v1/activity?group_by=workspace&workspace_id=${encodeURIComponent(workspace.id)}`,
+        managementKey,
+        fetcher,
+    );
+    const activity =
+        openRouterActivityEnvelopeSchema.safeParse(activityPayload);
     if (!activity.success) {
         throw usageProviderError();
     }

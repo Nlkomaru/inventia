@@ -95,7 +95,7 @@ const getOpenRouterUsageRoute = createRoute({
     summary: "Get recent OpenRouter usage",
     operationId: "getOpenRouterUsage",
     description:
-        "Returns usage aggregated by model and provider for OpenRouter's last 30 completed UTC days. Token counts include prompt, completion, and reasoning tokens; totalTokens is promptTokens plus completionTokens because reasoning tokens are already included in completionTokens. cost is the OpenRouter usage amount. The management key is used only for the upstream request and is never returned.",
+        "Returns usage aggregated by model and provider for the inventia OpenRouter workspace for the last 30 completed UTC days. The service resolves the workspace by slug or name, then calls Activity with group_by=workspace and workspace_id. Token counts include prompt, completion, and reasoning tokens; totalTokens is promptTokens plus completionTokens because reasoning tokens are already included in completionTokens. cost is the OpenRouter usage amount. The management key is used only for upstream requests and is never returned.",
     responses: {
         200: {
             description:

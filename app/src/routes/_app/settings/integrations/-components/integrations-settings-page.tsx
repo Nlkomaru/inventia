@@ -452,8 +452,8 @@ export function IntegrationsSettingsPage() {
                     </h2>
                 </div>
                 <p className="mb-4 text-sm text-muted-foreground">
-                    OpenRouter の Activity API
-                    が返す直近30完了UTC日を表示します。 Management key
+                    OpenRouter の inventia workspace における Activity API の
+                    直近30完了UTC日を表示します。Management key
                     はサーバーから外部へ返しません。
                 </p>
                 {usageQuery.isPending ? (
