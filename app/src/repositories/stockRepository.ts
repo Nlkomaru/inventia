@@ -29,6 +29,13 @@ export interface StockMovementRow {
     // 連携先アプリ側の ID。Inventia は解釈せず、保存と表示だけを行う
     externalId: string | null;
 }
+export interface StockMovementRevisionRow {
+    id: number;
+    movementId: string;
+    beforeNote: string | null;
+    afterNote: string | null;
+    correctedAt: string;
+}
 
 export interface StockLotAllocationRow {
     movementId: string;
@@ -124,6 +131,7 @@ export interface StockWriteResult {
 export interface StockHistoryResult {
     movements: StockMovementRow[];
     allocationsByMovementId: Map<string, StockLotAllocationRow[]>;
+    revisionsByMovementId: Map<string, StockMovementRevisionRow[]>;
     nextCursor: string | null;
 }
 
@@ -131,6 +139,13 @@ export class InvalidStockCursorError extends Error {
     constructor() {
         super("invalid cursor");
         this.name = "InvalidStockCursorError";
+    }
+}
+
+export class StockMovementNotFoundError extends Error {
+    constructor() {
+        super("stock movement was not found");
+        this.name = "StockMovementNotFoundError";
     }
 }
 
@@ -360,6 +375,77 @@ export const listMovementAllocations = async (
         }
     }
     return byMovementId;
+};
+/**
+ * movement id ごとのメモ訂正監査を 1 クエリで返す。訂正が無い movement は
+ * Map に現れず、service が空配列として扱う。
+ */
+export const listMovementRevisions = async (
+    db: D1Database,
+    movementIds: readonly string[],
+): Promise<Map<string, StockMovementRevisionRow[]>> => {
+    const byMovementId = new Map<string, StockMovementRevisionRow[]>();
+    if (movementIds.length === 0) {
+        return byMovementId;
+    }
+    const placeholders = movementIds.map(() => "?").join(", ");
+    const result = await db
+        .prepare(
+            `SELECT id,
+                    movement_id AS movementId,
+                    before_note AS beforeNote,
+                    after_note AS afterNote,
+                    corrected_at AS correctedAt
+             FROM stock_movement_revisions
+             WHERE movement_id IN (${placeholders})
+             ORDER BY corrected_at ASC, id ASC`,
+        )
+        .bind(...movementIds)
+        .all<StockMovementRevisionRow>();
+    for (const row of result.results) {
+        const rows = byMovementId.get(row.movementId);
+        if (rows) {
+            rows.push(row);
+        } else {
+            byMovementId.set(row.movementId, [row]);
+        }
+    }
+    return byMovementId;
+};
+
+export const correctStockMovementNote = async (
+    db: D1Database,
+    movementId: string,
+    note: string | null,
+): Promise<{
+    movement: StockMovementRow;
+    allocations: StockLotAllocationRow[];
+    revisions: StockMovementRevisionRow[];
+}> => {
+    // trigger が同じ UPDATE 内で監査行を追加する。値が同じ再送では trigger の
+    // WHEN が偽になり、監査行を重複させない
+    const updated = await db
+        .prepare(
+            "UPDATE stock_movements SET note = ? WHERE id = ? RETURNING id",
+        )
+        .bind(note, movementId)
+        .first<{ id: string }>();
+    if (!updated) {
+        throw new StockMovementNotFoundError();
+    }
+    const movement = await getStockMovement(db, updated.id);
+    if (!movement) {
+        throw new Error("corrected stock movement could not be read");
+    }
+    const [allocationsByMovementId, revisionsByMovementId] = await Promise.all([
+        listMovementAllocations(db, [updated.id]),
+        listMovementRevisions(db, [updated.id]),
+    ]);
+    return {
+        movement,
+        allocations: allocationsByMovementId.get(updated.id) ?? [],
+        revisions: revisionsByMovementId.get(updated.id) ?? [],
+    };
 };
 
 const getMovementAllocations = async (
@@ -885,12 +971,15 @@ export const listStockMovements = async (
     const hasMore = rows.length > query.limit;
     const movements = hasMore ? rows.slice(0, query.limit) : rows;
     const last = movements.at(-1);
+    const movementIds = movements.map((movement) => movement.id);
+    const [allocationsByMovementId, revisionsByMovementId] = await Promise.all([
+        listMovementAllocations(db, movementIds),
+        listMovementRevisions(db, movementIds),
+    ]);
     return {
         movements,
-        allocationsByMovementId: await listMovementAllocations(
-            db,
-            movements.map((movement) => movement.id),
-        ),
+        allocationsByMovementId,
+        revisionsByMovementId,
         nextCursor:
             hasMore && last
                 ? encodeCursor({

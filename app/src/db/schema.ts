@@ -411,6 +411,56 @@ export const stockMovements = sqliteTable(
         ),
     ],
 );
+// 在庫移動の数量・ロット配分は不変のまま、メモ訂正の前後だけを追記で監査する。
+// INSERT は migration の UPDATE trigger が行い、訂正と同じ transaction に閉じる
+export const stockMovementRevisions = sqliteTable(
+    "stock_movement_revisions",
+    {
+        id: integer("id").primaryKey({ autoIncrement: true }),
+        movementId: text("movement_id")
+            .notNull()
+            .references(() => stockMovements.id, { onDelete: "restrict" }),
+        beforeNote: text("before_note"),
+        afterNote: text("after_note"),
+        correctedAt: text("corrected_at").notNull(),
+    },
+    (t) => [
+        index("idx_stock_movement_revisions_movement").on(
+            t.movementId,
+            t.correctedAt,
+            t.id,
+        ),
+    ],
+);
+
+// MCP tool 名は利用記録から分離する。利用記録は tool id と時刻だけを持つため、
+// 改名や表示用属性を追加しても呼び出し履歴を更新しない。
+export const mcpTools = sqliteTable(
+    "mcp_tools",
+    {
+        id: text("id").primaryKey(),
+        name: text("name").notNull(),
+        createdAt: text("created_at").notNull(),
+    },
+    (t) => [uniqueIndex("uq_mcp_tools_name").on(t.name)],
+);
+
+// tools/call を受信した時点の監査記録。MCP client 側の入力・出力トークン数は
+// protocol に含まれないため、この表には保存しない。
+export const mcpToolCalls = sqliteTable(
+    "mcp_tool_calls",
+    {
+        id: text("id").primaryKey(),
+        mcpToolId: text("mcp_tool_id")
+            .notNull()
+            .references(() => mcpTools.id, { onDelete: "restrict" }),
+        calledAt: text("called_at").notNull(),
+    },
+    (t) => [
+        index("idx_mcp_tool_calls_tool_called").on(t.mcpToolId, t.calledAt),
+        index("idx_mcp_tool_calls_called").on(t.calledAt, t.id),
+    ],
+);
 
 // 1 movement の増減をどのロットへどれだけ割り当てたかの内訳。追加のみで不変。
 // 0005 より前に記録された movement には allocation が存在しない（ロット追跡前の履歴）。

@@ -12,6 +12,8 @@ import {
 } from "../../../domain/reading";
 import {
     stockAdjustmentSchema,
+    stockMovementDtoSchema,
+    stockMovementNoteCorrectionSchema,
     stockOperationResultSchema,
     stocktakeSchema,
 } from "../../../domain/stock";
@@ -34,6 +36,7 @@ import {
 } from "../../../services/readingService";
 import {
     adjustStock,
+    correctStockMovementNote,
     StockServiceError,
     stocktake,
 } from "../../../services/stockService";
@@ -43,6 +46,7 @@ import { mcpError, mcpSuccess } from "../result";
 // service 側でも trim と空文字の検証を行うので、ここは入力書式の門番だけを担う
 const itemIdInputSchema = z.string().trim().min(1).max(128);
 const lotIdInputSchema = z.string().trim().min(1).max(128);
+const movementIdInputSchema = z.string().trim().min(1).max(128);
 
 // 更新対象の id は入力に足すだけで、更新できるフィールドはドメインの定義に従う。
 // id があるため「1 つ以上のフィールドが必要」という制約はここでは成立せず、
@@ -58,6 +62,10 @@ const stockAdjustmentInputSchema = stockAdjustmentSchema.extend({
 const stocktakeInputSchema = stocktakeSchema.extend({
     itemId: itemIdInputSchema,
 });
+const stockMovementCorrectionInputSchema =
+    stockMovementNoteCorrectionSchema.extend({
+        movementId: movementIdInputSchema,
+    });
 
 const lotExpiryCorrectionInputSchema = lotUpdateSchema.extend({
     itemId: itemIdInputSchema,
@@ -145,6 +153,25 @@ export const registerInventoryWriteTools = (
                 return mcpSuccess(await adjustStock(db, itemId, adjustment));
             } catch (error) {
                 return serviceError(error, "stock adjustment failed");
+            }
+        },
+    );
+    server.registerTool(
+        "correct_inventory_movement_note",
+        {
+            title: "Correct inventory movement note",
+            description:
+                "Corrects only the note metadata of the stock movement named by movementId. Send a non-empty note, or null to clear it. The movement's item, quantity, reason, occurrence time, idempotency identity, and lot allocations are never changed or applied again. Every changed value is retained in revisions with its before value, after value, and correction time; replaying the same value does not add another revision. A missing movementId returns MOVEMENT_NOT_FOUND.",
+            inputSchema: stockMovementCorrectionInputSchema,
+            outputSchema: stockMovementDtoSchema,
+        },
+        async ({ movementId, note }) => {
+            try {
+                return mcpSuccess(
+                    await correctStockMovementNote(db, movementId, { note }),
+                );
+            } catch (error) {
+                return serviceError(error, "stock movement correction failed");
             }
         },
     );

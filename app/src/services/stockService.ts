@@ -14,12 +14,15 @@ import {
     type StockHistoryQuery,
     type StockLotSelector,
     type StockMovementDto,
+    type StockMovementNoteCorrection,
+    type StockMovementRevisionDto,
     type StockOperationResult,
     type StocktakeInput,
     staleStocktakeQuerySchema,
     staleStocktakeThreshold,
     stockAdjustmentSchema,
     stockHistoryQuerySchema,
+    stockMovementNoteCorrectionSchema,
     stockRequestDigest,
     stocktakeSchema,
 } from "../domain/stock";
@@ -27,6 +30,7 @@ import { type ItemLotRow, listItemLots } from "../repositories/lotRepository";
 import { listReadingStatesByItemIds } from "../repositories/readingRepository";
 import {
     appendStockOperation,
+    correctStockMovementNote as correctStockMovementNoteRow,
     InvalidStockCursorError,
     itemExists,
     type LotPlanEntry,
@@ -38,6 +42,8 @@ import {
     StockItemNotFoundError,
     type StockLotAllocationRow,
     StockLotConflictError,
+    StockMovementNotFoundError,
+    type StockMovementRevisionRow,
     type StockMovementRow,
     StockNegativeQuantityError,
     StockOperationConflictError,
@@ -116,6 +122,7 @@ const toMovementProvider = (
 const toMovementDto = (
     row: StockMovementRow,
     allocations: readonly StockLotAllocationRow[],
+    revisions: readonly StockMovementRevisionRow[] = [],
 ): StockMovementDto => ({
     id: row.id,
     itemId: row.itemId,
@@ -128,6 +135,14 @@ const toMovementDto = (
     note: row.note,
     externalProvider: toMovementProvider(row),
     externalId: row.externalId,
+    revisions: revisions.map(
+        (revision): StockMovementRevisionDto => ({
+            id: revision.id,
+            beforeNote: revision.beforeNote,
+            afterNote: revision.afterNote,
+            correctedAt: revision.correctedAt,
+        }),
+    ),
 });
 
 // ロットが在庫の正なので、応答の数量とロット内訳は同じ読み取りから導く。
@@ -196,6 +211,9 @@ const externalProviderNotFound = (): never => {
 const mapRepositoryError = (error: unknown): never => {
     if (error instanceof StockItemNotFoundError) {
         throw new StockServiceError(404, "ITEM_NOT_FOUND", error.message);
+    }
+    if (error instanceof StockMovementNotFoundError) {
+        throw new StockServiceError(404, "MOVEMENT_NOT_FOUND", error.message);
     }
     if (error instanceof StockExternalProviderNotFoundError) {
         return externalProviderNotFound();
@@ -552,6 +570,7 @@ const toHistoryResult = (
         toMovementDto(
             movement,
             result.allocationsByMovementId.get(movement.id) ?? [],
+            result.revisionsByMovementId.get(movement.id) ?? [],
         ),
     ),
     nextCursor: result.nextCursor,
@@ -587,6 +606,42 @@ export const listStaleStocktakeItems = async (
             })),
             nextCursor: page.nextCursor,
         };
+    } catch (error) {
+        return mapRepositoryError(error);
+    }
+};
+
+/**
+ * 在庫移動のメモだけを訂正する。数量・ロット配分・理由・発生日時には触れず、
+ * DB trigger が訂正前後を同じ UPDATE の transaction で監査表へ追記する。
+ */
+export const correctStockMovementNote = async (
+    db: D1Database,
+    movementId: string,
+    input: unknown,
+): Promise<StockMovementDto> => {
+    const normalizedMovementId = movementId.trim();
+    if (normalizedMovementId.length === 0) {
+        throw new StockServiceError(
+            400,
+            "INVALID_ID",
+            "movement id must not be empty",
+        );
+    }
+    const parsed: StockMovementNoteCorrection = parseOrThrow(
+        stockMovementNoteCorrectionSchema.safeParse(input),
+    );
+    try {
+        const result = await correctStockMovementNoteRow(
+            db,
+            normalizedMovementId,
+            parsed.note,
+        );
+        return toMovementDto(
+            result.movement,
+            result.allocations,
+            result.revisions,
+        );
     } catch (error) {
         return mapRepositoryError(error);
     }

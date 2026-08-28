@@ -2,9 +2,12 @@ import { z } from "zod";
 import { type ItemLotListDto, itemLotListDtoSchema } from "@/domain/lot";
 import { type PriceRecordDto, priceRecordDtoSchema } from "@/domain/price";
 import {
+    type StockMovementDto,
     type StockMovementReason,
     type StockOperationResult,
     stockAdjustmentSchema,
+    stockMovementDtoSchema,
+    stockMovementNoteCorrectionSchema,
     stockOperationResultSchema,
 } from "@/domain/stock";
 
@@ -63,6 +66,53 @@ export const receiveStock = (
         "入庫を記録できませんでした",
         {
             method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+        },
+    );
+};
+export interface IssueStockInput {
+    quantity: number;
+    reason: StockMovementReason;
+    note?: string;
+    idempotencyKey: string;
+}
+
+/** この品目から FEFO で出庫する。ロットを省略し、service の共通配分を使う。 */
+export const issueStock = (
+    itemId: string,
+    input: IssueStockInput,
+): Promise<StockOperationResult> => {
+    const body = stockAdjustmentSchema.parse({
+        delta: -input.quantity,
+        reason: input.reason,
+        note: input.note,
+        idempotencyKey: input.idempotencyKey,
+    });
+    return request(
+        `/api/items/${encodeURIComponent(itemId)}/adjustments`,
+        stockOperationResultSchema,
+        "出庫を記録できませんでした",
+        {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+        },
+    );
+};
+
+/** 数量やロット配分を再適用せず、movement id でメモだけを訂正する。 */
+export const correctMovementNote = (
+    movementId: string,
+    note: string | null,
+): Promise<StockMovementDto> => {
+    const body = stockMovementNoteCorrectionSchema.parse({ note });
+    return request(
+        `/api/inventory/movements/${encodeURIComponent(movementId)}`,
+        stockMovementDtoSchema,
+        "メモを訂正できませんでした",
+        {
+            method: "PATCH",
             headers: { "content-type": "application/json" },
             body: JSON.stringify(body),
         },

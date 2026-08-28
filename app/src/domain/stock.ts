@@ -42,7 +42,7 @@ const controlCharacterFree = /^\P{Cc}*$/u;
 // 在庫を何に使ったかの記録。reason（enum）では表せない用途と、外部アプリへの
 // 参照を持つ。棚卸しは「数えた結果」であり行き先を持たないため、
 // stocktakeSchema には足さない
-const stockNoteSchema = z
+export const stockNoteSchema = z
     .string()
     .trim()
     .min(1, "用途は1文字以上で入力してください")
@@ -131,6 +131,22 @@ export const stocktakeSchema = z
         },
     );
 
+export const stockMovementNoteCorrectionSchema = z
+    .object({
+        // null はメモの削除。省略と区別し、更新対象を必ず明示させる
+        note: stockNoteSchema.nullable(),
+    })
+    .strict();
+
+export const stockMovementRevisionDtoSchema = z
+    .object({
+        id: z.int().positive(),
+        beforeNote: z.string().nullable(),
+        afterNote: z.string().nullable(),
+        correctedAt: stockOccurredAtSchema,
+    })
+    .strict();
+
 export const stockMovementDtoSchema = z
     .object({
         id: z.string().min(1),
@@ -150,6 +166,8 @@ export const stockMovementDtoSchema = z
             .nullable(),
         // 連携先アプリ側の ID。Inventia は解釈しない
         externalId: z.string().nullable(),
+        // メモ訂正の監査履歴。古い順で返し、訂正が無い移動は空配列
+        revisions: z.array(stockMovementRevisionDtoSchema),
     })
     .strict();
 
@@ -324,6 +342,12 @@ export const stockRequestDigest = async (
 
 export type StockAdjustmentInput = z.infer<typeof stockAdjustmentSchema>;
 export type StocktakeInput = z.infer<typeof stocktakeSchema>;
+export type StockMovementNoteCorrection = z.infer<
+    typeof stockMovementNoteCorrectionSchema
+>;
+export type StockMovementRevisionDto = z.infer<
+    typeof stockMovementRevisionDtoSchema
+>;
 export type StockMovementDto = z.infer<typeof stockMovementDtoSchema>;
 export type StockOperationResult = z.infer<typeof stockOperationResultSchema>;
 export type StockHistoryQuery = z.infer<typeof stockHistoryQuerySchema>;

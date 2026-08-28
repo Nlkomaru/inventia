@@ -120,6 +120,20 @@
       "when": 1787482130974,
       "tag": "0016_receipt_line_applied_values",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1787898878028,
+      "tag": "0017_loving_titania",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1787899607148,
+      "tag": "0018_overjoyed_apocalypse",
+      "breakpoints": true
     }
   ]
 }

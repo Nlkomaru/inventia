@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { categoryDtoSchema } from "../../../domain/category";
 import { itemBatchOutputSchema, itemDtoSchema } from "../../../domain/item";
 import { locationDtoSchema } from "../../../domain/location";
-import { stockOperationResultSchema } from "../../../domain/stock";
+import {
+    stockMovementDtoSchema,
+    stockOperationResultSchema,
+} from "../../../domain/stock";
 import { listStockHistory } from "../../../services/stockService";
 import {
     createTestMcpClient,
@@ -114,5 +117,70 @@ describe("update_inventory_item によるカテゴリ・保管場所の移行", 
             itemId: created.id,
         });
         expect(historyAfter.movements).toEqual(historyBefore.movements);
+    });
+
+    it("MCP が movement id を明示してメモだけを訂正する", async () => {
+        const location = locationDtoSchema.parse(
+            await call("create_location", {
+                name: `訂正テスト-${suffix}`,
+            }),
+        );
+        const created = itemDtoSchema.parse(
+            await call("create_inventory_item", {
+                name: `訂正品目-${suffix}`,
+                categoryId: dailyGoodsId,
+                locationId: location.id,
+                baseUnit: "個",
+                baseDimension: "count",
+                currentQuantity: 3,
+            }),
+        );
+        const target = stockOperationResultSchema.parse(
+            await call("adjust_inventory_stock", {
+                itemId: created.id,
+                delta: -1,
+                reason: "consume",
+                note: "朝食",
+                idempotencyKey: `target-${suffix}`,
+            }),
+        ).movement;
+        const untouched = stockOperationResultSchema.parse(
+            await call("adjust_inventory_stock", {
+                itemId: created.id,
+                delta: -1,
+                reason: "consume",
+                note: "昼食",
+                idempotencyKey: `untouched-${suffix}`,
+            }),
+        ).movement;
+        if (!target || !untouched) {
+            throw new Error("test movements were not recorded");
+        }
+
+        const corrected = stockMovementDtoSchema.parse(
+            await call("correct_inventory_movement_note", {
+                movementId: target.id,
+                note: "夕食",
+            }),
+        );
+        expect(corrected).toMatchObject({
+            id: target.id,
+            delta: target.delta,
+            note: "夕食",
+            allocations: target.allocations,
+            revisions: [
+                {
+                    beforeNote: "朝食",
+                    afterNote: "夕食",
+                },
+            ],
+        });
+
+        const history = await listStockHistory(env.DB, {
+            itemId: created.id,
+        });
+        expect(
+            history.movements.find((movement) => movement.id === untouched.id),
+        ).toEqual(untouched);
     });
 });
