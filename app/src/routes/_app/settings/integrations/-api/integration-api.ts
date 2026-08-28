@@ -4,20 +4,25 @@ import {
     type OpenRouterChatModelList,
     type OpenRouterIntegrationStatus,
     type OpenRouterIntegrationUpdate,
+    type OpenRouterUsageSummary,
     openRouterIntegrationStatusSchema,
+    openRouterUsageSummarySchema,
 } from "@/domain/integration";
 
 const apiErrorSchema = z.object({
     error: z.object({ message: z.string() }),
 });
 
-const readApiError = async (response: Response): Promise<string> => {
+const readApiError = async (
+    response: Response,
+    fallback: string = "連携設定を保存できませんでした。",
+): Promise<string> => {
     const body: unknown = await response.json().catch(() => null);
     const parsed = apiErrorSchema.safeParse(body);
     if (parsed.success) {
         return parsed.data.error.message;
     }
-    return "連携設定を保存できませんでした。";
+    return fallback;
 };
 
 export const getOpenRouterStatus = createServerFn({ method: "GET" }).handler(
@@ -51,6 +56,24 @@ export const listOpenRouterModels = createServerFn({ method: "GET" }).handler(
         }
     },
 );
+export const getOpenRouterUsage = async (): Promise<OpenRouterUsageSummary> => {
+    const response = await fetch("/api/settings/integrations/openrouter/usage");
+    if (!response.ok) {
+        throw new Error(
+            await readApiError(
+                response,
+                "OpenRouter の利用量を取得できませんでした。",
+            ),
+        );
+    }
+    const parsed = openRouterUsageSummarySchema.safeParse(
+        await response.json(),
+    );
+    if (!parsed.success) {
+        throw new Error("OpenRouter の利用量の応答を確認できませんでした。");
+    }
+    return parsed.data;
+};
 
 export const updateOpenRouterIntegration = async (
     input: OpenRouterIntegrationUpdate,

@@ -3,9 +3,11 @@ import {
     openRouterChatModelListSchema,
     openRouterIntegrationStatusSchema,
     openRouterIntegrationUpdateSchema,
+    openRouterUsageSummarySchema,
 } from "../../domain/integration";
 import {
     getOpenRouterIntegrationStatus,
+    getOpenRouterUsage,
     IntegrationServiceError,
     listOpenRouterVisionModels,
     updateOpenRouterIntegration,
@@ -86,6 +88,37 @@ const listOpenRouterModelsRoute = createRoute({
     },
 });
 
+const getOpenRouterUsageRoute = createRoute({
+    method: "get",
+    path: "/openrouter/usage",
+    tags: ["Integrations"],
+    summary: "Get recent OpenRouter usage",
+    operationId: "getOpenRouterUsage",
+    description:
+        "Returns usage aggregated by model and provider for OpenRouter's last 30 completed UTC days. Token counts include prompt, completion, and reasoning tokens; totalTokens is promptTokens plus completionTokens because reasoning tokens are already included in completionTokens. cost is the OpenRouter usage amount. The management key is used only for the upstream request and is never returned.",
+    responses: {
+        200: {
+            description:
+                "The last 30 completed UTC days of usage, aggregated by model and provider.",
+            content: jsonContent(openRouterUsageSummarySchema),
+        },
+        502: {
+            description:
+                "OpenRouter could not be reached or returned an invalid usage response.",
+            content: jsonContent(errorSchema),
+        },
+        503: {
+            description:
+                "The OPENROUTER_MANAGEMENT_KEY secret is not configured.",
+            content: jsonContent(errorSchema),
+        },
+        500: {
+            description: "The service could not complete the request.",
+            content: jsonContent(errorSchema),
+        },
+    },
+});
+
 const updateOpenRouterRoute = createRoute({
     method: "put",
     path: "/openrouter",
@@ -151,6 +184,20 @@ integrationsApp.openapi(listOpenRouterModelsRoute, async (c) => {
             return c.json(
                 { error: { code: error.code, message: error.message } },
                 502,
+            );
+        }
+        return c.json(internalError, 500);
+    }
+});
+
+integrationsApp.openapi(getOpenRouterUsageRoute, async (c) => {
+    try {
+        return c.json(await getOpenRouterUsage(c.env), 200);
+    } catch (error) {
+        if (error instanceof IntegrationServiceError) {
+            return c.json(
+                { error: { code: error.code, message: error.message } },
+                error.status,
             );
         }
         return c.json(internalError, 500);

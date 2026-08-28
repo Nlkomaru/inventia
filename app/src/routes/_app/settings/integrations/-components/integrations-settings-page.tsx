@@ -24,6 +24,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import {
     type OpenRouterChatModelOption,
@@ -42,6 +50,7 @@ import {
     integrationKeys,
     openRouterModelsQueryOptions,
     openRouterStatusQueryOptions,
+    openRouterUsageQueryOptions,
 } from "../-api/integration-queries";
 
 // SSR と クライアントで同じ文字列になるよう時間帯を固定する。既定のままだと
@@ -77,6 +86,8 @@ export function IntegrationsSettingsPage() {
     const models = modelsQuery.data?.models ?? [];
     const modelsError = modelsQuery.error;
 
+    const usageQuery = useQuery(openRouterUsageQueryOptions());
+    const usage = usageQuery.data;
     const [apiKey, setApiKey] = useState("");
     // 保存前の編集値だけをローカルに持ち、確定値は status クエリを唯一の情報源にする。
     const [chatModelDraft, setChatModelDraft] = useState<string | null>(null);
@@ -434,6 +445,154 @@ export function IntegrationsSettingsPage() {
                     </div>
                 </section>
             </form>
+            <section aria-labelledby="openrouter-usage-title">
+                <div className="mb-5 flex items-center gap-3">
+                    <h2 id="openrouter-usage-title" className="font-bold">
+                        OpenRouter 利用量
+                    </h2>
+                </div>
+                <p className="mb-4 text-sm text-muted-foreground">
+                    OpenRouter の Activity API
+                    が返す直近30完了UTC日を表示します。 Management key
+                    はサーバーから外部へ返しません。
+                </p>
+                {usageQuery.isPending ? (
+                    <p className="text-sm text-muted-foreground">
+                        利用量を取得しています。
+                    </p>
+                ) : usageQuery.error ? (
+                    <div
+                        aria-live="assertive"
+                        className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+                        role="alert"
+                    >
+                        <span>
+                            {usageQuery.error instanceof Error
+                                ? usageQuery.error.message
+                                : "OpenRouter の利用量を取得できませんでした。"}
+                        </span>
+                        <Button
+                            onClick={() => void usageQuery.refetch()}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                        >
+                            再読み込み
+                        </Button>
+                    </div>
+                ) : usage ? (
+                    <>
+                        <dl className="grid gap-4 sm:grid-cols-3">
+                            <div>
+                                <dt className="text-sm text-muted-foreground">
+                                    合計トークン
+                                </dt>
+                                <dd className="mt-1 font-mono text-xl font-semibold tabular-nums">
+                                    {usage.totalTokens.toLocaleString("ja-JP")}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-sm text-muted-foreground">
+                                    リクエスト数
+                                </dt>
+                                <dd className="mt-1 font-mono text-xl font-semibold tabular-nums">
+                                    {usage.requestCount.toLocaleString("ja-JP")}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-sm text-muted-foreground">
+                                    利用額
+                                </dt>
+                                <dd className="mt-1 font-mono text-xl font-semibold tabular-nums">
+                                    ${usage.cost.toFixed(6)}
+                                </dd>
+                            </div>
+                        </dl>
+                        <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-3">
+                            <div>
+                                <dt className="text-muted-foreground">
+                                    入力トークン
+                                </dt>
+                                <dd className="font-mono tabular-nums">
+                                    {usage.promptTokens.toLocaleString("ja-JP")}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-muted-foreground">
+                                    出力トークン
+                                </dt>
+                                <dd className="font-mono tabular-nums">
+                                    {usage.completionTokens.toLocaleString(
+                                        "ja-JP",
+                                    )}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-muted-foreground">
+                                    推論トークン
+                                </dt>
+                                <dd className="font-mono tabular-nums">
+                                    {usage.reasoningTokens.toLocaleString(
+                                        "ja-JP",
+                                    )}
+                                </dd>
+                            </div>
+                        </dl>
+                        {usage.models.length === 0 ? (
+                            <p className="mt-5 text-sm text-muted-foreground">
+                                利用記録がありません。
+                            </p>
+                        ) : (
+                            <div className="mt-5 overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>モデル</TableHead>
+                                            <TableHead>プロバイダー</TableHead>
+                                            <TableHead className="text-right">
+                                                リクエスト
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                トークン
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                利用額
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {usage.models.map((model) => (
+                                            <TableRow
+                                                key={`${model.model}:${model.providerName}`}
+                                            >
+                                                <TableCell className="font-mono text-xs">
+                                                    {model.model}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {model.providerName}
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono tabular-nums">
+                                                    {model.requestCount.toLocaleString(
+                                                        "ja-JP",
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono tabular-nums">
+                                                    {model.totalTokens.toLocaleString(
+                                                        "ja-JP",
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono tabular-nums">
+                                                    ${model.cost.toFixed(6)}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
+                    </>
+                ) : null}
+            </section>
         </main>
     );
 }

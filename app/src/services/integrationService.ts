@@ -3,6 +3,8 @@ import {
     type OpenRouterChatModelList,
     type OpenRouterChatModelOption,
     type OpenRouterIntegrationStatus,
+    type OpenRouterUsageByModel,
+    type OpenRouterUsageSummary,
     openRouterApiKeySchema,
     openRouterChatModelSchema,
     openRouterDefaultChatModel,
@@ -23,12 +25,14 @@ import {
 export type IntegrationServiceErrorCode =
     | "INTEGRATION_INVALID_INPUT"
     | "INTEGRATION_PROVIDER_ERROR"
-    | "INTEGRATION_ENCRYPTION_UNAVAILABLE";
+    | "INTEGRATION_ENCRYPTION_UNAVAILABLE"
+    | "INTEGRATION_MANAGEMENT_KEY_UNAVAILABLE";
 
 const statusByCode: Record<IntegrationServiceErrorCode, 400 | 502 | 503> = {
     INTEGRATION_INVALID_INPUT: 400,
     INTEGRATION_PROVIDER_ERROR: 502,
     INTEGRATION_ENCRYPTION_UNAVAILABLE: 503,
+    INTEGRATION_MANAGEMENT_KEY_UNAVAILABLE: 503,
 };
 
 export class IntegrationServiceError extends Error {
@@ -310,6 +314,124 @@ export const listOpenRouterVisionModels = async (
             left.id.localeCompare(right.id, "en"),
     );
     return { models };
+};
+
+export interface OpenRouterUsageEnv {
+    // Wrangler secret。生成型は wrangler.jsonc の binding だけを表すため、
+    // service が必要とする任意の構造型で受ける
+    OPENROUTER_MANAGEMENT_KEY?: string;
+}
+
+const openRouterActivityEntrySchema = z.object({
+    model: z.string().min(1),
+    provider_name: z.string().min(1),
+    requests: z.int().nonnegative(),
+    prompt_tokens: z.int().nonnegative(),
+    completion_tokens: z.int().nonnegative(),
+    reasoning_tokens: z.int().nonnegative().optional().default(0),
+    usage: z.number().nonnegative(),
+});
+
+const openRouterActivityEnvelopeSchema = z.object({
+    data: z.array(openRouterActivityEntrySchema),
+});
+
+const managementKeyUnavailable = () =>
+    new IntegrationServiceError(
+        "INTEGRATION_MANAGEMENT_KEY_UNAVAILABLE",
+        "OpenRouter の利用量を取得できません。管理者が OPENROUTER_MANAGEMENT_KEY を設定してください。",
+    );
+
+const usageProviderError = () =>
+    new IntegrationServiceError(
+        "INTEGRATION_PROVIDER_ERROR",
+        "OpenRouter から利用量を取得できませんでした。時間をおいて再試行してください。",
+    );
+
+/**
+ * OpenRouter Activity API の直近 30 完了 UTC 日を、モデルと provider 単位に集約する。
+ * management key は Worker secret だけで使い、ブラウザや API 応答へ返さない。
+ */
+export const getOpenRouterUsage = async (
+    env: OpenRouterUsageEnv,
+    fetcher: typeof fetch = fetch,
+): Promise<OpenRouterUsageSummary> => {
+    const managementKey = env.OPENROUTER_MANAGEMENT_KEY;
+    if (!managementKey) {
+        throw managementKeyUnavailable();
+    }
+    let payload: unknown;
+    try {
+        const response = await fetcher(
+            "https://openrouter.ai/api/v1/activity",
+            {
+                headers: {
+                    accept: "application/json",
+                    authorization: `Bearer ${managementKey}`,
+                },
+                signal: AbortSignal.timeout(10_000),
+            },
+        );
+        if (!response.ok) {
+            throw usageProviderError();
+        }
+        payload = await response.json();
+    } catch {
+        throw usageProviderError();
+    }
+    const activity = openRouterActivityEnvelopeSchema.safeParse(payload);
+    if (!activity.success) {
+        throw usageProviderError();
+    }
+
+    const modelsByName = new Map<string, Map<string, OpenRouterUsageByModel>>();
+    for (const entry of activity.data.data) {
+        const providers = modelsByName.get(entry.model) ?? new Map();
+        const existing = providers.get(entry.provider_name);
+        providers.set(entry.provider_name, {
+            model: entry.model,
+            providerName: entry.provider_name,
+            requestCount: (existing?.requestCount ?? 0) + entry.requests,
+            promptTokens: (existing?.promptTokens ?? 0) + entry.prompt_tokens,
+            completionTokens:
+                (existing?.completionTokens ?? 0) + entry.completion_tokens,
+            reasoningTokens:
+                (existing?.reasoningTokens ?? 0) + entry.reasoning_tokens,
+            totalTokens:
+                (existing?.totalTokens ?? 0) +
+                entry.prompt_tokens +
+                entry.completion_tokens,
+            cost: (existing?.cost ?? 0) + entry.usage,
+        });
+        modelsByName.set(entry.model, providers);
+    }
+    const models = [...modelsByName.values()]
+        .flatMap((providers) => [...providers.values()])
+        .sort(
+            (left, right) =>
+                right.totalTokens - left.totalTokens ||
+                left.model.localeCompare(right.model) ||
+                left.providerName.localeCompare(right.providerName),
+        );
+    const summary: OpenRouterUsageSummary = {
+        periodDays: 30,
+        requestCount: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        reasoningTokens: 0,
+        totalTokens: 0,
+        cost: 0,
+        models,
+    };
+    for (const model of models) {
+        summary.requestCount += model.requestCount;
+        summary.promptTokens += model.promptTokens;
+        summary.completionTokens += model.completionTokens;
+        summary.reasoningTokens += model.reasoningTokens;
+        summary.totalTokens += model.totalTokens;
+        summary.cost += model.cost;
+    }
+    return summary;
 };
 
 /** Returns the credential only to server-side callers that invoke OpenRouter. */

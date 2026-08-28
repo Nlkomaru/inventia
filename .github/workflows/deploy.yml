@@ -97,6 +97,8 @@ jobs:
           command: whoami
           secrets: |
             SETTINGS_ENCRYPTION_KEY
+            OPENROUTER_MANAGEMENT_KEY
           workingDirectory: app
         env:
           SETTINGS_ENCRYPTION_KEY: ${{ secrets.SETTINGS_ENCRYPTION_KEY }}
+          OPENROUTER_MANAGEMENT_KEY: ${{ secrets.OPENROUTER_MANAGEMENT_KEY }}
