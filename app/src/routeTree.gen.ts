@@ -37,6 +37,7 @@ import { Route as AppPricePricesIndexRouteImport } from './routes/_app/_price/pr
 import { Route as AppPriceStoresIndexRouteImport } from './routes/_app/_price/stores/index'
 import { Route as AppSettingsIntegrationsIndexRouteImport } from './routes/_app/settings/integrations/index'
 import { Route as AppSettingsMcpIndexRouteImport } from './routes/_app/settings/mcp/index'
+import { Route as AppSettingsUsageIndexRouteImport } from './routes/_app/settings/usage/index'
 import { Route as AppInventoryInventoryHistoryIndexRouteImport } from './routes/_app/_inventory/inventory/history/index'
 import { Route as AppInventoryInventoryIssueIndexRouteImport } from './routes/_app/_inventory/inventory/issue/index'
 import { Route as AppInventoryInventoryItemsIndexRouteImport } from './routes/_app/_inventory/inventory/items/index'
@@ -189,6 +190,11 @@ const AppSettingsMcpIndexRoute = AppSettingsMcpIndexRouteImport.update({
   path: '/mcp/',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsUsageIndexRoute = AppSettingsUsageIndexRouteImport.update({
+  id: '/usage/',
+  path: '/usage/',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppInventoryInventoryHistoryIndexRoute =
   AppInventoryInventoryHistoryIndexRouteImport.update({
     id: '/inventory/history/',
@@ -268,6 +274,7 @@ export interface FileRoutesByFullPath {
   '/stores/': typeof AppPriceStoresIndexRoute
   '/settings/integrations/': typeof AppSettingsIntegrationsIndexRoute
   '/settings/mcp/': typeof AppSettingsMcpIndexRoute
+  '/settings/usage/': typeof AppSettingsUsageIndexRoute
   '/inventory/history/': typeof AppInventoryInventoryHistoryIndexRoute
   '/inventory/issue/': typeof AppInventoryInventoryIssueIndexRoute
   '/inventory/items/': typeof AppInventoryInventoryItemsIndexRoute
@@ -297,6 +304,7 @@ export interface FileRoutesByTo {
   '/stores': typeof AppPriceStoresIndexRoute
   '/settings/integrations': typeof AppSettingsIntegrationsIndexRoute
   '/settings/mcp': typeof AppSettingsMcpIndexRoute
+  '/settings/usage': typeof AppSettingsUsageIndexRoute
   '/inventory/history': typeof AppInventoryInventoryHistoryIndexRoute
   '/inventory/issue': typeof AppInventoryInventoryIssueIndexRoute
   '/inventory/items': typeof AppInventoryInventoryItemsIndexRoute
@@ -337,6 +345,7 @@ export interface FileRoutesById {
   '/_app/_price/stores/': typeof AppPriceStoresIndexRoute
   '/_app/settings/integrations/': typeof AppSettingsIntegrationsIndexRoute
   '/_app/settings/mcp/': typeof AppSettingsMcpIndexRoute
+  '/_app/settings/usage/': typeof AppSettingsUsageIndexRoute
   '/_app/_inventory/inventory/history/': typeof AppInventoryInventoryHistoryIndexRoute
   '/_app/_inventory/inventory/issue/': typeof AppInventoryInventoryIssueIndexRoute
   '/_app/_inventory/inventory/items/': typeof AppInventoryInventoryItemsIndexRoute
@@ -373,6 +382,7 @@ export interface FileRouteTypes {
     | '/stores/'
     | '/settings/integrations/'
     | '/settings/mcp/'
+    | '/settings/usage/'
     | '/inventory/history/'
     | '/inventory/issue/'
     | '/inventory/items/'
@@ -402,6 +412,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/settings/integrations'
     | '/settings/mcp'
+    | '/settings/usage'
     | '/inventory/history'
     | '/inventory/issue'
     | '/inventory/items'
@@ -441,6 +452,7 @@ export interface FileRouteTypes {
     | '/_app/_price/stores/'
     | '/_app/settings/integrations/'
     | '/_app/settings/mcp/'
+    | '/_app/settings/usage/'
     | '/_app/_inventory/inventory/history/'
     | '/_app/_inventory/inventory/issue/'
     | '/_app/_inventory/inventory/items/'
@@ -653,6 +665,13 @@ declare module '@tanstack/react-router' {
       path: '/mcp'
       fullPath: '/settings/mcp/'
       preLoaderRoute: typeof AppSettingsMcpIndexRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/usage/': {
+      id: '/_app/settings/usage/'
+      path: '/usage'
+      fullPath: '/settings/usage/'
+      preLoaderRoute: typeof AppSettingsUsageIndexRouteImport
       parentRoute: typeof AppSettingsRoute
     }
     '/_app/_inventory/inventory/history/': {
@@ -870,11 +889,13 @@ const AppPriceRouteWithChildren = AppPriceRoute._addFileChildren(
 interface AppSettingsRouteChildren {
   AppSettingsIntegrationsIndexRoute: typeof AppSettingsIntegrationsIndexRoute
   AppSettingsMcpIndexRoute: typeof AppSettingsMcpIndexRoute
+  AppSettingsUsageIndexRoute: typeof AppSettingsUsageIndexRoute
 }
 
 const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsIntegrationsIndexRoute: AppSettingsIntegrationsIndexRoute,
   AppSettingsMcpIndexRoute: AppSettingsMcpIndexRoute,
+  AppSettingsUsageIndexRoute: AppSettingsUsageIndexRoute,
 }
 
 const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
