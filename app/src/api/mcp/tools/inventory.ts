@@ -60,7 +60,7 @@ const itemListOutputSchema = z.object({
 });
 
 // 期限接近の絞り込みだけを必須にした一覧入力。limit と cursor の意味を
-// search_inventory と揃えるため itemListQuerySchema から取り、範囲を二重に定義しない
+// itemListQuerySchema から取り、範囲を二重に定義しない
 const expiringInventoryInputSchema = itemListQuerySchema
     .pick({
         categoryId: true,
@@ -117,23 +117,6 @@ export const registerInventoryTools = (
     env: ItemSearchEnv,
 ): void => {
     const db = env.DB;
-    server.registerTool(
-        "search_inventory",
-        {
-            title: "Search inventory",
-            description:
-                "Search inventory item names and filter by category, storage location, low-stock state, expiry within a number of days (expiringWithinDays), or stored reading state (readingStatus: unread, reading, or finished). Sort with sort=name, category, location, baseUnit, or expiry and choose sortDirection=asc or desc; pass a cursor only with the same sort and direction. Category and location sort by their stored names, and expiry keeps items without an expiry date last in either direction. Each item carries its total quantity, its readingStatus (null when no reading state is stored for it), plus the expiry summary of its stocked lots: earliestExpiryDate is the earliest expiry among lots that still have stock (null when none has an expiry date) and lotCount is how many lots have stock.",
-            inputSchema: itemListQuerySchema,
-            outputSchema: itemListOutputSchema,
-        },
-        async (input) => {
-            try {
-                return mcpSuccess(await listItems(db, input));
-            } catch (error) {
-                return inventoryError(error, "inventory search failed");
-            }
-        },
-    );
 
     server.registerTool(
         "resolve_inventory_items",
@@ -243,7 +226,7 @@ export const registerInventoryTools = (
         {
             title: "Search inventory by meaning",
             description:
-                "Finds inventory items whose stored name is semantically similar to the query, using a vector index built from item names. This is a supplement to search_inventory's exact/partial name match, not a replacement: it can find items even when the query uses different wording, but only items that have been indexed can be returned. Indexing runs best-effort whenever an item is created or updated, so an item can be missing from the index (and therefore from these results) when the OpenRouter API key was not configured or the indexing call failed; the item-reindexing endpoint recovers from that by rebuilding the index for every item. There is no cursor: results are cut off at topK (default 20, maximum 100) because the underlying vector query has no paging.",
+                "Finds inventory items whose stored name is semantically similar to the query, using a vector index built from item names. Use this as the primary inventory lookup when the query may use different wording from the stored item name. Only items that have been indexed can be returned. Indexing runs best-effort whenever an item is created or updated, so an item can be missing from the index when the OpenRouter API key was not configured or the indexing call failed; the item-reindexing endpoint recovers from that by rebuilding the index for every item. There is no cursor: results are cut off at topK (default 20, maximum 100) because the underlying vector query has no paging.",
             inputSchema: itemSemanticSearchQuerySchema,
             outputSchema: itemSemanticSearchResultSchema,
         },

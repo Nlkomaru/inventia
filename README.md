@@ -49,7 +49,7 @@ The MCP server exposes these tools through the same services as the HTTP API:
 | Area | Tools |
 | --- | --- |
 | System | `get_health` |
-| Inventory (read) | `search_inventory`, `search_inventory_semantic`, `resolve_inventory_items`, `get_inventory_items`, `list_expiring_inventory`, `list_stale_stocktake_items`, `list_book_reading_status` |
+| Inventory (read) | `search_inventory_semantic`, `resolve_inventory_items`, `get_inventory_items`, `list_expiring_inventory`, `list_stale_stocktake_items`, `list_book_reading_status` |
 | Inventory (write) | `create_inventory_item`, `update_inventory_item`, `adjust_inventory_stock`, `stocktake_inventory_item`, `correct_inventory_lot_expiry`, `set_book_reading_status` |
 | Prices | `get_price_history`, `get_price_histories`, `compare_unit_prices`, `compare_unit_prices_across_items` |
 | Categories | `list_categories`, `list_category_tree`, `get_category`, `create_category` |
@@ -108,7 +108,9 @@ variables and bindings in `app/wrangler.jsonc`.
 The OpenRouter settings page stores its API key encrypted in D1. Production
 deployments sync the repository Actions secrets `SETTINGS_ENCRYPTION_KEY` and
 `OPENROUTER_MANAGEMENT_KEY` to the Worker through `cloudflare/wrangler-action`.
-For local development, set both variables in an untracked `app/.dev.vars` file:
+`OPENROUTER_WORKSPACE_ID` is a non-secret Wrangler variable configured in
+`app/wrangler.jsonc` and identifies the workspace used by the usage dashboard.
+For local development, set both secrets in an untracked `app/.dev.vars` file:
 
 ```dotenv
 SETTINGS_ENCRYPTION_KEY=<32-byte-base64-value>

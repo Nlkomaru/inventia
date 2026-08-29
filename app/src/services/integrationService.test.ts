@@ -5,26 +5,18 @@ import {
 } from "./integrationService";
 
 describe("OpenRouter usage", () => {
-    it("filters Activity API rows to the inventia workspace", async () => {
+    it("uses the configured workspace ID for Activity API", async () => {
         const requests: string[] = [];
         const usage = await getOpenRouterUsage(
-            { OPENROUTER_MANAGEMENT_KEY: "management-key" },
+            {
+                OPENROUTER_MANAGEMENT_KEY: "management-key",
+                OPENROUTER_WORKSPACE_ID: "656c4b87-d2ac-4bbe-b79c-c9d79c735536",
+            },
             async (input, init) => {
                 requests.push(String(input));
                 expect(init?.headers).toMatchObject({
                     authorization: "Bearer management-key",
                 });
-                if (String(input).includes("/workspaces")) {
-                    return Response.json({
-                        data: [
-                            {
-                                id: "550e8400-e29b-41d4-a716-446655440000",
-                                name: "Inventia",
-                                slug: "inventia",
-                            },
-                        ],
-                    });
-                }
                 return Response.json({
                     data: [
                         {
@@ -59,8 +51,7 @@ describe("OpenRouter usage", () => {
         );
 
         expect(requests).toEqual([
-            "https://openrouter.ai/api/v1/workspaces?limit=100",
-            "https://openrouter.ai/api/v1/activity?group_by=workspace&workspace_id=550e8400-e29b-41d4-a716-446655440000",
+            "https://openrouter.ai/api/v1/activity?group_by=workspace&workspace_id=656c4b87-d2ac-4bbe-b79c-c9d79c735536",
         ]);
         expect(usage).toEqual({
             periodDays: 30,
@@ -95,21 +86,11 @@ describe("OpenRouter usage", () => {
         });
     });
 
-    it("reports when the inventia workspace is unavailable", async () => {
+    it("reports when the workspace ID is unavailable", async () => {
         await expect(
-            getOpenRouterUsage(
-                { OPENROUTER_MANAGEMENT_KEY: "management-key" },
-                async () =>
-                    Response.json({
-                        data: [
-                            {
-                                id: "550e8400-e29b-41d4-a716-446655440000",
-                                name: "Production",
-                                slug: "production",
-                            },
-                        ],
-                    }),
-            ),
+            getOpenRouterUsage({
+                OPENROUTER_MANAGEMENT_KEY: "management-key",
+            }),
         ).rejects.toMatchObject({
             code: "INTEGRATION_WORKSPACE_UNAVAILABLE",
             status: 503,

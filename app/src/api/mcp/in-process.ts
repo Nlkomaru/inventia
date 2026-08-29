@@ -11,19 +11,15 @@ import { createMcpServer } from "./server";
  * server.ts へ書き込み系 tool が増えても解析経路へ漏れないようにする。
  */
 export const receiptParseToolAllowlist = [
-    // 明細の表記をまとめて照合する。1 行ずつ search_inventory を呼ばせると
-    // 呼び出し回数が明細の行数に比例し、往復上限を使い切る
+    // 明細の表記をまとめて照合する。意味検索で候補を拾った後に、
+    // exact / alias の確定と候補の絞り込みへ使う
     "resolve_inventory_items",
     // 店名も同じ理由でまとめて照合する。読み取った店名を既存店舗の登録名へ
     // 寄せられれば、反映時の resolveStoreByName が完全一致で当たり、
     // 同じ店の表記揺れが別の店舗として作られない。読み取り専用で副作用は無い
     "resolve_stores",
-    "search_inventory",
-    // レシートの表記（略称やブランド名の前置きなど）は在庫の品目名と語彙が
-    // ずれやすく、search_inventory の LIKE 検索だけでは既存品目を見落とす。
-    // 意味検索を補助として足すことで既存品目とのマッチ率を上げる。読み取り専用で
-    // 副作用が無く、解析はそもそも OpenRouter を呼ぶ経路なので API key 未設定
-    // による失敗もこの経路では起きない
+    // 品目名の検索は意味検索を使う。略称・ブランド名の前置きなど、
+    // レシートと登録名の表記や語彙が違っても候補を拾える
     "search_inventory_semantic",
     // 品目の詳細も明細の行数ぶん引かれるため、id をまとめて受ける一括版だけを渡す
     "get_inventory_items",
