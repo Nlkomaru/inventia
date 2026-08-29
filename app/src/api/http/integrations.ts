@@ -95,7 +95,7 @@ const getOpenRouterUsageRoute = createRoute({
     summary: "Get recent OpenRouter usage",
     operationId: "getOpenRouterUsage",
     description:
-        "Returns usage aggregated by model and provider for the inventia OpenRouter workspace for the last 30 completed UTC days. The service resolves the workspace by slug or name, then calls Activity with group_by=workspace and workspace_id. Token counts include prompt, completion, and reasoning tokens; totalTokens is promptTokens plus completionTokens because reasoning tokens are already included in completionTokens. cost is the OpenRouter usage amount. The management key is used only for upstream requests and is never returned.",
+        "Returns usage aggregated by model and provider for the configured OpenRouter workspace for the last 30 completed UTC days. The service calls Activity with group_by=workspace and the OPENROUTER_WORKSPACE_ID configured in wrangler.jsonc. Token counts include prompt, completion, and reasoning tokens; totalTokens is promptTokens plus completionTokens because reasoning tokens are already included in completionTokens. cost is the OpenRouter usage amount. The management key is used only for upstream requests and is never returned.",
     responses: {
         200: {
             description:
@@ -109,7 +109,7 @@ const getOpenRouterUsageRoute = createRoute({
         },
         503: {
             description:
-                "The OPENROUTER_MANAGEMENT_KEY secret is not configured.",
+                "The OPENROUTER_MANAGEMENT_KEY secret or OPENROUTER_WORKSPACE_ID variable is not configured.",
             content: jsonContent(errorSchema),
         },
         500: {

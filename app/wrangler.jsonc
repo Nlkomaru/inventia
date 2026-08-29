@@ -63,7 +63,7 @@
 	],
 	"secrets": {
 		"required": ["SETTINGS_ENCRYPTION_KEY", "OPENROUTER_MANAGEMENT_KEY"]
-	}
+	},
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
@@ -81,7 +81,9 @@
 	 * Note: Use secrets to store sensitive data.
 	 * https://developers.cloudflare.com/workers/configuration/secrets/
 	 */
-	// "vars": {  "MY_VARIABLE": "production_value" }
+	"vars": {
+		"OPENROUTER_WORKSPACE_ID": "656c4b87-d2ac-4bbe-b79c-c9d79c735536"
+	}
 	/**
 	 * Static Assets
 	 * https://developers.cloudflare.com/workers/static-assets/binding/

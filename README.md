@@ -108,7 +108,9 @@ variables and bindings in `app/wrangler.jsonc`.
 The OpenRouter settings page stores its API key encrypted in D1. Production
 deployments sync the repository Actions secrets `SETTINGS_ENCRYPTION_KEY` and
 `OPENROUTER_MANAGEMENT_KEY` to the Worker through `cloudflare/wrangler-action`.
-For local development, set both variables in an untracked `app/.dev.vars` file:
+`OPENROUTER_WORKSPACE_ID` is a non-secret Wrangler variable configured in
+`app/wrangler.jsonc` and identifies the workspace used by the usage dashboard.
+For local development, set both secrets in an untracked `app/.dev.vars` file:
 
 ```dotenv
 SETTINGS_ENCRYPTION_KEY=<32-byte-base64-value>

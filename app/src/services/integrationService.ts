@@ -322,17 +322,9 @@ export interface OpenRouterUsageEnv {
     // Wrangler secret。生成型は wrangler.jsonc の binding だけを表すため、
     // service が必要とする任意の構造型で受ける
     OPENROUTER_MANAGEMENT_KEY?: string;
+    // wrangler.jsonc の vars。workspace ID は秘密情報ではない
+    OPENROUTER_WORKSPACE_ID?: string;
 }
-
-const openRouterWorkspaceSchema = z.object({
-    id: z.string().uuid(),
-    name: z.string().min(1),
-    slug: z.string().min(1),
-});
-
-const openRouterWorkspaceEnvelopeSchema = z.object({
-    data: z.array(openRouterWorkspaceSchema),
-});
 
 const openRouterActivityEntrySchema = z.object({
     model: z.string().min(1),
@@ -357,7 +349,7 @@ const managementKeyUnavailable = () =>
 const workspaceUnavailable = () =>
     new IntegrationServiceError(
         "INTEGRATION_WORKSPACE_UNAVAILABLE",
-        "OpenRouter に inventia workspace が見つかりません。",
+        "OpenRouter の workspace ID が設定されていないか不正です。",
     );
 
 const usageProviderError = () =>
@@ -393,7 +385,7 @@ const fetchOpenRouterJson = async (
 };
 
 /**
- * OpenRouter Activity API の inventia workspace における直近 30 完了 UTC 日を、
+ * OpenRouter Activity API の設定済み workspace における直近 30 完了 UTC 日を、
  * モデルと provider 単位に集約する。
  * management key は Worker secret だけで使い、ブラウザや API 応答へ返さない。
  */
@@ -405,26 +397,15 @@ export const getOpenRouterUsage = async (
     if (!managementKey) {
         throw managementKeyUnavailable();
     }
-    const workspacePayload = await fetchOpenRouterJson(
-        "https://openrouter.ai/api/v1/workspaces?limit=100",
-        managementKey,
-        fetcher,
-    );
-    const workspaces =
-        openRouterWorkspaceEnvelopeSchema.safeParse(workspacePayload);
-    if (!workspaces.success) {
-        throw usageProviderError();
-    }
-    const workspace = workspaces.data.data.find(
-        (candidate) =>
-            candidate.slug.toLowerCase() === "inventia" ||
-            candidate.name.toLowerCase() === "inventia",
-    );
-    if (!workspace) {
+    const workspaceId = z
+        .string()
+        .uuid()
+        .safeParse(env.OPENROUTER_WORKSPACE_ID);
+    if (!workspaceId.success) {
         throw workspaceUnavailable();
     }
     const activityPayload = await fetchOpenRouterJson(
-        `https://openrouter.ai/api/v1/activity?group_by=workspace&workspace_id=${encodeURIComponent(workspace.id)}`,
+        `https://openrouter.ai/api/v1/activity?group_by=workspace&workspace_id=${encodeURIComponent(workspaceId.data)}`,
         managementKey,
         fetcher,
     );
