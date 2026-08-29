@@ -83,19 +83,33 @@ const columns = columnHelper.columns([
     columnHelper.accessor((row) => row.storeName ?? row.source, {
         id: "store",
         header: "Store",
-        cell: ({ row }) => (
-            <span className="flex items-center gap-2 whitespace-nowrap">
-                {row.original.storeFaviconUrl === null ? null : (
-                    <img
-                        alt=""
-                        className="size-4 shrink-0 rounded-sm object-contain"
-                        src={row.original.storeFaviconUrl}
-                    />
-                )}
-                {/* 店舗マスタを持たない古い行は自由記述の source をそのまま出す */}
-                <span>{row.original.storeName ?? row.original.source}</span>
-            </span>
-        ),
+        cell: ({ row }) => {
+            const label = row.original.storeName ?? row.original.source;
+            return (
+                <span className="flex items-center gap-2 whitespace-nowrap">
+                    {row.original.storeFaviconUrl === null ? null : (
+                        <img
+                            alt=""
+                            className="size-4 shrink-0 rounded-sm object-contain"
+                            src={row.original.storeFaviconUrl}
+                        />
+                    )}
+                    {/* 店舗マスタを持たない古い行は自由記述の source をそのまま出す */}
+                    {row.original.url === null ? (
+                        <span>{label}</span>
+                    ) : (
+                        <a
+                            className="underline underline-offset-4 hover:text-primary"
+                            href={row.original.url}
+                            rel="noreferrer"
+                            target="_blank"
+                        >
+                            {label}
+                        </a>
+                    )}
+                </span>
+            );
+        },
     }),
     columnHelper.accessor((row) => row.contentAmount, {
         id: "content",

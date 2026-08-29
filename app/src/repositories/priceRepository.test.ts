@@ -1,5 +1,6 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { newId } from "../domain/id";
 import { calculateUnitPrice, type PriceRecordDimension } from "../domain/price";
 import { createItem, updateItem } from "../services/itemService";
 import { createLocation } from "../services/locationService";
@@ -12,6 +13,7 @@ import {
     insertPriceRecord,
     listPriceRecordsByUnitPrice,
 } from "./priceRepository";
+import { insertStore } from "./storeRepository";
 
 // 0001_seed_base_categories.sql が投入するルートカテゴリ
 const foodCategoryId = "019fdcef-ee16-70fb-a3a0-5c5837f334db";
@@ -273,5 +275,35 @@ describe("基準単位のつけ替え後の単価", () => {
         const after = await unitPrices(itemId);
         expect(after.fromHistory).toBeCloseTo(0.05, 10);
         expect(after.fromComparison).toBeCloseTo(0.05, 10);
+    });
+});
+
+describe("価格記録の取得元URL", () => {
+    it("店舗と商品ページURLを同じ価格記録へ保存する", async () => {
+        const itemId = await createTestItem({
+            baseUnit: "個",
+            baseDimension: "count",
+        });
+        const store = await insertStore(env.DB, {
+            id: newId(),
+            name: `ネット通販-${crypto.randomUUID()}`,
+            url: "https://example.com",
+            createdAt: "2026-08-20T00:00:00.000Z",
+            updatedAt: "2026-08-20T00:00:00.000Z",
+        });
+
+        const record = await createPriceRecord(env.DB, {
+            itemId,
+            contentAmount: 1,
+            contentUnit: "個",
+            price: 1980,
+            storeId: store.id,
+            url: "https://example.com/products/1",
+            recordedAt: "2026-08-20T00:00:00.000Z",
+        });
+
+        expect(record.storeId).toBe(store.id);
+        expect(record.source).toBe(store.name);
+        expect(record.url).toBe("https://example.com/products/1");
     });
 });

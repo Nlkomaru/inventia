@@ -90,6 +90,7 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
     const [packaging, setPackaging] = useState("");
     const [storeId, setStoreId] = useState(noStoreValue);
     const [source, setSource] = useState("");
+    const [url, setUrl] = useState("");
     const [recordedAt, setRecordedAt] = useState(todayInputValue);
     const [fieldError, setFieldError] = useState<string | null>(null);
     const [submitError, setSubmitError] = useState<string | null>(null);
@@ -145,6 +146,7 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
             return;
         }
         const trimmedSource = source.trim();
+        const trimmedUrl = url.trim();
         const selectedStoreId = storeId === noStoreValue ? null : storeId;
         if (selectedStoreId === null && trimmedSource === "") {
             setFieldError("店舗を選ぶか、取得元を入力してください");
@@ -158,6 +160,7 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
                 price: priceValue,
                 packaging: packaging.trim() === "" ? null : packaging.trim(),
                 storeId: selectedStoreId,
+                url: trimmedUrl === "" ? null : trimmedUrl,
                 // 店舗を選んだときは service が店名を転記するため送らない
                 ...(selectedStoreId === null
                     ? { source: trimmedSource }
@@ -171,6 +174,7 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
             setSetCount("1");
             setPrice("");
             setPackaging("");
+            setUrl("");
         } catch (cause) {
             setSubmitError(errorMessage(cause, "価格を記録できませんでした"));
         }
@@ -276,8 +280,21 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
                     <Input
                         id="price-source"
                         onChange={(event) => setSource(event.target.value)}
-                        placeholder="Amazon など"
+                        placeholder="店舗名など"
                         value={source}
+                    />
+                </Field>
+                <Field>
+                    <FieldLabel htmlFor="price-url">
+                        商品ページURL（任意）
+                    </FieldLabel>
+                    <Input
+                        id="price-url"
+                        inputMode="url"
+                        onChange={(event) => setUrl(event.target.value)}
+                        placeholder="https://example.com/product"
+                        type="url"
+                        value={url}
                     />
                 </Field>
                 <Field>

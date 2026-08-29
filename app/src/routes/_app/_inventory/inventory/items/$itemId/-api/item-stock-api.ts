@@ -148,6 +148,7 @@ export interface CreatePriceRecordInput {
     packaging: string | null;
     storeId: string | null;
     source?: string;
+    url: string | null;
     recordedAt: string;
 }
 
