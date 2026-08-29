@@ -31,3 +31,6 @@ apm.lock.yaml
 !.vscode/mcp.json
 .agents/
 .github/skills
+
+app/src/routes/_app/license/-data.json
+.omp/*

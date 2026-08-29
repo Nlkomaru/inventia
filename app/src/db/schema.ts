@@ -566,7 +566,7 @@ export const priceRecords = sqliteTable(
         itemId: text("item_id")
             .notNull()
             .references(() => items.id, { onDelete: "cascade" }),
-        // 購入明細のとき設定する。NULL は Amazon 手動入力などの価格観測のみの行。
+        // 購入明細のとき設定する。NULL は手動入力などの価格観測のみの行。
         // 購入行でも source を保持するのは、価格比較を 1 テーブルで完結させるための
         // 非正規化（service が purchases.source を転記する）
         purchaseId: text("purchase_id").references(() => purchases.id, {
@@ -580,7 +580,7 @@ export const priceRecords = sqliteTable(
         packaging: text("packaging"),
         // 販売価格（円、整数）。単位あたり価格は保存せず表示時に計算する
         price: integer("price").notNull(),
-        // Amazon、スーパーA などの取得元
+        // ネット通販、スーパーA などの取得元
         source: text("source").notNull(),
         // 購入元の店舗。既存行は null。source は表示互換のため残し、
         // storeId がある行では店舗名を転記した値になる
