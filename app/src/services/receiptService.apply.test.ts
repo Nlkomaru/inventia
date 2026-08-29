@@ -20,6 +20,7 @@ import {
     buildApplyInput,
     createReviewRows,
     patchReviewRow,
+    patchReviewRowNewItem,
     type ReceiptReviewRow,
     receiptApplyIdempotencyKey,
 } from "../routes/_app/_inventory/receipts/new/-functions/receipt-review-form";
@@ -534,11 +535,9 @@ describe("applyReceipt の数量換算", () => {
     });
 
     it("換算できない単位の組み合わせでも数量を明示すれば反映できる", async () => {
-        // 個数は換算しないため、「本」で数えたレシートは「個」の品目へ足せない。
-        // 確認画面が「数量を品目の単位に直して指定してください」の指示どおりの
-        // 入力を明示送信できないと、この行は永久に反映できないまま残る
-        // （表記が大小文字だけ違う "ml" と "mL" は換算できるようになったため、
-        // 換算できない例としてはもう使えない）
+        // 量の種類が違うレシートは品目へそのまま足せない。確認画面が
+        // 「数量を品目の単位に直して指定してください」の指示どおりの入力を
+        // 明示送信できれば反映できる。
         const itemId = await createTestItem({
             baseUnit: "個",
             baseDimension: "count",
@@ -546,8 +545,8 @@ describe("applyReceipt の数量換算", () => {
         const line = {
             quantity: 500,
             price: 200,
-            suggestedBaseUnit: "本",
-            suggestedBaseDimension: "count",
+            suggestedBaseUnit: "g",
+            suggestedBaseDimension: "mass",
         } as const;
         const withoutQuantity = await createSingleLineReceipt(line);
 
@@ -870,7 +869,41 @@ describe("確認画面から反映までの通し", () => {
         });
     });
 
-    it("換算できない 個/袋 の行を打ち直して、部分反映のレシートを完了できる", async () => {
+    it("同じ個数の次元なら単位表記が違っても自動で反映する", async () => {
+        const { receiptId, lineId } = await createSingleLineReceipt({
+            quantity: 3,
+            price: 240,
+            suggestedBaseUnit: "個",
+            suggestedBaseDimension: "count",
+        });
+        const locationId = await createTestLocation();
+        const input = await buildScreenInput(receiptId, (rows) =>
+            patchReviewRowNewItem(
+                patchReviewRow(rows, lineId, { action: "create_item" }),
+                lineId,
+                {
+                    baseUnit: "袋",
+                    categoryId: foodCategoryId,
+                    locationId,
+                },
+            ),
+        );
+        const result = await applyReceipt(env.DB, receiptId, input, env);
+
+        expect(result.lines[0]).toMatchObject({
+            itemCreated: true,
+            quantity: 3,
+        });
+        expect(result.receipt.status).toBe("applied");
+        const itemId = result.lines[0]?.itemId;
+        if (itemId === null || itemId === undefined) {
+            throw new Error("created item was not returned");
+        }
+        expect((await getItem(env.DB, itemId)).baseUnit).toBe("袋");
+        expect((await getItem(env.DB, itemId)).currentQuantity).toBe(3);
+    });
+
+    it("量の種類が違う行は止め、数量を明示すれば部分反映を完了できる", async () => {
         const volumeItemId = await createTestItem({
             baseUnit: "mL",
             baseDimension: "volume",
@@ -889,12 +922,15 @@ describe("確認画面から反映までの通し", () => {
             {
                 quantity: 3,
                 price: 240,
-                suggestedBaseUnit: "個",
-                suggestedBaseDimension: "count",
+                suggestedBaseUnit: "g",
+                suggestedBaseDimension: "mass",
             },
         ]);
-        const [convertibleLineId, deadlockLineId] = lineIds;
-        if (convertibleLineId === undefined || deadlockLineId === undefined) {
+        const [convertibleLineId, incompatibleLineId] = lineIds;
+        if (
+            convertibleLineId === undefined ||
+            incompatibleLineId === undefined
+        ) {
             throw new Error("receipt lines were not created");
         }
         const chooseItems = (
@@ -905,24 +941,23 @@ describe("確認画面から反映までの通し", () => {
                     action: "add_to_item",
                     itemId: volumeItemId,
                 }),
-                deadlockLineId,
+                incompatibleLineId,
                 { action: "add_to_item", itemId: bagItemId },
             );
 
-        // 「個」は「袋」へ換算できないため 2 行目で止まる。1 行目の在庫は動いたまま
+        // 量の種類が違うため 2 行目で止まる。1 行目の在庫は動いたまま
         const firstInput = await buildScreenInput(receiptId, chooseItems);
         await expect(
             applyReceipt(env.DB, receiptId, firstInput, env),
         ).rejects.toThrow(ReceiptServiceError);
 
-        // 画面を開き直し、エラー文言の指示どおり解析値と同じ数を打ち直す
+        // 画面を開き直し、エラー文言の指示どおり品目の単位の数量を明示する
         const retryInput = await buildScreenInput(receiptId, (rows) =>
-            patchReviewRow(chooseItems(rows), deadlockLineId, {
+            patchReviewRow(chooseItems(rows), incompatibleLineId, {
                 quantity: "3",
                 quantityEdited: true,
             }),
         );
-        // 打ち直した数は値が同じでも明示して送る。送らないと同じエラーが返り続ける
         expect(retryInput.lines[1]).toMatchObject({ quantity: 3 });
         // 反映済みの 1 行目は実績を初期値に戻し、常に数量を明示する。ここが
         // 解析値へ戻ると digest がずれて RECEIPT_APPLY_CONFLICT になる
@@ -930,7 +965,6 @@ describe("確認画面から反映までの通し", () => {
 
         const second = await applyReceipt(env.DB, receiptId, retryInput, env);
 
-        // 1 行目は在庫が動き済み。二重計上せずに 2 行目だけが新たに反映される
         expect(second.lines[0]?.replayed).toBe(true);
         expect(second.lines[1]?.replayed).toBe(false);
         expect(second.lines[1]?.quantity).toBe(3);
@@ -956,8 +990,8 @@ describe("確認画面から反映までの通し", () => {
             {
                 quantity: 3,
                 price: 240,
-                suggestedBaseUnit: "個",
-                suggestedBaseDimension: "count",
+                suggestedBaseUnit: "g",
+                suggestedBaseDimension: "mass",
             },
         ]);
         const [skippedLineId, deadlockLineId] = lineIds;
@@ -972,7 +1006,7 @@ describe("確認画面から反映までの通し", () => {
             matchScore: 100,
         });
 
-        // 1 行目は取り込まない。「個」は「袋」へ換算できず 2 行目で止まる
+        // 1 行目は取り込まない。量の種類が違うため 2 行目で止まる
         const firstInput = await buildScreenInput(receiptId, (rows) =>
             patchReviewRow(
                 patchReviewRow(rows, skippedLineId, { action: "skip" }),

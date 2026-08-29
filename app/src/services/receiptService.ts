@@ -985,7 +985,8 @@ const withinQuantityMax = (
  * 明細の数量を反映先の品目の単位へ揃える。数量は解析時に提案した単位
  * （`suggested_base_unit`）で表されているため、品目が別の単位で在庫を数えて
  * いる場合はそのまま足すと桁が変わる（ml の 1000 を L の品目へ足すなど）。
- * 換算できない組み合わせは反映を止め、数量の入れ直しを促す。
+ * 質量・体積は換算し、個数は「個」「袋」のような表現の変更を数量の変更と
+ * みなさず、そのまま反映する。量の種類自体が違う場合は反映を止める。
  * 確認画面で数量を指定した行はその値を品目の単位での入力とみなし、換算しない。
  */
 const resolveLineQuantity = (
@@ -994,7 +995,9 @@ const resolveLineQuantity = (
 ): number => {
     if (
         line.suggestedBaseUnit === null ||
-        line.suggestedBaseUnit === pricing.baseUnit
+        line.suggestedBaseUnit === pricing.baseUnit ||
+        (line.suggestedBaseDimension === pricing.baseDimension &&
+            pricing.baseDimension === "count")
     ) {
         return withinQuantityMax(line, pricing, line.quantity);
     }
