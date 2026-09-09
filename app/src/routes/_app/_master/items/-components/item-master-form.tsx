@@ -380,7 +380,7 @@ export function ItemMasterForm({
                         </SelectContent>
                     </Select>
                     <FieldDescription>
-                        カテゴリの種別（書籍・書類など）は変えられないため、同じ種別のカテゴリだけを選べます。
+                        カテゴリの種別（書類など）は変えられないため、同じ種別のカテゴリだけを選べます。
                     </FieldDescription>
                     <FieldError>{fieldErrors.categoryId}</FieldError>
                 </Field>

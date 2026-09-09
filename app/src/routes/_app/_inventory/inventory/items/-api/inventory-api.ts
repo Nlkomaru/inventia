@@ -4,7 +4,6 @@ import type { CategoryDto } from "@/domain/category";
 import type { ItemDto } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
 import type { ItemLotDto } from "@/domain/lot";
-import { readingStatusSchema } from "@/domain/reading";
 
 // 一覧 service の 1 ページ上限。画面は全件を扱うため cursor を辿って集める
 const pageLimit = 100;
@@ -16,7 +15,6 @@ export const inventoryItemFiltersSchema = z.object({
     lowStockOnly: z.boolean().optional(),
     // 数量 > 0 のロットの期限が now + n 日以内の品目だけに絞る。0 は期限切れのみ
     expiringWithinDays: z.number().int().min(0).optional(),
-    readingStatus: readingStatusSchema.optional(),
 });
 
 export type InventoryItemFilters = z.infer<typeof inventoryItemFiltersSchema>;

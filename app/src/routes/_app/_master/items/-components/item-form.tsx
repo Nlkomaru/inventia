@@ -35,23 +35,11 @@ import {
     itemUpdateSchema,
 } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
-import {
-    type ReadingStateDto,
-    type ReadingStateUpsertInput,
-    type ReadingStatus,
-    readingStatuses,
-} from "@/domain/reading";
 import { toIsoFromDate } from "@/lib/expiry-input";
 import {
     buildHierarchyLabels,
     getEffectiveCategoryKind,
 } from "@/lib/hierarchy";
-import {
-    type ReadingStateChange,
-    readingStateFormValues,
-    readingStatusLabels,
-    resolveReadingStateChange,
-} from "@/lib/reading-input";
 
 type BaseDimension = "mass" | "volume" | "count";
 
@@ -65,9 +53,6 @@ type FormValues = {
     expiryDate: string;
     lowStockThreshold: string;
     memo: string;
-    readingStatus: ReadingStatus | "";
-    readingStartedAt: string;
-    readingFinishedAt: string;
 };
 
 type FieldErrors = Partial<Record<keyof FormValues, string>>;
@@ -75,21 +60,11 @@ type FieldErrors = Partial<Record<keyof FormValues, string>>;
 type ItemFormProps = {
     open: boolean;
     item: ItemDto | null;
-    /** 編集対象に保存済みの読書状態。取得前と未設定はどちらも null。 */
-    readingState: ReadingStateDto | null;
-    readingStateLoading?: boolean;
     categories: CategoryDto[];
     locations: LocationDto[];
     onOpenChange: (open: boolean) => void;
-    onCreate: (
-        input: ItemCreateInput,
-        readingState: ReadingStateUpsertInput | null,
-    ) => Promise<void>;
-    onUpdate: (
-        id: string,
-        input: ItemUpdateInput,
-        readingState: ReadingStateChange,
-    ) => Promise<void>;
+    onCreate: (input: ItemCreateInput) => Promise<void>;
+    onUpdate: (id: string, input: ItemUpdateInput) => Promise<void>;
 };
 
 const emptyForm: FormValues = {
@@ -102,9 +77,6 @@ const emptyForm: FormValues = {
     expiryDate: "",
     lowStockThreshold: "",
     memo: "",
-    readingStatus: "",
-    readingStartedAt: "",
-    readingFinishedAt: "",
 };
 
 const dimensionLabels: Record<BaseDimension, string> = {
@@ -113,30 +85,15 @@ const dimensionLabels: Record<BaseDimension, string> = {
     count: "個数",
 };
 
-const readingStatusItems = [
-    { label: "未設定", value: null },
-    ...readingStatuses.map((status) => ({
-        label: readingStatusLabels[status],
-        value: status,
-    })),
-];
-
-const toReadingStatus = (value: string | null): ReadingStatus | "" =>
-    readingStatuses.find((status) => status === value) ?? "";
-
 const parseNullableInteger = (value: string): number | null => {
     if (!value.trim()) return null;
     const parsed = Number(value);
     return Number.isInteger(parsed) ? parsed : null;
 };
 
-const initialForm = (
-    item: ItemDto | null,
-    readingState: ReadingStateDto | null,
-): FormValues => {
-    if (!item) return { ...emptyForm, ...readingStateFormValues(readingState) };
+const initialForm = (item: ItemDto | null): FormValues => {
+    if (!item) return { ...emptyForm };
     return {
-        ...readingStateFormValues(readingState),
         name: item.name,
         categoryId: item.categoryId,
         locationId: item.locationId,
@@ -169,17 +126,13 @@ const fieldErrorsFromIssues = (
 export function ItemForm({
     open,
     item,
-    readingState,
-    readingStateLoading = false,
     categories,
     locations,
     onOpenChange,
     onCreate,
     onUpdate,
 }: ItemFormProps) {
-    const [form, setForm] = useState<FormValues>(() =>
-        initialForm(item, readingState),
-    );
+    const [form, setForm] = useState<FormValues>(() => initialForm(item));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -206,9 +159,6 @@ export function ItemForm({
         [categories, item],
     );
     const isDocument = effectiveCategoryKind === "document";
-    // 読書状態は実効カテゴリー種別が book の品目だけが持つ。
-    // 欄を出さない品目では、残っている読書状態にも触らない
-    const readingEnabled = effectiveCategoryKind === "book";
     const availableCategories = useMemo(
         () =>
             item
@@ -241,22 +191,12 @@ export function ItemForm({
         [locationLabels, locations],
     );
 
-    // 読書状態は品目より遅れて届くため、ここでは空にしておき次の効果で入れる
     useEffect(() => {
         if (!open) return;
-        setForm(initialForm(item, null));
+        setForm(initialForm(item));
         setError(null);
         setFieldErrors({});
     }, [item, open]);
-
-    // 遅れて届いた読書状態は、入力中の他の欄を巻き戻さないよう読書欄だけへ反映する
-    useEffect(() => {
-        if (!open) return;
-        setForm((current) => ({
-            ...current,
-            ...readingStateFormValues(readingState),
-        }));
-    }, [open, readingState]);
 
     const update = <K extends keyof FormValues>(
         key: K,
@@ -270,39 +210,6 @@ export function ItemForm({
             return next;
         });
     };
-
-    // 状態を選び直したときは、その状態で持てない日付を空へ戻す
-    const updateReadingStatus = (value: ReadingStatus | "") => {
-        setForm((current) => ({
-            ...current,
-            readingStatus: value,
-            readingStartedAt:
-                value === "" || value === "unread"
-                    ? ""
-                    : current.readingStartedAt,
-            readingFinishedAt:
-                value === "finished" ? current.readingFinishedAt : "",
-        }));
-        setFieldErrors((current) => {
-            const next = { ...current };
-            delete next.readingStatus;
-            delete next.readingStartedAt;
-            delete next.readingFinishedAt;
-            return next;
-        });
-    };
-
-    const resolveReading = () =>
-        readingEnabled
-            ? resolveReadingStateChange(
-                  {
-                      readingStatus: form.readingStatus,
-                      readingStartedAt: form.readingStartedAt,
-                      readingFinishedAt: form.readingFinishedAt,
-                  },
-                  readingState,
-              )
-            : ({ ok: true, change: { kind: "unchanged" } } as const);
 
     const submit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -332,14 +239,6 @@ export function ItemForm({
             setError("発注点は0以上の整数で入力してください");
             return;
         }
-        const reading = resolveReading();
-        if (!reading.ok) {
-            const readingErrors: FieldErrors = {};
-            readingErrors[reading.field] = reading.message;
-            setFieldErrors(readingErrors);
-            setError(reading.message);
-            return;
-        }
         if (item) {
             // itemUpdateSchema は strict で expiryDate を受け付けない
             const parsed = itemUpdateSchema.safeParse({
@@ -358,7 +257,7 @@ export function ItemForm({
             }
             setSaving(true);
             try {
-                await onUpdate(item.id, parsed.data, reading.change);
+                await onUpdate(item.id, parsed.data);
                 onOpenChange(false);
             } catch (cause) {
                 setError(
@@ -423,10 +322,7 @@ export function ItemForm({
         }
         setSaving(true);
         try {
-            await onCreate(
-                parsed.data,
-                reading.change.kind === "set" ? reading.change.input : null,
-            );
+            await onCreate(parsed.data);
             onOpenChange(false);
         } catch (cause) {
             setError(
@@ -716,130 +612,6 @@ export function ItemForm({
                         </FieldGroup>
                     )}
 
-                    {readingEnabled ? (
-                        <FieldGroup>
-                            <Field
-                                data-disabled={readingStateLoading}
-                                data-invalid={Boolean(
-                                    fieldErrors.readingStatus,
-                                )}
-                            >
-                                <FieldLabel htmlFor="item-reading-status">
-                                    読書状態
-                                </FieldLabel>
-                                <Select
-                                    items={readingStatusItems}
-                                    value={form.readingStatus || null}
-                                    onValueChange={(value) =>
-                                        updateReadingStatus(
-                                            toReadingStatus(value),
-                                        )
-                                    }
-                                >
-                                    <SelectTrigger
-                                        aria-invalid={Boolean(
-                                            fieldErrors.readingStatus,
-                                        )}
-                                        className="w-full"
-                                        disabled={readingStateLoading}
-                                        id="item-reading-status"
-                                    >
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectGroup>
-                                            {readingStatusItems.map(
-                                                (option) => (
-                                                    <SelectItem
-                                                        key={
-                                                            option.value ??
-                                                            "none"
-                                                        }
-                                                        value={option.value}
-                                                    >
-                                                        {option.label}
-                                                    </SelectItem>
-                                                ),
-                                            )}
-                                        </SelectGroup>
-                                    </SelectContent>
-                                </Select>
-                                <FieldDescription>
-                                    {readingStateLoading
-                                        ? "保存済みの読書状態を読み込み中です。"
-                                        : "未設定を選ぶと保存済みの読書状態を削除します。"}
-                                </FieldDescription>
-                                <FieldError>
-                                    {fieldErrors.readingStatus}
-                                </FieldError>
-                            </Field>
-                            <Field
-                                data-disabled={
-                                    readingStateLoading ||
-                                    form.readingStatus === "" ||
-                                    form.readingStatus === "unread"
-                                }
-                                data-invalid={Boolean(
-                                    fieldErrors.readingStartedAt,
-                                )}
-                            >
-                                <FieldLabel htmlFor="item-reading-started-at">
-                                    開始日（任意）
-                                </FieldLabel>
-                                <DatePicker
-                                    aria-invalid={Boolean(
-                                        fieldErrors.readingStartedAt,
-                                    )}
-                                    calendarLabel="開始日をカレンダーから選ぶ"
-                                    disabled={
-                                        readingStateLoading ||
-                                        form.readingStatus === "" ||
-                                        form.readingStatus === "unread"
-                                    }
-                                    id="item-reading-started-at"
-                                    onValueChange={(value) =>
-                                        update("readingStartedAt", value)
-                                    }
-                                    value={form.readingStartedAt}
-                                />
-                                <FieldError>
-                                    {fieldErrors.readingStartedAt}
-                                </FieldError>
-                            </Field>
-                            <Field
-                                data-disabled={
-                                    readingStateLoading ||
-                                    form.readingStatus !== "finished"
-                                }
-                                data-invalid={Boolean(
-                                    fieldErrors.readingFinishedAt,
-                                )}
-                            >
-                                <FieldLabel htmlFor="item-reading-finished-at">
-                                    読了日（任意）
-                                </FieldLabel>
-                                <DatePicker
-                                    aria-invalid={Boolean(
-                                        fieldErrors.readingFinishedAt,
-                                    )}
-                                    calendarLabel="読了日をカレンダーから選ぶ"
-                                    disabled={
-                                        readingStateLoading ||
-                                        form.readingStatus !== "finished"
-                                    }
-                                    id="item-reading-finished-at"
-                                    onValueChange={(value) =>
-                                        update("readingFinishedAt", value)
-                                    }
-                                    value={form.readingFinishedAt}
-                                />
-                                <FieldError>
-                                    {fieldErrors.readingFinishedAt}
-                                </FieldError>
-                            </Field>
-                        </FieldGroup>
-                    ) : null}
-
                     <FieldGroup>
                         {item ? null : (
                             <Field
@@ -911,11 +683,7 @@ export function ItemForm({
                     </FieldGroup>
                 </form>
                 <SheetFooter>
-                    <Button
-                        disabled={saving || readingStateLoading}
-                        form="item-form"
-                        type="submit"
-                    >
+                    <Button disabled={saving} form="item-form" type="submit">
                         {saving ? "保存中…" : item ? "変更を保存" : "登録する"}
                     </Button>
                     <Button

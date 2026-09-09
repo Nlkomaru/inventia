@@ -25,30 +25,30 @@ const categories: CategoryDto[] = [
 		...timestamps,
 	},
 	{
-		id: "books",
-		name: "書籍",
+		id: "documents",
+		name: "書類",
 		parentId: null,
-		kind: "book",
+		kind: "document",
 		sortOrder: 30,
 		...timestamps,
 	},
 ];
 
-// 種別未設定の子は祖先を遡って実効種別が決まる。展開すると「継承: 書籍」を表示する
+// 種別未設定の子は祖先を遡って実効種別が決まる。展開すると「継承: 書類」を表示する
 const nestedCategories: CategoryDto[] = [
 	...categories,
 	{
-		id: "books-technical",
-		name: "技術書",
-		parentId: "books",
+		id: "documents-work",
+		name: "業務書類",
+		parentId: "documents",
 		kind: null,
 		sortOrder: 10,
 		...timestamps,
 	},
 	{
-		id: "books-technical-frontend",
-		name: "フロントエンド",
-		parentId: "books-technical",
+		id: "documents-work-forms",
+		name: "申請書",
+		parentId: "documents-work",
 		kind: null,
 		sortOrder: 10,
 		...timestamps,
@@ -93,7 +93,7 @@ export const Nested: Story = {
 	},
 };
 
-// 種別未設定の子カテゴリは、親を展開すると「継承: 書籍」を表示する
+// 種別未設定の子カテゴリは、親を展開すると「継承: 書類」を表示する
 export const KindInheritance: Story = {
 	args: {
 		categories: [
@@ -106,18 +106,18 @@ export const KindInheritance: Story = {
 				...timestamps,
 			},
 			{
-				id: "books-technical",
-				name: "技術書",
-				parentId: "books",
+				id: "documents-work",
+				name: "業務書類",
+				parentId: "documents",
 				kind: null,
 				sortOrder: 20,
 				...timestamps,
 			},
 			{
-				id: "books",
-				name: "書籍",
+				id: "documents",
+				name: "書類",
 				parentId: null,
-				kind: "book",
+				kind: "document",
 				sortOrder: 30,
 				...timestamps,
 			},

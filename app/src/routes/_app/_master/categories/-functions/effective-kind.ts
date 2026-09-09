@@ -3,7 +3,6 @@ import type { CategoryDto, CategoryKind } from "@/domain/category";
 export const categoryKindLabels: Record<CategoryKind, string> = {
     daily_goods: "日用品",
     food: "食料品",
-    book: "書籍",
     document: "書類",
 };
 

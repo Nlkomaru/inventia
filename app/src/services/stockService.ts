@@ -27,7 +27,6 @@ import {
     stocktakeSchema,
 } from "../domain/stock";
 import { type ItemLotRow, listItemLots } from "../repositories/lotRepository";
-import { listReadingStatesByItemIds } from "../repositories/readingRepository";
 import {
     appendStockOperation,
     correctStockMovementNote as correctStockMovementNoteRow,
@@ -594,14 +593,9 @@ export const listStaleStocktakeItems = async (
             parsed,
             staleStocktakeThreshold(parsed.staleAfterDays),
         );
-        // 読書状態はページに並んだ品目 id の IN 句 1 回で解決する（N+1 禁止）
-        const readingStates = await listReadingStatesByItemIds(
-            db,
-            page.rows.map((row) => row.id),
-        );
         return {
             items: page.rows.map((row) => ({
-                ...toItemDto(row, readingStates.get(row.id)?.status ?? null),
+                ...toItemDto(row),
                 lastStocktakeAt: row.lastStocktakeAt,
             })),
             nextCursor: page.nextCursor,

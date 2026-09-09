@@ -6,7 +6,6 @@ import {
     type ItemRow,
     listItems as listItemRecords,
 } from "../repositories/itemRepository";
-import { listReadingStatesByItemIds } from "../repositories/readingRepository";
 import {
     createOpenRouterEmbeddings,
     EmbeddingServiceError,
@@ -267,11 +266,5 @@ export const searchItemsByVector = async (
             logIndexFailure("searchItemsByVector cleanup", staleIds, error);
         });
     }
-    const readingStates = await listReadingStatesByItemIds(
-        env.DB,
-        rows.map((row) => row.id),
-    );
-    return rows.map((row) =>
-        toItemDto(row, readingStates.get(row.id)?.status ?? null),
-    );
+    return rows.map((row) => toItemDto(row));
 };

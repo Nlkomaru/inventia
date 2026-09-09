@@ -134,6 +134,13 @@
       "when": 1787899607148,
       "tag": "0018_overjoyed_apocalypse",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1788913720994,
+      "tag": "0019_remove_book_reading_and_kind",
+      "breakpoints": true
     }
   ]
 }

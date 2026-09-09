@@ -45,7 +45,6 @@ const pageClassName = "flex w-full flex-col gap-6 p-4 sm:p-6 lg:p-8";
 const kindLabels = {
     daily_goods: "日用品",
     food: "食料品",
-    book: "書籍",
     document: "書類",
 } as const;
 
