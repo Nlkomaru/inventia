@@ -8,12 +8,7 @@ export const categoryNameSchema = z
     .min(1, "カテゴリ名は必須です")
     .max(200, "カテゴリ名は200文字以内で入力してください");
 
-export const categoryKindSchema = z.enum([
-    "daily_goods",
-    "food",
-    "book",
-    "document",
-]);
+export const categoryKindSchema = z.enum(["daily_goods", "food", "document"]);
 
 export const categorySortOrderSchema = z
     .number()

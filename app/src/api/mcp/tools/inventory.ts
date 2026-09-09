@@ -1,7 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
-    bookReadingListDtoSchema,
     itemBatchIdsMax,
     itemBatchInputSchema,
     itemBatchOutputSchema,
@@ -21,7 +20,6 @@ import {
     priceRecordListInputSchema,
     priceRecordListOutputSchema,
 } from "../../../domain/price";
-import { bookReadingListQuerySchema } from "../../../domain/reading";
 import {
     staleStocktakeListDtoSchema,
     staleStocktakeQuerySchema,
@@ -44,10 +42,6 @@ import {
     listPriceRecordsForItems,
     PriceServiceError,
 } from "../../../services/priceService";
-import {
-    listBookReadingStates,
-    ReadingServiceError,
-} from "../../../services/readingService";
 import {
     listStaleStocktakeItems,
     StockServiceError,
@@ -95,13 +89,6 @@ const priceError = (error: unknown, fallback: string) =>
             : `INTERNAL_ERROR: ${fallback}`,
     );
 
-const readingError = (error: unknown, fallback: string) =>
-    mcpError(
-        error instanceof ReadingServiceError
-            ? `${error.code}: ${error.message}`
-            : `INTERNAL_ERROR: ${fallback}`,
-    );
-
 const stockError = (error: unknown, fallback: string) =>
     mcpError(
         error instanceof StockServiceError
@@ -139,7 +126,7 @@ export const registerInventoryTools = (
         "get_inventory_items",
         {
             title: "Get several inventory items",
-            description: `Read up to ${itemBatchIdsMax} items by id in one call, so a caller holding a page of search results does not have to spend one call per row; a single item is read by passing its id as the only element of ids. Each item carries its base unit, total quantity, low-stock threshold, the expiry-lot breakdown, its storage location and its reading state. items comes back in the order the ids were given, duplicates removed, and ids that do not exist are listed in notFound instead of failing the whole call. includeLots defaults to true and carries the per-expiry lot breakdown, one entry per expiry date in FEFO order (earliest expiry first, the lot without an expiry date last, lots holding no stock omitted); set it to false when only the summary is needed — lots is then empty while lotCount and earliestExpiryDate still describe the lots that have stock. This tool only reads data.`,
+            description: `Read up to ${itemBatchIdsMax} items by id in one call, so a caller holding a page of search results does not have to spend one call per row; a single item is read by passing its id as the only element of ids. Each item carries its base unit, total quantity, low-stock threshold, the expiry-lot breakdown and its storage location. items comes back in the order the ids were given, duplicates removed, and ids that do not exist are listed in notFound instead of failing the whole call. includeLots defaults to true and carries the per-expiry lot breakdown, one entry per expiry date in FEFO order (earliest expiry first, the lot without an expiry date last, lots holding no stock omitted); set it to false when only the summary is needed — lots is then empty while lotCount and earliestExpiryDate still describe the lots that have stock. This tool only reads data.`,
             inputSchema: itemBatchInputSchema,
             outputSchema: itemBatchOutputSchema,
         },
@@ -177,27 +164,6 @@ export const registerInventoryTools = (
                 return inventoryError(
                     error,
                     "expiring inventory listing failed",
-                );
-            }
-        },
-    );
-
-    server.registerTool(
-        "list_book_reading_status",
-        {
-            title: "List book reading status",
-            description:
-                "List the inventory items that belong to a book category together with their reading state. Each item carries readingStatus plus readingState, which adds startedAt and finishedAt; both are null when no reading state is stored for that item, so books that were never marked are still listed. The optional status filter (unread, reading, or finished) matches stored reading states only, so a book without a stored state never matches any value and an unset state is not treated as unread. Results are ordered by item name, return at most limit items (default 50, maximum 100), and pass nextCursor back as cursor to continue.",
-            inputSchema: bookReadingListQuerySchema,
-            outputSchema: bookReadingListDtoSchema,
-        },
-        async (input) => {
-            try {
-                return mcpSuccess(await listBookReadingStates(db, input));
-            } catch (error) {
-                return readingError(
-                    error,
-                    "book reading status listing failed",
                 );
             }
         },

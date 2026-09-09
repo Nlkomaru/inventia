@@ -155,7 +155,7 @@ function ReceiveStockPage() {
         [locations, locationLabels],
     );
 
-    // 書籍などの種別は基準単位を service が補うため、入力を必須にしない
+    // 書類などの種別は基準単位を service が補うため、入力を必須にしない
     const effectiveKind = useMemo(
         () => getEffectiveCategoryKind(categoryId || null, categories),
         [categories, categoryId],

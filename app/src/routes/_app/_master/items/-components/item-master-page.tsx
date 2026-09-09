@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -22,21 +22,11 @@ import type {
     ItemUpdateInput,
 } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
-import type { ReadingStateUpsertInput } from "@/domain/reading";
 import { buildHierarchyLabels, collectDescendantIds } from "@/lib/hierarchy";
-import type { ReadingStateChange } from "@/lib/reading-input";
+import { createItem, deleteItem, updateItem } from "../-api/item-api";
 import {
-    clearReadingState,
-    createItem,
-    deleteItem,
-    setReadingState,
-    updateItem,
-} from "../-api/item-api";
-import {
-    bookKeys,
     categoryKeys,
     inventoryKeys,
-    itemDetailQueryOptions,
     itemKeys,
     locationKeys,
 } from "../-api/item-queries";
@@ -87,14 +77,13 @@ export function ItemMasterPage({
     const [editingItem, setEditingItem] = useState<ItemDto | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
-    // 品目の変更は在庫一覧の行・ラベルと書籍一覧にも波及するため、
-    // ["inventory"] と ["books"] も無効化する。
+    // 品目の変更は在庫一覧の行・ラベルにも波及するため、
+    // ["inventory"] も無効化する。
     // onSuccess の Promise を返すと mutateAsync が再取得完了まで待つ。
     const invalidateItems = () =>
         Promise.all([
             queryClient.invalidateQueries({ queryKey: itemKeys.all }),
             queryClient.invalidateQueries({ queryKey: inventoryKeys.all }),
-            queryClient.invalidateQueries({ queryKey: bookKeys.all }),
         ]);
     const createMutation = useMutation({
         mutationFn: (input: ItemCreateInput) => createItem(input),
@@ -108,28 +97,6 @@ export function ItemMasterPage({
     const deleteMutation = useMutation({
         mutationFn: (id: string) => deleteItem(id),
         onSuccess: invalidateItems,
-    });
-    const setReadingStateMutation = useMutation({
-        mutationFn: ({
-            itemId,
-            input,
-        }: {
-            itemId: string;
-            input: ReadingStateUpsertInput;
-        }) => setReadingState(itemId, input),
-        onSuccess: invalidateItems,
-    });
-    const clearReadingStateMutation = useMutation({
-        mutationFn: (itemId: string) => clearReadingState(itemId),
-        onSuccess: invalidateItems,
-    });
-
-    // readingStatus が null の品目は読書状態の行を持たないため詳細を取りに行かない。
-    // 品目 id が query key に入るため、シートを閉じた後や別の品目へ切り替えた後に
-    // 前の応答が届いても混ざらない。
-    const readingStateQuery = useQuery({
-        ...itemDetailQueryOptions(editingItem?.id ?? ""),
-        enabled: editingItem !== null && editingItem.readingStatus !== null,
     });
 
     const reload = () => {
@@ -170,42 +137,18 @@ export function ItemMasterPage({
         setFormOpen(true);
     };
 
-    const saveCreate = async (
-        input: ItemCreateInput,
-        readingState: ReadingStateUpsertInput | null,
-    ) => {
+    const saveCreate = async (input: ItemCreateInput) => {
         setError(null);
-        let created: ItemDto;
         try {
-            created = await createMutation.mutateAsync(input);
+            await createMutation.mutateAsync(input);
         } catch (cause) {
             const message = errorMessage(cause, "品目を登録できませんでした");
             setError(message);
             throw new Error(message);
         }
-        if (!readingState) return;
-        try {
-            await setReadingStateMutation.mutateAsync({
-                itemId: created.id,
-                input: readingState,
-            });
-        } catch (cause) {
-            // 品目の登録は確定しているため、再送で品目が二重に増えないよう
-            // 例外を投げ直さず、読書状態だけをやり直せる案内にする
-            setError(
-                `品目は登録しましたが、読書状態を保存できませんでした（${errorMessage(
-                    cause,
-                    "原因不明のエラー",
-                )}）。編集から設定し直してください`,
-            );
-        }
     };
 
-    const saveUpdate = async (
-        id: string,
-        input: ItemUpdateInput,
-        readingState: ReadingStateChange,
-    ) => {
+    const saveUpdate = async (id: string, input: ItemUpdateInput) => {
         setError(null);
         try {
             await updateMutation.mutateAsync({ id, input });
@@ -213,25 +156,6 @@ export function ItemMasterPage({
             const message = errorMessage(cause, "品目を更新できませんでした");
             setError(message);
             throw new Error(message);
-        }
-        if (readingState.kind === "unchanged") return;
-        try {
-            if (readingState.kind === "clear") {
-                await clearReadingStateMutation.mutateAsync(id);
-                return;
-            }
-            await setReadingStateMutation.mutateAsync({
-                itemId: id,
-                input: readingState.input,
-            });
-        } catch (cause) {
-            // 品目の更新は確定しているため、こちらも例外を投げ直さない
-            setError(
-                `品目は更新しましたが、読書状態を保存できませんでした（${errorMessage(
-                    cause,
-                    "原因不明のエラー",
-                )}）。編集から設定し直してください`,
-            );
         }
     };
 
@@ -283,15 +207,6 @@ export function ItemMasterPage({
         [locationLabels, locations],
     );
 
-    const displayError =
-        error ??
-        (readingStateQuery.error
-            ? errorMessage(
-                  readingStateQuery.error,
-                  "読書状態を読み込めませんでした",
-              )
-            : null);
-
     return (
         <main className="w-full space-y-6 p-4 sm:p-6 lg:p-8">
             <header className="flex items-center justify-between gap-4">
@@ -302,13 +217,13 @@ export function ItemMasterPage({
                 </Button>
             </header>
 
-            {displayError ? (
+            {error ? (
                 <div
                     aria-live="polite"
                     className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
                     role="alert"
                 >
-                    <span>{displayError}</span>
+                    <span>{error}</span>
                     <Button
                         onClick={reload}
                         size="sm"
@@ -452,8 +367,6 @@ export function ItemMasterPage({
                 }}
                 onUpdate={saveUpdate}
                 open={formOpen}
-                readingState={readingStateQuery.data?.readingState ?? null}
-                readingStateLoading={readingStateQuery.isLoading}
             />
         </main>
     );

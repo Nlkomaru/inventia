@@ -4,7 +4,6 @@ import {
     lotExpiryDateOutputSchema,
     lotExpiryDateSchema,
 } from "./lot";
-import { readingStateDtoSchema, readingStatusSchema } from "./reading";
 
 export const itemBaseDimensionSchema = z.enum(["mass", "volume", "count"]);
 
@@ -23,9 +22,6 @@ export const itemDtoSchema = z.object({
     lotCount: z.int().min(0),
     lowStockThreshold: z.int().min(0).nullable(),
     memo: z.string().nullable(),
-    // 保存済みの読書状態。読書状態は書籍カテゴリーの品目だけが持つため、
-    // 書籍以外と未設定はどちらも null になる
-    readingStatus: readingStatusSchema.nullable(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
 });
@@ -33,18 +29,6 @@ export const itemDtoSchema = z.object({
 // 詳細取得では期限別の内訳を同梱する（数量 0 のロットは含めない）
 export const itemDetailDtoSchema = itemDtoSchema.extend({
     lots: z.array(itemLotDtoSchema),
-    // readingStatus と同じ行から導く、開始日・読了日まで含めた読書状態
-    readingState: readingStateDtoSchema.nullable(),
-});
-
-// 書籍カテゴリーの品目と読書状態の一覧行。一覧のためロット内訳は含めない
-export const bookReadingItemDtoSchema = itemDtoSchema.extend({
-    readingState: readingStateDtoSchema.nullable(),
-});
-
-export const bookReadingListDtoSchema = z.object({
-    items: z.array(bookReadingItemDtoSchema),
-    nextCursor: z.string().nullable(),
 });
 
 const itemFields = {
@@ -143,9 +127,6 @@ export const itemListQuerySchema = z
         // 数量 > 0 のロットの期限が now + n 日以内の品目だけに絞る。
         // 期限なしロットは対象外で、既に期限を過ぎたロットは常に該当する
         expiringWithinDays: z.coerce.number().int().min(0).max(3650).optional(),
-        // 指定した読書状態が保存されている品目だけに絞る。読書状態を持たない品目は
-        // どの値にも一致しない（未設定を unread とみなさない）
-        readingStatus: readingStatusSchema.optional(),
         // category と location は関連マスタの名前、baseUnit は品目の基準単位で並べる。
         // expiry は期限が近い在庫を先頭ページで返すために残し、期限なしは向きに
         // かかわらず最後へ置く。既定は従来どおり名前の昇順
@@ -227,8 +208,8 @@ export type ItemNameMatchResult = z.infer<typeof itemNameMatchResultSchema>;
 export type ItemNameMatchOutput = z.infer<typeof itemNameMatchOutputSchema>;
 
 // id の一括読み取り。1 件ずつ引くと呼び出し回数が id の数に比例するため、
-// まとめて受ける。上限は D1 の bind 上限（100）に収まる値で、読書状態の
-// 一括取得が 1 つの IN 句を作るためこれ以上には広げられない
+// まとめて受ける。上限は D1 の bind 上限（100）に収まり、IN 句以外の絞り込み
+// 条件を足す余地を残す値にする
 export const itemBatchIdsMax = 90;
 
 export const itemBatchInputSchema = z
@@ -265,5 +246,3 @@ export type ItemSemanticSearchResult = z.infer<
 export type ItemBaseDimension = z.infer<typeof itemBaseDimensionSchema>;
 export type ItemDto = z.infer<typeof itemDtoSchema>;
 export type ItemDetailDto = z.infer<typeof itemDetailDtoSchema>;
-export type BookReadingItemDto = z.infer<typeof bookReadingItemDtoSchema>;
-export type BookReadingListDto = z.infer<typeof bookReadingListDtoSchema>;

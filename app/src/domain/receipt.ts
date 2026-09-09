@@ -129,7 +129,7 @@ export const receiptOcrLineSchema = z.object({
     stockRelevant: z
         .boolean()
         .describe(
-            "在庫として管理する品物の行なら true。食品・日用品・書籍などの商品は true。レジ袋、割り箸、送料、手数料、包装代、預り金の調整のような、在庫に置かないものは false",
+            "在庫として管理する品物の行なら true。食品・日用品などの商品は true。レジ袋、割り箸、送料、手数料、包装代、預り金の調整のような、在庫に置かないものは false",
         ),
     expiry: receiptOcrLineExpirySchema,
     stocking: receiptOcrLineStockingSchema,

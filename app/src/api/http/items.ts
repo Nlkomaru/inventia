@@ -68,7 +68,7 @@ itemsApp.openAPIRegistry.registerPath({
     summary: "Search inventory items",
     operationId: "listItems",
     description:
-        "Search item names and filter by category, location, low-stock state, expiry within a number of days (expiringWithinDays), or reading state (readingStatus) with stable cursor pagination. Sort with sort=name, category, location, baseUnit, or expiry and choose sortDirection=asc or desc; cursors are valid only for the same sort and direction. Category and location sort by their stored names, and expiry keeps items without an expiry date last in either direction. Each item reports its total quantity plus the expiry summary of its stocked lots: earliestExpiryDate is the earliest expiry date (null when none has an expiry date) and lotCount is how many lots hold stock. readingStatus is null when no reading state is stored, including every item outside a book category; filtering by readingStatus matches stored states only.",
+        "Search item names and filter by category, location, low-stock state, expiry within a number of days (expiringWithinDays) with stable cursor pagination. Sort with sort=name, category, location, baseUnit, or expiry and choose sortDirection=asc or desc; cursors are valid only for the same sort and direction. Category and location sort by their stored names, and expiry keeps items without an expiry date last in either direction. Each item reports its total quantity plus the expiry summary of its stocked lots: earliestExpiryDate is the earliest expiry date (null when none has an expiry date) and lotCount is how many lots hold stock.",
     request: { query: itemListQuerySchema },
     responses: {
         200: {
@@ -135,7 +135,7 @@ itemsApp.openAPIRegistry.registerPath({
     summary: "Get an inventory item",
     operationId: "getItem",
     description:
-        "Returns the item with its expiry lots and its reading state. lots holds one entry per expiry date in FEFO order (earliest expiry first, the lot without an expiry date last) and omits lots at quantity 0, so currentQuantity equals the sum of the returned lot quantities. readingState carries the stored status with startedAt and finishedAt, and is null for an item that has no reading state, which includes every item outside a book category; readingStatus repeats the status of that same row. Set the reading state with PUT /api/items/{itemId}/reading-state.",
+        "Returns the item with its expiry lots. lots holds one entry per expiry date in FEFO order (earliest expiry first, the lot without an expiry date last) and omits lots at quantity 0, so currentQuantity equals the sum of the returned lot quantities.",
     request: { params: z.object({ id: itemIdParameter }) },
     responses: {
         200: {
@@ -182,7 +182,7 @@ itemsApp.openAPIRegistry.registerPath({
     summary: "Update an inventory item",
     operationId: "updateItem",
     description:
-        "Updates the item master data: name, categoryId, locationId, baseUnit, baseDimension, lowStockThreshold, and memo. At least one field is required, and the fields you omit stay unchanged. baseUnit and baseDimension changes relabel the item without converting existing quantities: the item's current quantity, its lots, its stock movements, its price records and its low-stock threshold all keep their stored numbers, so the same numbers simply start meaning the new unit. The low-stock threshold is expressed in the base unit, so send a corrected lowStockThreshold in the same request or in a follow-up PATCH after relabelling. Warn the user before sending one for an item that already holds stock or history. A baseDimension change must send baseUnit in the same request, because a dimension left with the previous dimension's unit is never what the caller meant; baseUnit alone is accepted for relabelling within the same dimension. Stock quantity and lot expiry dates remain immutable through this endpoint: change an expiry date with PATCH /api/items/{itemId}/lots/{lotId} and a quantity with the adjustment or stocktake endpoints. Moving an item that holds a reading state out of its book category is rejected, because only items in a book category can hold one; remove it with DELETE /api/items/{itemId}/reading-state first.",
+        "Updates the item master data: name, categoryId, locationId, baseUnit, baseDimension, lowStockThreshold, and memo. At least one field is required, and the fields you omit stay unchanged. baseUnit and baseDimension changes relabel the item without converting existing quantities: the item's current quantity, its lots, its stock movements, its price records and its low-stock threshold all keep their stored numbers, so the same numbers simply start meaning the new unit. The low-stock threshold is expressed in the base unit, so send a corrected lowStockThreshold in the same request or in a follow-up PATCH after relabelling. Warn the user before sending one for an item that already holds stock or history. A baseDimension change must send baseUnit in the same request, because a dimension left with the previous dimension's unit is never what the caller meant; baseUnit alone is accepted for relabelling within the same dimension. Stock quantity and lot expiry dates remain immutable through this endpoint: change an expiry date with PATCH /api/items/{itemId}/lots/{lotId} and a quantity with the adjustment or stocktake endpoints.",
     request: {
         params: z.object({ id: itemIdParameter }),
         body: {
@@ -202,7 +202,7 @@ itemsApp.openAPIRegistry.registerPath({
             "The item or a referenced record does not exist. Codes: ITEM_NOT_FOUND, CATEGORY_NOT_FOUND, LOCATION_NOT_FOUND.",
         ),
         409: jsonError(
-            "The requested update is not allowed. Codes: ITEM_CATEGORY_KIND_CONFLICT (an item cannot move across the document and non-document category boundary), ITEM_READING_STATE_CONFLICT (the item still holds a reading state; remove it with DELETE /api/items/{itemId}/reading-state before moving the item out of a book category), ITEM_PRICE_UNIT_CONFLICT (the item holds price records whose unit price is derived from the base unit, so a mass base unit must be g or kg and a volume base unit must be mL or L).",
+            "The requested update is not allowed. Codes: ITEM_CATEGORY_KIND_CONFLICT (an item cannot move across the document and non-document category boundary), ITEM_PRICE_UNIT_CONFLICT (the item holds price records whose unit price is derived from the base unit, so a mass base unit must be g or kg and a volume base unit must be mL or L).",
         ),
         ...serverErrorResponses,
     },

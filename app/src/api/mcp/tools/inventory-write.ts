@@ -7,10 +7,6 @@ import {
 } from "../../../domain/item";
 import { itemLotListDtoSchema, lotUpdateSchema } from "../../../domain/lot";
 import {
-    readingStateDtoSchema,
-    readingStateUpsertSchema,
-} from "../../../domain/reading";
-import {
     stockAdjustmentSchema,
     stockMovementDtoSchema,
     stockMovementNoteCorrectionSchema,
@@ -30,10 +26,6 @@ import {
     LotServiceError,
     updateLotExpiryDate,
 } from "../../../services/lotService";
-import {
-    ReadingServiceError,
-    setReadingState,
-} from "../../../services/readingService";
 import {
     adjustStock,
     correctStockMovementNote,
@@ -72,17 +64,12 @@ const lotExpiryCorrectionInputSchema = lotUpdateSchema.extend({
     lotId: lotIdInputSchema,
 });
 
-const readingStatusInputSchema = readingStateUpsertSchema.extend({
-    itemId: itemIdInputSchema,
-});
-
 // 業務エラーは service のコードと文言だけを返し、内部例外や SQL を利用者へ渡さない
 const serviceError = (error: unknown, fallback: string) =>
     mcpError(
         error instanceof ItemServiceError ||
             error instanceof StockServiceError ||
-            error instanceof LotServiceError ||
-            error instanceof ReadingServiceError
+            error instanceof LotServiceError
             ? `${error.code}: ${error.message}`
             : `INTERNAL_ERROR: ${fallback}`,
     );
@@ -121,7 +108,7 @@ export const registerInventoryWriteTools = (
         {
             title: "Update inventory item",
             description:
-                "Overwrites the master data of the existing item named by id; the fields you send replace the stored values and the fields you omit stay unchanged. At least one of name, categoryId, locationId, baseUnit, baseDimension, lowStockThreshold, or memo is required. baseUnit and baseDimension changes relabel the item without converting existing quantities: the item's current quantity, its lots, its stock movements, its price records and its low-stock threshold all keep their stored numbers, so the same numbers start meaning the new unit. The low-stock threshold is expressed in the base unit, so send a corrected lowStockThreshold in the same call or right after relabelling. Tell the user that before changing either on an item that already holds stock or history. A baseDimension change must send baseUnit in the same request, because a dimension left with the previous dimension's unit is never what the caller meant; baseUnit alone is accepted for relabelling within the same dimension. Stock quantity and lot expiry dates still cannot be changed here: use adjust_inventory_stock or stocktake_inventory_item for quantities and correct_inventory_lot_expiry for expiry dates. An item cannot move across the document and non-document category boundary, and an item that holds a reading state cannot leave its book category until that reading state is removed. An item that holds price records is rejected when the new base unit cannot express a unit price: mass must be g or kg and volume must be mL or L, while count accepts any label.",
+                "Overwrites the master data of the existing item named by id; the fields you send replace the stored values and the fields you omit stay unchanged. At least one of name, categoryId, locationId, baseUnit, baseDimension, lowStockThreshold, or memo is required. baseUnit and baseDimension changes relabel the item without converting existing quantities: the item's current quantity, its lots, its stock movements, its price records and its low-stock threshold all keep their stored numbers, so the same numbers start meaning the new unit. The low-stock threshold is expressed in the base unit, so send a corrected lowStockThreshold in the same call or right after relabelling. Tell the user that before changing either on an item that already holds stock or history. A baseDimension change must send baseUnit in the same request, because a dimension left with the previous dimension's unit is never what the caller meant; baseUnit alone is accepted for relabelling within the same dimension. Stock quantity and lot expiry dates still cannot be changed here: use adjust_inventory_stock or stocktake_inventory_item for quantities and correct_inventory_lot_expiry for expiry dates. An item cannot move across the document and non-document category boundary. An item that holds price records is rejected when the new base unit cannot express a unit price: mass must be g or kg and volume must be mL or L, while count accepts any label.",
             inputSchema: itemUpdateInputSchema,
             outputSchema: itemDtoSchema,
         },
@@ -212,24 +199,6 @@ export const registerInventoryWriteTools = (
                 );
             } catch (error) {
                 return serviceError(error, "lot expiry correction failed");
-            }
-        },
-    );
-
-    server.registerTool(
-        "set_book_reading_status",
-        {
-            title: "Set book reading status",
-            description:
-                "Replaces the stored reading state of one book item with the given status and dates; startedAt and finishedAt are overwritten on every call, so omitting them clears the stored dates. Only items in a book category, including items inheriting that kind from an ancestor category, can hold a reading state; any other item is rejected. status unread requires both dates to be empty, status reading requires finishedAt to be empty, and finishedAt must not be earlier than startedAt. Dates are ISO 8601 date-times with an offset and are stored normalized to UTC. Stock, lots, and movements are not touched.",
-            inputSchema: readingStatusInputSchema,
-            outputSchema: readingStateDtoSchema,
-        },
-        async ({ itemId, ...state }) => {
-            try {
-                return mcpSuccess(await setReadingState(db, itemId, state));
-            } catch (error) {
-                return serviceError(error, "reading status update failed");
             }
         },
     );
