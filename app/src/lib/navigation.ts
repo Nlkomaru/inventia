@@ -57,6 +57,7 @@ export const navigationGroups: readonly NavGroup[] = [
         items: [
             { title: "AI・ベクトル検索", url: "/settings/integrations" },
             { title: "利用状況", url: "/settings/usage" },
+            { title: "API トークン", url: "/settings/tokens" },
             {
                 title: "API リファレンス",
                 url: "/api/scalar",
