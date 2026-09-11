@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { mcpUsageSummarySchema } from "../../domain/usage";
 import { recordMcpToolCall } from "../../repositories/mcpToolUsageRepository";
+import { createTestAuthHeaders } from "../../test/apiTokenAuth";
 import { apiApp } from "../app";
 
 describe("MCP usage API", () => {
@@ -10,7 +11,9 @@ describe("MCP usage API", () => {
         await recordMcpToolCall(env.DB, toolName, "2026-08-28T13:00:00.000Z");
 
         const response = await apiApp.fetch(
-            new Request("https://inventia.test/api/settings/usage/mcp"),
+            new Request("https://inventia.test/api/settings/usage/mcp", {
+                headers: await createTestAuthHeaders(),
+            }),
             env,
         );
         expect(response.status).toBe(200);

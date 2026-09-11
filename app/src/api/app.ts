@@ -1,5 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
+import { apiTokenAuth } from "./apiTokenAuth";
 import type { ApiBindings } from "./bindings";
 import { categoriesApp } from "./http/categories";
 import { externalProvidersApp } from "./http/external-providers";
@@ -16,6 +17,10 @@ import { usageApp } from "./http/usage";
 import { handleMcpRequest } from "./mcp/handler";
 
 export const apiApp = new OpenAPIHono<ApiBindings>();
+
+// すべての /api/* はここでトークンを検証する。Cloudflare Access を /api で
+// 無効にしても、外部からはトークンが無いと何も読めない・書けない
+apiApp.use("/api/*", apiTokenAuth);
 
 apiApp.route("/api/health", healthApp);
 apiApp.route("/api/categories", categoriesApp);
