@@ -106,7 +106,7 @@ export function IntegrationsSettingsPage() {
 
     const saveMutation = useMutation({
         mutationFn: (input: OpenRouterIntegrationUpdate) =>
-            updateOpenRouterIntegration(input),
+            updateOpenRouterIntegration({ data: input }),
         // 保存で変わるのは連携状態だけ。モデル一覧は上流の公開エンドポイント由来で
         // 保存の影響を受けないため無効化しない。
         onSuccess: () =>
