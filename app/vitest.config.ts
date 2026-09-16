@@ -20,8 +20,10 @@ export default defineConfig({
                 r2Buckets: ["RECEIPTS"],
                 bindings: {
                     TEST_MIGRATIONS: migrations,
-                    // 店舗ファビコン URL の署名鍵の元。テスト用の固定値で秘密ではない
-                    SETTINGS_ENCRYPTION_KEY: "inventia-test-settings-key",
+                    // 店舗ファビコン URL の署名と連携設定の暗号化に使う鍵。本番と同じ
+                    // 32 バイトの Base64 形式にしておく。テスト用の固定値で秘密ではない
+                    SETTINGS_ENCRYPTION_KEY:
+                        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                 },
             },
         }),
