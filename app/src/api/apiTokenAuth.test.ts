@@ -1,5 +1,6 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { storeDtoSchema } from "../domain/store";
 import {
     apiTokenUsageRefreshMs,
     authenticateApiToken,
@@ -7,6 +8,7 @@ import {
     listApiTokenRecords,
     revokeApiToken,
 } from "../services/apiTokenService";
+import { createStore, uploadStoreFavicon } from "../services/storeService";
 import { apiApp } from "./app";
 
 const categoriesRequest = (headers: Record<string, string> = {}) =>
@@ -132,5 +134,53 @@ describe("API token authentication", () => {
         expect(second?.lastUsedAt).toBe("2026-09-01T00:01:00.000Z");
         expect(third?.lastUsedAt).not.toBe("2026-09-01T00:01:00.000Z");
         expect(stored?.lastUsedAt).toBe(third?.lastUsedAt);
+    });
+    it("serves a store favicon through its signed URL without a token", async () => {
+        const store = await createStore(env, {
+            name: `favicon-${crypto.randomUUID()}`,
+        });
+        const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+        const withFavicon = storeDtoSchema.parse(
+            await uploadStoreFavicon(env, store.id, {
+                bytes: image,
+                contentType: "image/png",
+            }),
+        );
+        const faviconUrl = withFavicon.faviconUrl;
+        if (faviconUrl === null) {
+            throw new Error("faviconUrl was not issued");
+        }
+        const origin = "https://inventia.example";
+
+        const signed = await apiApp.fetch(
+            new Request(`${origin}${faviconUrl}`),
+            env,
+        );
+        // ブラウザのキャッシュ用に query を足しても署名は壊れない
+        const withVersion = await apiApp.fetch(
+            new Request(`${origin}${faviconUrl}&v=1`),
+            env,
+        );
+        const unsigned = await apiApp.fetch(
+            new Request(`${origin}/api/stores/${store.id}/favicon`),
+            env,
+        );
+        const tampered = await apiApp.fetch(
+            new Request(`${origin}${faviconUrl}0`),
+            env,
+        );
+        // 署名は画像の GET だけを通す。削除や差し替えはトークンが要る
+        const deleteWithSignature = await apiApp.fetch(
+            new Request(`${origin}${faviconUrl}`, { method: "DELETE" }),
+            env,
+        );
+
+        expect(signed.status).toBe(200);
+        expect(signed.headers.get("content-type")).toBe("image/png");
+        expect(new Uint8Array(await signed.arrayBuffer())).toEqual(image);
+        expect(withVersion.status).toBe(200);
+        expect(unsigned.status).toBe(401);
+        expect(tampered.status).toBe(401);
+        expect(deleteWithSignature.status).toBe(401);
     });
 });

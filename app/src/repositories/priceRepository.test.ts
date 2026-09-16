@@ -215,8 +215,8 @@ describe("単価式の TS と SQL の一致", () => {
  */
 describe("基準単位のつけ替え後の単価", () => {
     const unitPrices = async (itemId: string) => {
-        const history = await listPriceRecords(env.DB, { itemId });
-        const comparison = await compareUnitPrices(env.DB, { itemId });
+        const history = await listPriceRecords(env, { itemId });
+        const comparison = await compareUnitPrices(env, { itemId });
         const fromHistory = history.items[0]?.unitPrice;
         const fromComparison = comparison.items[0]?.unitPrice;
         if (fromHistory === undefined || fromComparison === undefined) {
@@ -230,7 +230,7 @@ describe("基準単位のつけ替え後の単価", () => {
             baseUnit: "mL",
             baseDimension: "volume",
         });
-        await createPriceRecord(env.DB, {
+        await createPriceRecord(env, {
             itemId,
             contentAmount: 2000,
             contentUnit: "mL",
@@ -257,7 +257,7 @@ describe("基準単位のつけ替え後の単価", () => {
             baseUnit: "g",
             baseDimension: "mass",
         });
-        await createPriceRecord(env.DB, {
+        await createPriceRecord(env, {
             itemId,
             contentAmount: 500,
             contentUnit: "g",
@@ -292,7 +292,7 @@ describe("価格記録の取得元URL", () => {
             updatedAt: "2026-08-20T00:00:00.000Z",
         });
 
-        const record = await createPriceRecord(env.DB, {
+        const record = await createPriceRecord(env, {
             itemId,
             contentAmount: 1,
             contentUnit: "個",

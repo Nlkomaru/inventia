@@ -16,7 +16,13 @@ export default defineConfig({
                 compatibilityDate: "2026-08-07",
                 compatibilityFlags: ["nodejs_compat"],
                 d1Databases: ["DB"],
-                bindings: { TEST_MIGRATIONS: migrations },
+                // 店舗ファビコンの保管先。ローカルの R2 emulation なので本番へは触れない
+                r2Buckets: ["RECEIPTS"],
+                bindings: {
+                    TEST_MIGRATIONS: migrations,
+                    // 店舗ファビコン URL の署名鍵の元。テスト用の固定値で秘密ではない
+                    SETTINGS_ENCRYPTION_KEY: "inventia-test-settings-key",
+                },
             },
         }),
     ],

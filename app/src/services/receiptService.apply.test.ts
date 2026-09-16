@@ -137,7 +137,7 @@ const applySingleLine = async (
     );
 
 const firstPriceRecord = async (itemId: string) => {
-    const page = await listPriceRecords(env.DB, { itemId });
+    const page = await listPriceRecords(env, { itemId });
     return page.items;
 };
 

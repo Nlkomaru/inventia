@@ -21,7 +21,6 @@ import {
     priceRecordCreateInputSchema,
     priceRecordListInputSchema,
 } from "../domain/price";
-import { storeFaviconPath } from "../domain/store";
 import {
     type AllPriceRecordRow,
     findItemPricingContext,
@@ -33,6 +32,15 @@ import {
     type PriceRecordRow,
 } from "../repositories/priceRepository";
 import { findStoreById } from "../repositories/storeRepository";
+import {
+    type StoreFaviconUrlEnv,
+    signStoreFaviconUrl,
+} from "./storeFaviconUrlService";
+
+/** 価格記録は店舗のファビコン URL に署名するため、D1 に加えて署名鍵の元が要る。 */
+export interface PriceEnv extends StoreFaviconUrlEnv {
+    DB: D1Database;
+}
 
 export type PriceServiceErrorCode =
     | "PRICE_INVALID_INPUT"
@@ -99,6 +107,7 @@ const parseComparisonInput = (input: unknown): PriceComparisonListInput => {
 };
 
 const toDto = (
+    env: StoreFaviconUrlEnv,
     row: PriceRecordRow,
     unitPrice = calculateUnitPrice(
         row.price,
@@ -119,7 +128,7 @@ const toDto = (
     storeName: row.storeName,
     storeFaviconUrl:
         row.storeId !== null && row.storeFaviconObjectKey !== null
-            ? storeFaviconPath(row.storeId)
+            ? signStoreFaviconUrl(env, row.storeId)
             : null,
     url: row.url,
     recordedAt: canonicalUtcDateTime(row.recordedAt),
@@ -129,8 +138,11 @@ const toDto = (
     unitPrice,
 });
 
-const toAllDto = (row: AllPriceRecordRow): AllPriceRecordDto => ({
-    ...toDto(row),
+const toAllDto = (
+    env: StoreFaviconUrlEnv,
+    row: AllPriceRecordRow,
+): AllPriceRecordDto => ({
+    ...toDto(env, row),
     itemName: row.itemName,
 });
 
@@ -145,11 +157,11 @@ export type AllPriceRecordListResponse = {
 };
 
 export const createPriceRecord = async (
-    db: D1Database,
+    env: PriceEnv,
     input: unknown,
 ): Promise<PriceRecordDto> => {
     const parsed = parseCreateInput(input);
-    const item = await findItemPricingContext(db, parsed.itemId);
+    const item = await findItemPricingContext(env.DB, parsed.itemId);
     if (!item) {
         throw new PriceServiceError(
             "PRICE_ITEM_NOT_FOUND",
@@ -171,7 +183,7 @@ export const createPriceRecord = async (
     const store =
         parsed.storeId === undefined || parsed.storeId === null
             ? null
-            : await findStoreById(db, parsed.storeId);
+            : await findStoreById(env.DB, parsed.storeId);
     if (parsed.storeId && !store) {
         throw new PriceServiceError(
             "PRICE_STORE_NOT_FOUND",
@@ -186,7 +198,8 @@ export const createPriceRecord = async (
     }
     const { contentUnit: _contentUnit, ...normalizedInput } = parsed;
     return toDto(
-        await insertPriceRecord(db, {
+        env,
+        await insertPriceRecord(env.DB, {
             ...normalizedInput,
             contentAmount: normalizedContentAmount,
             source,
@@ -196,11 +209,11 @@ export const createPriceRecord = async (
 };
 
 export const listPriceRecords = async (
-    db: D1Database,
+    env: PriceEnv,
     input: unknown,
 ): Promise<PriceRecordListResponse> => {
     const parsed = parseListInput(input);
-    const item = await findItemPricingContext(db, parsed.itemId);
+    const item = await findItemPricingContext(env.DB, parsed.itemId);
     if (!item) {
         throw new PriceServiceError(
             "PRICE_ITEM_NOT_FOUND",
@@ -216,14 +229,14 @@ export const listPriceRecords = async (
             "価格履歴のcursorが不正です",
         );
     }
-    const page = await listPriceRecordRows(db, {
+    const page = await listPriceRecordRows(env.DB, {
         itemId: parsed.itemId,
         limit: parsed.limit,
         cursor,
     });
     // toDto の第 2 引数は単価で、既定は行から計算する。map へ関数をそのまま渡すと
     // 添字が単価として入るため、1 引数で呼ぶ
-    const items = page.rows.map((row) => toDto(row));
+    const items = page.rows.map((row) => toDto(env, row));
     const last = items.at(-1);
     return {
         items,
@@ -243,7 +256,7 @@ export const listPriceRecords = async (
  * 持ち、品目ごとの価格履歴の cursor とは互換性がない。
  */
 export const listAllPriceRecords = async (
-    db: D1Database,
+    env: PriceEnv,
     input: unknown,
 ): Promise<AllPriceRecordListResponse> => {
     const parsed = parseAllListInput(input);
@@ -256,11 +269,11 @@ export const listAllPriceRecords = async (
             "価格一覧のcursorが不正です",
         );
     }
-    const page = await listAllPriceRecordRows(db, {
+    const page = await listAllPriceRecordRows(env.DB, {
         limit: parsed.limit,
         cursor,
     });
-    const items = page.rows.map(toAllDto);
+    const items = page.rows.map((row) => toAllDto(env, row));
     const last = items.at(-1);
     return {
         items,
@@ -275,11 +288,11 @@ export const listAllPriceRecords = async (
 };
 
 export const compareUnitPrices = async (
-    db: D1Database,
+    env: PriceEnv,
     input: unknown,
 ): Promise<PriceRecordListResponse> => {
     const parsed = parseComparisonInput(input);
-    const item = await findItemPricingContext(db, parsed.itemId);
+    const item = await findItemPricingContext(env.DB, parsed.itemId);
     if (!item) {
         throw new PriceServiceError(
             "PRICE_ITEM_NOT_FOUND",
@@ -295,13 +308,13 @@ export const compareUnitPrices = async (
             "価格比較のcursorが不正です",
         );
     }
-    const page = await listPriceRecordsByUnitPrice(db, {
+    const page = await listPriceRecordsByUnitPrice(env.DB, {
         itemId: parsed.itemId,
         limit: parsed.limit,
         cursor,
     });
     const items = page.rows.map((row: PriceComparisonRecordRow) =>
-        toDto(row, row.unitPrice),
+        toDto(env, row, row.unitPrice),
     );
     const last = items.at(-1);
     return {
@@ -356,34 +369,34 @@ const listPriceBatch = async (
 };
 
 export const listPriceRecordsForItems = async (
-    db: D1Database,
+    env: PriceEnv,
     input: unknown,
 ): Promise<PriceBatchOutput> =>
-    await listPriceBatch(db, input, async ({ itemId, limit }) => {
-        const page = await listPriceRecordRows(db, {
+    await listPriceBatch(env.DB, input, async ({ itemId, limit }) => {
+        const page = await listPriceRecordRows(env.DB, {
             itemId,
             limit,
             cursor: null,
         });
         return {
-            items: page.rows.map((row) => toDto(row)),
+            items: page.rows.map((row) => toDto(env, row)),
             hasMore: page.hasMore,
         };
     });
 
 export const compareUnitPricesForItems = async (
-    db: D1Database,
+    env: PriceEnv,
     input: unknown,
 ): Promise<PriceBatchOutput> =>
-    await listPriceBatch(db, input, async ({ itemId, limit }) => {
-        const page = await listPriceRecordsByUnitPrice(db, {
+    await listPriceBatch(env.DB, input, async ({ itemId, limit }) => {
+        const page = await listPriceRecordsByUnitPrice(env.DB, {
             itemId,
             limit,
             cursor: null,
         });
         return {
             items: page.rows.map((row: PriceComparisonRecordRow) =>
-                toDto(row, row.unitPrice),
+                toDto(env, row, row.unitPrice),
             ),
             hasMore: page.hasMore,
         };

@@ -106,7 +106,7 @@ export const listItemPriceRecords = createServerFn({ method: "GET" })
                 import("cloudflare:workers"),
                 import("@/services/priceService"),
             ]);
-            return listPriceRecords(env.DB, data);
+            return listPriceRecords(env, data);
         },
     );
 
@@ -120,7 +120,7 @@ export const listStoreOptions = createServerFn({ method: "GET" }).handler(
         const options: StoreOption[] = [];
         let cursor: string | undefined;
         do {
-            const page = await listStores(env.DB, { limit: 100, cursor });
+            const page = await listStores(env, { limit: 100, cursor });
             options.push(
                 ...page.items.map((store) => ({
                     id: store.id,

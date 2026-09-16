@@ -189,7 +189,7 @@ const withItemId = (itemId: string, body: unknown): unknown => {
 pricesApp.get("/:itemId/prices", async (c) => {
     try {
         return c.json(
-            await listPriceRecords(c.env.DB, {
+            await listPriceRecords(c.env, {
                 ...c.req.query(),
                 itemId: c.req.param("itemId"),
             }),
@@ -204,7 +204,7 @@ pricesApp.post("/:itemId/prices", async (c) => {
     try {
         return c.json(
             await createPriceRecord(
-                c.env.DB,
+                c.env,
                 withItemId(c.req.param("itemId"), await parseJson(c)),
             ),
             201,
@@ -216,7 +216,7 @@ pricesApp.post("/:itemId/prices", async (c) => {
 
 priceRecordsApp.get("/", async (c) => {
     try {
-        return c.json(await listAllPriceRecords(c.env.DB, c.req.query()), 200);
+        return c.json(await listAllPriceRecords(c.env, c.req.query()), 200);
     } catch (error) {
         return errorResponse(c, error);
     }

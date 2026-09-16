@@ -29,7 +29,7 @@ export const listAllStores = createServerFn({ method: "GET" }).handler(
         const stores: StoreDto[] = [];
         let cursor: string | undefined;
         do {
-            const page: StoreListResponse = await listStores(env.DB, {
+            const page: StoreListResponse = await listStores(env, {
                 limit: 100,
                 cursor,
             });

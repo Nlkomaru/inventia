@@ -26,6 +26,6 @@ export const listAllPriceRecords = createServerFn({ method: "GET" })
                     import("cloudflare:workers"),
                     import("@/services/priceService"),
                 ]);
-            return listRecords(env.DB, data);
+            return listRecords(env, data);
         },
     );

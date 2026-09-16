@@ -220,7 +220,7 @@ export const registerInventoryTools = (
         },
         async (input) => {
             try {
-                return mcpSuccess(await listPriceRecords(db, input));
+                return mcpSuccess(await listPriceRecords(env, input));
             } catch (error) {
                 return priceError(error, "price history lookup failed");
             }
@@ -237,7 +237,7 @@ export const registerInventoryTools = (
         },
         async (input) => {
             try {
-                return mcpSuccess(await listPriceRecordsForItems(db, input));
+                return mcpSuccess(await listPriceRecordsForItems(env, input));
             } catch (error) {
                 return priceError(error, "price history lookup failed");
             }
@@ -255,7 +255,7 @@ export const registerInventoryTools = (
         },
         async (input) => {
             try {
-                return mcpSuccess(await compareUnitPrices(db, input));
+                return mcpSuccess(await compareUnitPrices(env, input));
             } catch (error) {
                 return priceError(error, "unit price comparison failed");
             }
@@ -272,7 +272,7 @@ export const registerInventoryTools = (
         },
         async (input) => {
             try {
-                return mcpSuccess(await compareUnitPricesForItems(db, input));
+                return mcpSuccess(await compareUnitPricesForItems(env, input));
             } catch (error) {
                 return priceError(error, "unit price comparison failed");
             }
