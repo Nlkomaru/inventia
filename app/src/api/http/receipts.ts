@@ -152,7 +152,7 @@ receiptsApp.openAPIRegistry.registerPath({
     summary: "List receipts",
     operationId: "listReceipts",
     description:
-        "Lists uploaded receipts newest first with cursor pagination, optionally filtered by status. This endpoint only reads data. Each entry carries lineCount but not the lines themselves; read one receipt to get its lines and match candidates. The stored image is not part of this response; read it from the image endpoint. nextCursor is null on the last page; pass it back unchanged as cursor to continue.",
+        "Lists uploaded receipts newest first with cursor pagination, optionally filtered by status. This endpoint only reads data. Each entry carries lineCount but not the lines themselves; read one receipt to get its lines and match candidates. The stored image is not part of this response; imageUrl is a signed path of the image endpoint (exp and sig query parameters) that a browser can load without an API token, valid for about a week and identical within a UTC day. nextCursor is null on the last page; pass it back unchanged as cursor to continue.",
     request: { query: receiptListQuerySchema },
     responses: {
         200: {
@@ -173,7 +173,7 @@ receiptsApp.openAPIRegistry.registerPath({
     summary: "Get a receipt with its lines and match candidates",
     operationId: "getReceipt",
     description:
-        "Returns one receipt with every extracted line, the confirmed match when there is one, and the remaining candidates. This endpoint only reads data. Each line groups its fields into expiry, suggestion and match. Candidates are recomputed on read instead of being stored, so a line that is already confirmed returns an empty match.candidates array. expiry.suggestedDate is the confirmation screen's initial value: the printed expiry date when the receipt showed one, otherwise the estimated one, otherwise null; expiry.source, expiry.confidence and expiry.estimateReason explain where it came from. linesTotalPrice is the sum of the line prices for comparison against the receipt's own totalPrice, and is null when any line has no readable price. A line that was applied also carries applied, which is what the user confirmed and what really reached stock and price history: applied.quantity is expressed in applied.baseUnit, the base unit of the target item at the time of the apply, so it can differ from the extracted quantity and from suggestion.baseUnit; applied.expiryDate is the date the stock was filed under; a line applied with action skip has quantity, baseUnit, price and expiryDate all null. applied is null for a line that has not been applied and for lines applied before this record was kept, in which case the extracted values are all there is. appliedTotalPrice sums the prices actually recorded and is null when no line of the receipt has one. The stored image is not part of this response; read it from the image endpoint.",
+        "Returns one receipt with every extracted line, the confirmed match when there is one, and the remaining candidates. This endpoint only reads data. Each line groups its fields into expiry, suggestion and match. Candidates are recomputed on read instead of being stored, so a line that is already confirmed returns an empty match.candidates array. expiry.suggestedDate is the confirmation screen's initial value: the printed expiry date when the receipt showed one, otherwise the estimated one, otherwise null; expiry.source, expiry.confidence and expiry.estimateReason explain where it came from. linesTotalPrice is the sum of the line prices for comparison against the receipt's own totalPrice, and is null when any line has no readable price. A line that was applied also carries applied, which is what the user confirmed and what really reached stock and price history: applied.quantity is expressed in applied.baseUnit, the base unit of the target item at the time of the apply, so it can differ from the extracted quantity and from suggestion.baseUnit; applied.expiryDate is the date the stock was filed under; a line applied with action skip has quantity, baseUnit, price and expiryDate all null. applied is null for a line that has not been applied and for lines applied before this record was kept, in which case the extracted values are all there is. appliedTotalPrice sums the prices actually recorded and is null when no line of the receipt has one. The stored image is not part of this response; imageUrl is a signed path of the image endpoint (exp and sig query parameters) that a browser can load without an API token, valid for about a week and identical within a UTC day.",
     request: {
         params: z.object({ id: receiptIdParameter }),
     },
@@ -195,7 +195,7 @@ receiptsApp.openAPIRegistry.registerPath({
     summary: "Get the stored receipt image",
     operationId: "getReceiptImage",
     description:
-        "Returns the stored photo of one receipt as image bytes, with the content type it was uploaded with. This endpoint only reads data. It exists so the confirmation screen and the receipt detail page can show the photo next to the extracted lines; the object storage key stays private and is never part of any response. The response is marked private and may be cached by the caller for an hour; the entity tag comes from object storage and a request whose If-None-Match matches it is answered with 304 without transferring the image again.",
+        "Returns the stored photo of one receipt as image bytes, with the content type it was uploaded with. This endpoint only reads data. It exists so the confirmation screen and the receipt detail page can show the photo next to the extracted lines; the object storage key stays private and is never part of any response. A request that carries the exp and sig query parameters from the receipt's imageUrl is served without an API token, so an <img> can load it; without them, or once exp has passed, the usual Authorization header is required. The response is marked private and may be cached by the caller for an hour; the entity tag comes from object storage and a request whose If-None-Match matches it is answered with 304 without transferring the image again.",
     request: {
         params: z.object({ id: receiptIdParameter }),
     },
@@ -427,7 +427,7 @@ receiptsApp.post("/", async (c) => {
 
 receiptsApp.get("/", async (c) => {
     try {
-        return c.json(await listReceipts(c.env.DB, c.req.query()), 200);
+        return c.json(await listReceipts(c.env, c.req.query()), 200);
     } catch (error) {
         return errorResponse(c, error);
     }
@@ -435,7 +435,7 @@ receiptsApp.get("/", async (c) => {
 
 receiptsApp.get("/:id", async (c) => {
     try {
-        return c.json(await getReceipt(c.env.DB, c.req.param("id")), 200);
+        return c.json(await getReceipt(c.env, c.req.param("id")), 200);
     } catch (error) {
         return errorResponse(c, error);
     }

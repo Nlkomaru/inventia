@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import { authenticateApiToken } from "../services/apiTokenService";
-import { isSignedStoreFaviconRequest } from "../services/storeFaviconUrlService";
+import { isSignedImageRequest } from "../services/signedImageUrlService";
 import type { ApiBindings } from "./bindings";
 
 /**
@@ -8,8 +8,8 @@ import type { ApiBindings } from "./bindings";
  *
  * Cloudflare Access を /api で無効にしても安全に使えるように、/api/* は
  * Bearer トークンを必須にする。ヘルスチェックと API ドキュメントだけは、
- * 外形監視と仕様確認のためにトークン無しで通す。店舗ファビコンの GET は
- * ブラウザの <img> がヘッダーを付けられないため、URL の署名で通す。
+ * 外形監視と仕様確認のためにトークン無しで通す。店舗ファビコンとレシート写真の
+ * GET はブラウザの <img> がヘッダーを付けられないため、URL の署名で通す。
  */
 
 const publicPaths: readonly string[] = [
@@ -25,7 +25,7 @@ const errorBody = (code: string, message: string) => ({
 export const apiTokenAuth: MiddlewareHandler<ApiBindings> = async (c, next) => {
     if (
         publicPaths.includes(new URL(c.req.url).pathname) ||
-        isSignedStoreFaviconRequest(c.env, c.req.raw)
+        isSignedImageRequest(c.env, c.req.raw)
     ) {
         return next();
     }

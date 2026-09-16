@@ -12,6 +12,7 @@ import {
     storeFaviconContentTypeExtensions,
     storeFaviconContentTypeSchema,
     storeFaviconMaxByteSize,
+    storeFaviconPath,
     storeIdSchema,
     storeListInputSchema,
     storeNameMaxLength,
@@ -32,10 +33,7 @@ import {
     updateStore as updateStoreRow,
 } from "../repositories/storeRepository";
 
-import {
-    type StoreFaviconUrlEnv,
-    signStoreFaviconUrl,
-} from "./storeFaviconUrlService";
+import { type SignedImageUrlEnv, signImageUrl } from "./signedImageUrlService";
 import {
     indexStore,
     removeStoreFromIndex,
@@ -87,7 +85,7 @@ export class StoreServiceError extends Error {
  * ファビコン画像はレシートと同じ RECEIPTS バケットへ置く。専用の binding を
  * 足すと wrangler.jsonc・cf-typegen・バケット作成が必要になるため流用する。
  */
-export interface StoreEnv extends StoreFaviconUrlEnv {
+export interface StoreEnv extends SignedImageUrlEnv {
     DB: D1Database;
     RECEIPTS: R2Bucket;
 }
@@ -96,7 +94,7 @@ export interface StoreEnv extends StoreFaviconUrlEnv {
  * 読み取りだけの経路が要求する binding。DTO の faviconUrl は署名付きなので、
  * 一覧や 1 件取得でも署名鍵の元になる秘密が要る。
  */
-export type StoreReadEnv = Pick<StoreEnv, "DB"> & StoreFaviconUrlEnv;
+export type StoreReadEnv = Pick<StoreEnv, "DB"> & SignedImageUrlEnv;
 
 /** 店名の索引を触る経路が要求する binding。`Env` はこの形へ代入できる。 */
 export type StoreWriteEnv = StoreEnv & StoreSearchEnv;
@@ -154,12 +152,14 @@ const parseListInput = (input: unknown): StoreListInput => {
 const normalizeSearch = (q: string | undefined): string | null =>
     q !== undefined && q.length > 0 ? q : null;
 
-const toDto = (env: StoreFaviconUrlEnv, row: StoreRow): StoreDto => ({
+const toDto = (env: SignedImageUrlEnv, row: StoreRow): StoreDto => ({
     id: row.id,
     name: row.name,
     url: row.url,
     faviconUrl:
-        row.faviconObjectKey === null ? null : signStoreFaviconUrl(env, row.id),
+        row.faviconObjectKey === null
+            ? null
+            : signImageUrl(env, storeFaviconPath(row.id)),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
 });

@@ -8,6 +8,7 @@ import {
     listApiTokenRecords,
     revokeApiToken,
 } from "../services/apiTokenService";
+import { uploadReceipt } from "../services/receiptService";
 import { createStore, uploadStoreFavicon } from "../services/storeService";
 import { apiApp } from "./app";
 
@@ -182,5 +183,27 @@ describe("API token authentication", () => {
         expect(unsigned.status).toBe(401);
         expect(tampered.status).toBe(401);
         expect(deleteWithSignature.status).toBe(401);
+    });
+    it("serves a receipt image through its signed URL without a token", async () => {
+        const image = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+        const receipt = await uploadReceipt(env, {
+            bytes: image,
+            contentType: "image/jpeg",
+        });
+        const origin = "https://inventia.example";
+
+        const signed = await apiApp.fetch(
+            new Request(`${origin}${receipt.imageUrl}`),
+            env,
+        );
+        const unsigned = await apiApp.fetch(
+            new Request(`${origin}/api/receipts/${receipt.id}/image`),
+            env,
+        );
+
+        expect(signed.status).toBe(200);
+        expect(signed.headers.get("content-type")).toBe("image/jpeg");
+        expect(new Uint8Array(await signed.arrayBuffer())).toEqual(image);
+        expect(unsigned.status).toBe(401);
     });
 });

@@ -469,7 +469,7 @@ describe("applyReceipt の数量換算", () => {
             }),
         ).rejects.toThrow(ReceiptServiceError);
 
-        const stopped = await getReceipt(env.DB, receiptId);
+        const stopped = await getReceipt(env, receiptId);
         expect(stopped.lines[0]?.applied).toBeNull();
         expect((await getItem(env.DB, itemId)).currentQuantity).toBe(0);
 
@@ -506,7 +506,7 @@ describe("applyReceipt の数量換算", () => {
             }),
         ).rejects.toThrow(ReceiptServiceError);
 
-        const stopped = await getReceipt(env.DB, receiptId);
+        const stopped = await getReceipt(env, receiptId);
         expect(stopped.lines[0]?.applied).toBeNull();
         expect((await getItem(env.DB, itemId)).currentQuantity).toBe(0);
     });
@@ -819,7 +819,7 @@ describe("確認画面から反映までの通し", () => {
         receiptId: string,
         edit: (rows: readonly ReceiptReviewRow[]) => ReceiptReviewRow[],
     ): Promise<ReceiptApplyInput> => {
-        const detail = await getReceipt(env.DB, receiptId);
+        const detail = await getReceipt(env, receiptId);
         const built = buildApplyInput({
             idempotencyKey: receiptApplyIdempotencyKey(receiptId),
             receiptStoreName: detail.storeName,

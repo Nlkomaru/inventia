@@ -21,6 +21,7 @@ import {
     priceRecordCreateInputSchema,
     priceRecordListInputSchema,
 } from "../domain/price";
+import { storeFaviconPath } from "../domain/store";
 import {
     type AllPriceRecordRow,
     findItemPricingContext,
@@ -32,13 +33,10 @@ import {
     type PriceRecordRow,
 } from "../repositories/priceRepository";
 import { findStoreById } from "../repositories/storeRepository";
-import {
-    type StoreFaviconUrlEnv,
-    signStoreFaviconUrl,
-} from "./storeFaviconUrlService";
+import { type SignedImageUrlEnv, signImageUrl } from "./signedImageUrlService";
 
 /** 価格記録は店舗のファビコン URL に署名するため、D1 に加えて署名鍵の元が要る。 */
-export interface PriceEnv extends StoreFaviconUrlEnv {
+export interface PriceEnv extends SignedImageUrlEnv {
     DB: D1Database;
 }
 
@@ -107,7 +105,7 @@ const parseComparisonInput = (input: unknown): PriceComparisonListInput => {
 };
 
 const toDto = (
-    env: StoreFaviconUrlEnv,
+    env: SignedImageUrlEnv,
     row: PriceRecordRow,
     unitPrice = calculateUnitPrice(
         row.price,
@@ -128,7 +126,7 @@ const toDto = (
     storeName: row.storeName,
     storeFaviconUrl:
         row.storeId !== null && row.storeFaviconObjectKey !== null
-            ? signStoreFaviconUrl(env, row.storeId)
+            ? signImageUrl(env, storeFaviconPath(row.storeId))
             : null,
     url: row.url,
     recordedAt: canonicalUtcDateTime(row.recordedAt),
@@ -139,7 +137,7 @@ const toDto = (
 });
 
 const toAllDto = (
-    env: StoreFaviconUrlEnv,
+    env: SignedImageUrlEnv,
     row: AllPriceRecordRow,
 ): AllPriceRecordDto => ({
     ...toDto(env, row),

@@ -64,7 +64,7 @@ export const listReceiptsPage = createServerFn({ method: "GET" })
             import("cloudflare:workers"),
             import("@/services/receiptService"),
         ]);
-        return listReceipts(env.DB, data);
+        return listReceipts(env, data);
     });
 
 /** 明細と照合候補を含むレシート詳細。候補は読み取り時に計算される。 */
@@ -75,7 +75,7 @@ export const getReceiptDetail = createServerFn({ method: "GET" })
             import("cloudflare:workers"),
             import("@/services/receiptService"),
         ]);
-        return getReceipt(env.DB, data.receiptId);
+        return getReceipt(env, data.receiptId);
     });
 
 /**

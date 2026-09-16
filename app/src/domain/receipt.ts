@@ -236,6 +236,9 @@ export const receiptDtoSchema = z
         status: receiptStatusSchema,
         contentType: z.string().min(1),
         byteSize: z.int().min(1),
+        // 署名付きの /api/receipts/{id}/image。ブラウザの <img> が API トークン無しで
+        // 写真を読めるようにするための URL で、保存はしない
+        imageUrl: z.string().min(1),
         storeName: z.string().nullable(),
         purchasedAt: z.string().datetime().nullable(),
         totalPrice: z.int().min(0).nullable(),
@@ -532,6 +535,10 @@ export type ReceiptMatchMethodValue = z.infer<typeof receiptMatchMethodSchema>;
 export type ReceiptBaseDimension = z.infer<typeof receiptBaseDimensionSchema>;
 export type ReceiptContentType = z.infer<typeof receiptContentTypeSchema>;
 export type ReceiptDto = z.infer<typeof receiptDtoSchema>;
+
+/** レシート写真の配信パス（署名なし）。R2 のオブジェクトキーは公開しない。 */
+export const receiptImagePath = (id: string): string =>
+    `/api/receipts/${encodeURIComponent(id)}/image`;
 export type ReceiptLineExpiryDto = z.infer<typeof receiptLineExpiryDtoSchema>;
 export type ReceiptLineSuggestionDto = z.infer<
     typeof receiptLineSuggestionDtoSchema
