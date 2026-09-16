@@ -10,7 +10,7 @@ export const usageKeys = {
 export const mcpUsageQueryOptions = () =>
     queryOptions({
         queryKey: usageKeys.mcp(),
-        queryFn: getMcpUsage,
+        queryFn: () => getMcpUsage(),
         retry: false,
     });
 

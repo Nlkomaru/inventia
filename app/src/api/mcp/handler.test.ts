@@ -3,6 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it } from "vitest";
 import { listMcpToolCalls } from "../../repositories/mcpToolUsageRepository";
+import { createTestAuthHeaders } from "../../test/apiTokenAuth";
 import { apiApp } from "../app";
 import { createMcpServer } from "./server";
 
@@ -11,7 +12,10 @@ describe("MCP HTTP handler", () => {
         const response = await apiApp.fetch(
             new Request("https://inventia.test/api/mcp", {
                 method: "POST",
-                headers: { "content-type": "application/json" },
+                headers: {
+                    "content-type": "application/json",
+                    ...(await createTestAuthHeaders()),
+                },
                 body: JSON.stringify({
                     jsonrpc: "2.0",
                     id: crypto.randomUUID(),

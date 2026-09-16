@@ -1,29 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
-import {
-    type OpenRouterChatModelList,
-    type OpenRouterIntegrationStatus,
-    type OpenRouterIntegrationUpdate,
-    type OpenRouterUsageSummary,
-    openRouterIntegrationStatusSchema,
-    openRouterUsageSummarySchema,
+import type {
+    OpenRouterChatModelList,
+    OpenRouterIntegrationStatus,
+    OpenRouterIntegrationUpdate,
+    OpenRouterUsageSummary,
 } from "@/domain/integration";
-
-const apiErrorSchema = z.object({
-    error: z.object({ message: z.string() }),
-});
-
-const readApiError = async (
-    response: Response,
-    fallback: string = "連携設定を保存できませんでした。",
-): Promise<string> => {
-    const body: unknown = await response.json().catch(() => null);
-    const parsed = apiErrorSchema.safeParse(body);
-    if (parsed.success) {
-        return parsed.data.error.message;
-    }
-    return fallback;
-};
 
 export const getOpenRouterStatus = createServerFn({ method: "GET" }).handler(
     async (): Promise<OpenRouterIntegrationStatus> => {
@@ -56,41 +37,47 @@ export const listOpenRouterModels = createServerFn({ method: "GET" }).handler(
         }
     },
 );
-export const getOpenRouterUsage = async (): Promise<OpenRouterUsageSummary> => {
-    const response = await fetch("/api/settings/integrations/openrouter/usage");
-    if (!response.ok) {
-        throw new Error(
-            await readApiError(
-                response,
-                "OpenRouter の利用量を取得できませんでした。",
-            ),
-        );
-    }
-    const parsed = openRouterUsageSummarySchema.safeParse(
-        await response.json(),
-    );
-    if (!parsed.success) {
-        throw new Error("OpenRouter の利用量の応答を確認できませんでした。");
-    }
-    return parsed.data;
-};
 
-export const updateOpenRouterIntegration = async (
-    input: OpenRouterIntegrationUpdate,
-): Promise<OpenRouterIntegrationStatus> => {
-    const response = await fetch("/api/settings/integrations/openrouter", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(input),
+// /api は API トークン必須のため、画面は HTTP を経由せず service を直接呼ぶ。
+// これで Cloudflare Access を /api で無効にしても設定画面が動く。
+export const getOpenRouterUsage = createServerFn({ method: "GET" }).handler(
+    async (): Promise<OpenRouterUsageSummary> => {
+        const [
+            { env },
+            { getOpenRouterUsage: readUsage, IntegrationServiceError },
+        ] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/integrationService"),
+        ]);
+        try {
+            return await readUsage(env);
+        } catch (error) {
+            if (error instanceof IntegrationServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("OpenRouter の利用量を取得できませんでした。");
+        }
+    },
+);
+
+export const updateOpenRouterIntegration = createServerFn({
+    method: "POST",
+})
+    .inputValidator((data: OpenRouterIntegrationUpdate) => data)
+    .handler(async ({ data }): Promise<OpenRouterIntegrationStatus> => {
+        const [
+            { env },
+            { updateOpenRouterIntegration: update, IntegrationServiceError },
+        ] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/integrationService"),
+        ]);
+        try {
+            return await update(env.DB, env.SETTINGS_ENCRYPTION_KEY, data);
+        } catch (error) {
+            if (error instanceof IntegrationServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("連携設定を保存できませんでした。");
+        }
     });
-    if (!response.ok) {
-        throw new Error(await readApiError(response));
-    }
-    const parsed = openRouterIntegrationStatusSchema.safeParse(
-        await response.json(),
-    );
-    if (!parsed.success) {
-        throw new Error("連携設定の応答を確認できませんでした。");
-    }
-    return parsed.data;
-};

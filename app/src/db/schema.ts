@@ -826,3 +826,27 @@ export const itemAliases = sqliteTable(
         ),
     ],
 );
+
+/**
+ * HTTP API と MCP を外部から呼ぶためのトークン。値そのものは保存せず、
+ * SHA-256 のハッシュだけを持つ（発行時に一度だけ表示する）。
+ */
+export const apiTokens = sqliteTable(
+    "api_tokens",
+    {
+        id: text("id").primaryKey(),
+        name: text("name").notNull(),
+        // 一覧で見分けるための先頭 12 文字。トークン本体の復元には使えない
+        tokenPrefix: text("token_prefix").notNull(),
+        tokenHash: text("token_hash").notNull(),
+        createdAt: text("created_at").notNull(),
+        // 認証に使われた最終時刻。一定間隔でだけ更新する
+        lastUsedAt: text("last_used_at"),
+        // 失効させた時刻。行は残し、一覧で履歴として見せる
+        revokedAt: text("revoked_at"),
+    },
+    (t) => [
+        uniqueIndex("uq_api_tokens_token_hash").on(t.tokenHash),
+        index("idx_api_tokens_created_at").on(t.createdAt),
+    ],
+);

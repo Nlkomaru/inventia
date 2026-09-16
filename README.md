@@ -44,6 +44,21 @@ TanStack Start forwards `/api/*` to the Hono app in `app/src/api/app.ts`.
 | `/api/providers` | External provider master data used as the destination of stock issues |
 | `/api/settings/integrations/openrouter` | OpenRouter integration status and encrypted API key configuration |
 
+### API の認証
+
+`/api/*` は API トークンで認証します。トークンは設定の「API トークン」
+(`/settings/tokens`) で発行し、値は発行時に一度だけ表示されます。DB には
+SHA-256 のハッシュだけを保存します。
+
+```bash
+curl -H "Authorization: Bearer inv_…" "https://inventia.nikomaru.dev/api/items?q=牛乳"
+```
+
+- `/api/health`、`/api/openapi`、`/api/scalar` はトークン無しで取得できます。
+- MCP クライアントも同じトークンを `Authorization` ヘッダーへ付けます。
+- 使わなくなったトークンは同じ画面から失効させてください。失効した行は履歴として残ります。
+- Cloudflare Access を `/api` で無効にしても、トークンが無ければデータは読めません・書けません。
+
 The MCP server exposes these tools through the same services as the HTTP API:
 
 | Area | Tools |
@@ -120,9 +135,10 @@ OPENROUTER_MANAGEMENT_KEY=<OpenRouter-management-key>
 Never commit either value. Keep `SETTINGS_ENCRYPTION_KEY` stable; after rotating
 it, save the OpenRouter API key again from the settings page.
 
-The settings API changes a shared application-wide credential. Keep the Worker
-and `/api/settings/integrations/*` behind the existing Cloudflare Access
-application.
+The settings API changes a shared application-wide credential. Keep the
+browser-facing screens behind the existing Cloudflare Access application; the
+API itself is protected by API tokens instead, so `/api` can be excluded from
+Access.
 
 Local development normally uses the remote D1 database configured in
 `app/wrangler.jsonc`, which requires Wrangler account authentication. In a
