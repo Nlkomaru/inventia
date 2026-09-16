@@ -6,6 +6,7 @@ import {
     listCategoryTree,
     listLocationTree,
     listReceiptsPage,
+    lookupReceiptStore,
 } from "./receipt-api";
 
 // 先頭要素はデータセット名で揃える。品目・カテゴリ・保管場所は他画面と同じ
@@ -32,6 +33,12 @@ export const categoryKeys = {
 export const locationKeys = {
     all: ["locations"] as const,
     list: () => [...locationKeys.all, "list"] as const,
+};
+
+// 店舗マスタと同じ名前空間。店舗のファビコンを差し替えたときに一緒に流れる
+export const storeKeys = {
+    all: ["stores"] as const,
+    lookup: (name: string) => [...storeKeys.all, "lookup", name] as const,
 };
 
 // 反映は在庫を動かすため、在庫一覧と在庫履歴のキャッシュも無効化する
@@ -91,4 +98,12 @@ export const locationListQueryOptions = () =>
     queryOptions({
         queryKey: locationKeys.list(),
         queryFn: () => listLocationTree(),
+    });
+
+// 店名を読み取れていないレシートでは問い合わせない
+export const receiptStoreQueryOptions = (name: string | null) =>
+    queryOptions({
+        queryKey: storeKeys.lookup(name ?? ""),
+        queryFn: () => lookupReceiptStore({ data: { name: name ?? "" } }),
+        enabled: name !== null && name.trim() !== "",
     });

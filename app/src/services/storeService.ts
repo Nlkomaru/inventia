@@ -331,6 +331,25 @@ const findStoreByNormalizedName = async (
 };
 
 /**
+ * 印字そのまま・正規化・支店名を除いた表記の順に、登録済みの店舗を探す。
+ * ベクトル検索は含めず、決定的に同じ店舗と言える一致だけを返す。
+ */
+const findStoreByNameVariants = async (
+    db: D1Database,
+    name: string,
+): Promise<StoreRow | null> => {
+    const withoutBranch = stripStoreBranchSuffix(name);
+    return (
+        (await findStoreByName(db, name)) ??
+        (await findStoreByNormalizedName(db, name)) ??
+        (withoutBranch === name
+            ? null
+            : ((await findStoreByName(db, withoutBranch)) ??
+              (await findStoreByNormalizedName(db, withoutBranch))))
+    );
+};
+
+/**
  * 類似検索で同じ店舗を探す。しきい値を超えた最上位だけを採用し、超えなければ
  * null を返して新規作成へ落とす。判断の根拠は後から見直せるよう必ず記録する。
  *
@@ -366,6 +385,23 @@ const findStoreByVector = async (
 };
 
 /**
+ * 読み取った店名に対応する登録済みの店舗を探す。resolveStoreByName と違い、
+ * 見つからなくても作成せず、類似検索にも頼らない。レシート取込の画面が反映前に
+ * 店舗のファビコンを見せるための読み取り専用の経路。
+ */
+export const lookupStoreByName = async (
+    env: StoreReadEnv,
+    name: string,
+): Promise<StoreDto | null> => {
+    const normalized = name.trim().slice(0, storeNameMaxLength);
+    if (normalized.length === 0) {
+        return null;
+    }
+    const row = await findStoreByNameVariants(env.DB, normalized);
+    return row ? toDto(env, row) : null;
+};
+
+/**
  * 店名から店舗を引き、無ければ作る。レシート反映のように利用者が店舗を
  * 選んでいない経路から使うため、名前以外の入力は取らない。
  *
@@ -391,12 +427,7 @@ export const resolveStoreByName = async (
     }
     const withoutBranch = stripStoreBranchSuffix(normalized);
     const existing =
-        (await findStoreByName(env.DB, normalized)) ??
-        (await findStoreByNormalizedName(env.DB, normalized)) ??
-        (withoutBranch === normalized
-            ? null
-            : ((await findStoreByName(env.DB, withoutBranch)) ??
-              (await findStoreByNormalizedName(env.DB, withoutBranch)))) ??
+        (await findStoreByNameVariants(env.DB, normalized)) ??
         (await findStoreByVector(env, withoutBranch));
     if (existing) {
         return existing;
