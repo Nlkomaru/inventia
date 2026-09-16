@@ -172,7 +172,7 @@ export const getItemRelabelImpact = createServerFn({ method: "GET" })
             ]);
         const [history, prices] = await Promise.all([
             listStockHistory(env.DB, { itemId: data.itemId, limit: 1 }),
-            listPriceRecords(env.DB, { itemId: data.itemId, limit: 1 }),
+            listPriceRecords(env, { itemId: data.itemId, limit: 1 }),
         ]);
         return {
             hasStockMovements: history.movements.length > 0,

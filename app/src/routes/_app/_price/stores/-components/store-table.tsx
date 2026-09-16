@@ -47,11 +47,12 @@ const features = tableFeatures({
 const columnHelper = createColumnHelper<typeof features, StoreDto>();
 
 // ファビコンは 1 時間キャッシュされるため、差し替え後も古い画像を見せないよう
-// 更新時刻を付けて別の URL にする（query は service 側で無視される）
+// 更新時刻を付けて別の URL にする。faviconUrl は署名の query を既に持つので
+// 後ろへ足す（署名の検証は余分な query を見ない）
 const faviconSrc = (store: StoreDto): string | null =>
     store.faviconUrl === null
         ? null
-        : `${store.faviconUrl}?v=${encodeURIComponent(store.updatedAt)}`;
+        : `${store.faviconUrl}&v=${encodeURIComponent(store.updatedAt)}`;
 
 export function StoreTable({
     stores,

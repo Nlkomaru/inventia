@@ -214,13 +214,13 @@ export const registerInventoryTools = (
         {
             title: "Get price history",
             description:
-                "Get an inventory item's price history in reverse chronological order with cursor pagination. Each record also carries the store it was bought from as storeId, storeName and storeFaviconUrl, which are null for records recorded before a store was linked. To read the recent records of several items at once use get_price_histories, which returns them in one call but without paging.",
+                "Get an inventory item's price history in reverse chronological order with cursor pagination. Each record also carries the store it was bought from as storeId, storeName and storeFaviconUrl, which are null for records recorded before a store was linked; storeFaviconUrl is a signed path (exp and sig query parameters) that loads without an API token for about a week and is identical within a UTC day. To read the recent records of several items at once use get_price_histories, which returns them in one call but without paging.",
             inputSchema: priceRecordListInputSchema,
             outputSchema: priceRecordListOutputSchema,
         },
         async (input) => {
             try {
-                return mcpSuccess(await listPriceRecords(db, input));
+                return mcpSuccess(await listPriceRecords(env, input));
             } catch (error) {
                 return priceError(error, "price history lookup failed");
             }
@@ -237,7 +237,7 @@ export const registerInventoryTools = (
         },
         async (input) => {
             try {
-                return mcpSuccess(await listPriceRecordsForItems(db, input));
+                return mcpSuccess(await listPriceRecordsForItems(env, input));
             } catch (error) {
                 return priceError(error, "price history lookup failed");
             }
@@ -249,13 +249,13 @@ export const registerInventoryTools = (
         {
             title: "Compare unit prices",
             description:
-                "Get up to 100 price records for one item, sorted by unit price in ascending order (default 100). Unit price is the price per base unit, so records with different content amounts or set counts are comparable. Each record also carries the store it was bought from as storeId, storeName and storeFaviconUrl, which are null for records recorded before a store was linked. Pass nextCursor as cursor to continue when more records are available; to rank across several items use compare_unit_prices_across_items.",
+                "Get up to 100 price records for one item, sorted by unit price in ascending order (default 100). Unit price is the price per base unit, so records with different content amounts or set counts are comparable. Each record also carries the store it was bought from as storeId, storeName and storeFaviconUrl, which are null for records recorded before a store was linked; storeFaviconUrl is a signed path (exp and sig query parameters) that loads without an API token for about a week and is identical within a UTC day. Pass nextCursor as cursor to continue when more records are available; to rank across several items use compare_unit_prices_across_items.",
             inputSchema: priceComparisonListInputSchema,
             outputSchema: priceRecordListOutputSchema,
         },
         async (input) => {
             try {
-                return mcpSuccess(await compareUnitPrices(db, input));
+                return mcpSuccess(await compareUnitPrices(env, input));
             } catch (error) {
                 return priceError(error, "unit price comparison failed");
             }
@@ -272,7 +272,7 @@ export const registerInventoryTools = (
         },
         async (input) => {
             try {
-                return mcpSuccess(await compareUnitPricesForItems(db, input));
+                return mcpSuccess(await compareUnitPricesForItems(env, input));
             } catch (error) {
                 return priceError(error, "unit price comparison failed");
             }

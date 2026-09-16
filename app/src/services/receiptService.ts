@@ -24,6 +24,7 @@ import {
     receiptContentTypeExtensions,
     receiptContentTypeSchema,
     receiptExampleQuerySchema,
+    receiptImagePath,
     receiptListQuerySchema,
     receiptMaxByteSize,
     receiptOcrResultSchema,
@@ -79,6 +80,7 @@ import {
 } from "./integrationService";
 import { type ItemSearchEnv, indexItems } from "./itemSearchService";
 import { createItem, ItemServiceError } from "./itemService";
+import { type SignedImageUrlEnv, signImageUrl } from "./signedImageUrlService";
 import { adjustStock, StockServiceError } from "./stockService";
 import type { StoreSearchEnv } from "./storeSearchService";
 import { resolveStoreByName } from "./storeService";
@@ -126,11 +128,16 @@ export class ReceiptServiceError extends Error {
  * レシート取込が必要とする binding だけの構造型。`Env` はこの形へ代入できる。
  * service を Cloudflare の生成型へ固定しないことで、検証用のスタブを渡せる。
  */
-export interface ReceiptEnv {
+export interface ReceiptEnv extends SignedImageUrlEnv {
     DB: D1Database;
     RECEIPTS: R2Bucket;
-    SETTINGS_ENCRYPTION_KEY: string;
 }
+
+/**
+ * 読み取りだけの経路が要求する binding。DTO の imageUrl は署名付きなので、
+ * 一覧や 1 件取得でも署名鍵の元になる秘密が要る。
+ */
+export type ReceiptReadEnv = Pick<ReceiptEnv, "DB"> & SignedImageUrlEnv;
 
 /** 類似度候補の母集合の上限。これを超える品目数では候補提示が一部欠ける。 */
 export const receiptMatchItemLimit = 2000;
@@ -225,11 +232,12 @@ const requireReceipt = async (
     return row;
 };
 
-const toReceiptDto = (row: ReceiptRow): ReceiptDto => ({
+const toReceiptDto = (env: SignedImageUrlEnv, row: ReceiptRow): ReceiptDto => ({
     id: row.id,
     status: row.status,
     contentType: row.contentType,
     byteSize: row.byteSize,
+    imageUrl: signImageUrl(env, receiptImagePath(row.id)),
     storeName: row.storeName,
     purchasedAt: row.purchasedAt,
     totalPrice: row.totalPrice,
@@ -330,14 +338,15 @@ const appliedTotalPrice = (rows: readonly ReceiptLineRow[]): number | null => {
  * 品目一覧とエイリアス辞書はそれぞれ 1 クエリで読み、行ごとに問い合わせない。
  */
 export const getReceipt = async (
-    db: D1Database,
+    env: ReceiptReadEnv,
     id: string,
 ): Promise<ReceiptDetailDto> => {
+    const db = env.DB;
     const receipt = await requireReceipt(db, id);
     const lines = await listReceiptLines(db, id);
     if (lines.length === 0) {
         return {
-            ...toReceiptDto(receipt),
+            ...toReceiptDto(env, receipt),
             lines: [],
             linesTotalPrice: null,
             appliedTotalPrice: null,
@@ -366,7 +375,7 @@ export const getReceipt = async (
         items.map((item) => ({ id: item.id, name: item.name })),
     );
     return {
-        ...toReceiptDto(receipt),
+        ...toReceiptDto(env, receipt),
         lines: lines.map((line) =>
             toLineDto(
                 line,
@@ -388,7 +397,7 @@ export const getReceipt = async (
 };
 
 export const listReceipts = async (
-    db: D1Database,
+    env: ReceiptReadEnv,
     input: unknown,
 ): Promise<ReceiptListDto> => {
     const parsed = receiptListQuerySchema.safeParse(input);
@@ -404,12 +413,12 @@ export const listReceipts = async (
             "一覧の cursor が不正です。最初のページから読み直してください。",
         );
     }
-    const page = await listReceiptRows(db, {
+    const page = await listReceiptRows(env.DB, {
         status: parsed.data.status ?? null,
         limit: parsed.data.limit,
         cursor,
     });
-    const receipts = page.rows.map(toReceiptDto);
+    const receipts = page.rows.map((row) => toReceiptDto(env, row));
     const last = receipts.at(-1);
     return {
         receipts,
@@ -494,6 +503,7 @@ export const uploadReceipt = async (
     }
     try {
         return toReceiptDto(
+            env,
             await insertReceipt(env.DB, {
                 id,
                 objectKey,
@@ -775,7 +785,7 @@ export const parseReceipt = async (
                 model: status.chatModel,
                 lines,
             });
-            return await matchReceiptLines(env.DB, receipt.id);
+            return await matchReceiptLines(env, receipt.id);
         } finally {
             // 中断・タイムアウトでも transport を残さない
             await toolSet?.close();
@@ -786,7 +796,7 @@ export const parseReceipt = async (
             status: "failed",
             errorMessage: toParseFailureMessage(error),
         });
-        return await getReceipt(env.DB, receipt.id);
+        return await getReceipt(env, receipt.id);
     }
 };
 
@@ -836,9 +846,10 @@ const matchLineWithCompletedName = (
  * 利用者が確定させた行（`match_method = 'manual'`）は上書きしない。
  */
 export const matchReceiptLines = async (
-    db: D1Database,
+    env: ReceiptReadEnv,
     receiptId: string,
 ): Promise<ReceiptDetailDto> => {
+    const db = env.DB;
     await requireReceipt(db, receiptId);
     const lines = await listReceiptLines(db, receiptId);
     const targets = lines.filter((line) => line.matchMethod !== "manual");
@@ -874,7 +885,7 @@ export const matchReceiptLines = async (
             }),
         );
     }
-    return await getReceipt(db, receiptId);
+    return await getReceipt(env, receiptId);
 };
 
 const mapApplyError = (error: unknown): never => {
@@ -1416,7 +1427,8 @@ export const applyReceipt = async (
         );
     }
     return {
-        receipt: await getReceipt(db, receiptId),
+        // searchEnv は DB と署名鍵の元を持つので、署名付き imageUrl を含む DTO を作れる
+        receipt: await getReceipt(searchEnv, receiptId),
         purchaseId: purchase.id,
         appliedAt,
         lines: results,

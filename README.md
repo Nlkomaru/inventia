@@ -55,6 +55,12 @@ curl -H "Authorization: Bearer inv_…" "https://inventia.nikomaru.dev/api/items
 ```
 
 - `/api/health`、`/api/openapi`、`/api/scalar` はトークン無しで取得できます。
+- 店舗のファビコン（`/api/stores/{id}/favicon`）とレシート画像
+  （`/api/receipts/{id}/image`）は、店舗・価格記録の `faviconUrl` やレシートの
+  `imageUrl` に含まれる署名付きの URL（`exp` と `sig`）で取得すると、トークン無しでも
+  読めます。ブラウザの `<img>` が画像を表示するための経路で、署名は同じ UTC 日のうちは
+  同じ値になり、約 1 週間で失効します。署名があってもアップロードと削除にはトークンが
+  必要です。
 - MCP クライアントも同じトークンを `Authorization` ヘッダーへ付けます。
 - 使わなくなったトークンは同じ画面から失効させてください。失効した行は履歴として残ります。
 - Cloudflare Access を `/api` で無効にしても、トークンが無ければデータは読めません・書けません。
@@ -133,7 +139,10 @@ OPENROUTER_MANAGEMENT_KEY=<OpenRouter-management-key>
 ```
 
 Never commit either value. Keep `SETTINGS_ENCRYPTION_KEY` stable; after rotating
-it, save the OpenRouter API key again from the settings page.
+it, save the OpenRouter API key again from the settings page. The key also
+derives the signature of image URLs (store favicons and receipt photos), so
+rotating it only invalidates
+URLs that were already handed out; they are re-issued on the next read.
 
 The settings API changes a shared application-wide credential. Keep the
 browser-facing screens behind the existing Cloudflare Access application; the

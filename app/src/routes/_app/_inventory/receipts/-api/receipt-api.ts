@@ -15,6 +15,7 @@ import {
     receiptDtoSchema,
     receiptStatusSchema,
 } from "@/domain/receipt";
+import type { StoreDto } from "@/domain/store";
 
 const apiErrorSchema = z.object({
     error: z
@@ -63,7 +64,7 @@ export const listReceiptsPage = createServerFn({ method: "GET" })
             import("cloudflare:workers"),
             import("@/services/receiptService"),
         ]);
-        return listReceipts(env.DB, data);
+        return listReceipts(env, data);
     });
 
 /** 明細と照合候補を含むレシート詳細。候補は読み取り時に計算される。 */
@@ -74,7 +75,21 @@ export const getReceiptDetail = createServerFn({ method: "GET" })
             import("cloudflare:workers"),
             import("@/services/receiptService"),
         ]);
-        return getReceipt(env.DB, data.receiptId);
+        return getReceipt(env, data.receiptId);
+    });
+
+/**
+ * 読み取った店名に対応する登録済みの店舗。反映前にファビコンを見せるための
+ * 読み取りで、店舗の作成はしない。見つからなければ null。
+ */
+export const lookupReceiptStore = createServerFn({ method: "GET" })
+    .validator(z.object({ name: z.string().trim().min(1) }))
+    .handler(async ({ data }): Promise<StoreDto | null> => {
+        const [{ env }, { lookupStoreByName }] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/storeService"),
+        ]);
+        return lookupStoreByName(env, data.name);
     });
 
 export const listAllItems = createServerFn({ method: "GET" }).handler(

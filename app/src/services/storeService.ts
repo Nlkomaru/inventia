@@ -33,6 +33,7 @@ import {
     updateStore as updateStoreRow,
 } from "../repositories/storeRepository";
 
+import { type SignedImageUrlEnv, signImageUrl } from "./signedImageUrlService";
 import {
     indexStore,
     removeStoreFromIndex,
@@ -84,10 +85,16 @@ export class StoreServiceError extends Error {
  * ファビコン画像はレシートと同じ RECEIPTS バケットへ置く。専用の binding を
  * 足すと wrangler.jsonc・cf-typegen・バケット作成が必要になるため流用する。
  */
-export interface StoreEnv {
+export interface StoreEnv extends SignedImageUrlEnv {
     DB: D1Database;
     RECEIPTS: R2Bucket;
 }
+
+/**
+ * 読み取りだけの経路が要求する binding。DTO の faviconUrl は署名付きなので、
+ * 一覧や 1 件取得でも署名鍵の元になる秘密が要る。
+ */
+export type StoreReadEnv = Pick<StoreEnv, "DB"> & SignedImageUrlEnv;
 
 /** 店名の索引を触る経路が要求する binding。`Env` はこの形へ代入できる。 */
 export type StoreWriteEnv = StoreEnv & StoreSearchEnv;
@@ -145,11 +152,14 @@ const parseListInput = (input: unknown): StoreListInput => {
 const normalizeSearch = (q: string | undefined): string | null =>
     q !== undefined && q.length > 0 ? q : null;
 
-const toDto = (row: StoreRow): StoreDto => ({
+const toDto = (env: SignedImageUrlEnv, row: StoreRow): StoreDto => ({
     id: row.id,
     name: row.name,
     url: row.url,
-    faviconUrl: row.faviconObjectKey === null ? null : storeFaviconPath(row.id),
+    faviconUrl:
+        row.faviconObjectKey === null
+            ? null
+            : signImageUrl(env, storeFaviconPath(row.id)),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
 });
@@ -168,7 +178,7 @@ export type StoreListResponse = {
 };
 
 export const listStores = async (
-    db: D1Database,
+    env: StoreReadEnv,
     input: unknown = {},
 ): Promise<StoreListResponse> => {
     const query = parseListInput(input);
@@ -181,14 +191,14 @@ export const listStores = async (
             "cursorが不正です。同じ検索語の一覧で取得したcursorを使用してください",
         );
     }
-    const page = await listStoreRows(db, {
+    const page = await listStoreRows(env.DB, {
         q: search,
         limit: query.limit,
         cursor,
     });
     const last = page.rows.at(-1);
     return {
-        items: page.rows.map(toDto),
+        items: page.rows.map((row) => toDto(env, row)),
         nextCursor:
             page.hasMore && last
                 ? encodeStoreCursor({ q: search, name: last.name, id: last.id })
@@ -197,9 +207,10 @@ export const listStores = async (
 };
 
 export const getStore = async (
-    db: D1Database,
+    env: StoreReadEnv,
     id: unknown,
-): Promise<StoreDto> => toDto(await requireStore(db, parseStoreId(id)));
+): Promise<StoreDto> =>
+    toDto(env, await requireStore(env.DB, parseStoreId(id)));
 
 export const createStore = async (
     env: StoreWriteEnv,
@@ -227,7 +238,7 @@ export const createStore = async (
     }
     // 索引は検索用の副産物。失敗しても店舗の登録は成立させる
     await indexStore(env, row.id);
-    return toDto(row);
+    return toDto(env, row);
 };
 
 export const updateStore = async (
@@ -265,7 +276,7 @@ export const updateStore = async (
     if (row.name !== before.name) {
         await indexStore(env, row.id);
     }
-    return toDto(row);
+    return toDto(env, row);
 };
 
 export const deleteStore = async (
@@ -320,6 +331,25 @@ const findStoreByNormalizedName = async (
 };
 
 /**
+ * 印字そのまま・正規化・支店名を除いた表記の順に、登録済みの店舗を探す。
+ * ベクトル検索は含めず、決定的に同じ店舗と言える一致だけを返す。
+ */
+const findStoreByNameVariants = async (
+    db: D1Database,
+    name: string,
+): Promise<StoreRow | null> => {
+    const withoutBranch = stripStoreBranchSuffix(name);
+    return (
+        (await findStoreByName(db, name)) ??
+        (await findStoreByNormalizedName(db, name)) ??
+        (withoutBranch === name
+            ? null
+            : ((await findStoreByName(db, withoutBranch)) ??
+              (await findStoreByNormalizedName(db, withoutBranch))))
+    );
+};
+
+/**
  * 類似検索で同じ店舗を探す。しきい値を超えた最上位だけを採用し、超えなければ
  * null を返して新規作成へ落とす。判断の根拠は後から見直せるよう必ず記録する。
  *
@@ -355,6 +385,23 @@ const findStoreByVector = async (
 };
 
 /**
+ * 読み取った店名に対応する登録済みの店舗を探す。resolveStoreByName と違い、
+ * 見つからなくても作成せず、類似検索にも頼らない。レシート取込の画面が反映前に
+ * 店舗のファビコンを見せるための読み取り専用の経路。
+ */
+export const lookupStoreByName = async (
+    env: StoreReadEnv,
+    name: string,
+): Promise<StoreDto | null> => {
+    const normalized = name.trim().slice(0, storeNameMaxLength);
+    if (normalized.length === 0) {
+        return null;
+    }
+    const row = await findStoreByNameVariants(env.DB, normalized);
+    return row ? toDto(env, row) : null;
+};
+
+/**
  * 店名から店舗を引き、無ければ作る。レシート反映のように利用者が店舗を
  * 選んでいない経路から使うため、名前以外の入力は取らない。
  *
@@ -380,12 +427,7 @@ export const resolveStoreByName = async (
     }
     const withoutBranch = stripStoreBranchSuffix(normalized);
     const existing =
-        (await findStoreByName(env.DB, normalized)) ??
-        (await findStoreByNormalizedName(env.DB, normalized)) ??
-        (withoutBranch === normalized
-            ? null
-            : ((await findStoreByName(env.DB, withoutBranch)) ??
-              (await findStoreByNormalizedName(env.DB, withoutBranch)))) ??
+        (await findStoreByNameVariants(env.DB, normalized)) ??
         (await findStoreByVector(env, withoutBranch));
     if (existing) {
         return existing;
@@ -487,7 +529,7 @@ export const uploadStoreFavicon = async (
             () => undefined,
         );
     }
-    return toDto(row);
+    return toDto(env, row);
 };
 
 /**
@@ -552,7 +594,7 @@ export const deleteStoreFavicon = async (
             () => undefined,
         );
     }
-    return toDto(row);
+    return toDto(env, row);
 };
 
 export type { StoreRow };

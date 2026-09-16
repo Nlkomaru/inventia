@@ -111,7 +111,7 @@ export const priceRecordDtoSchema = z
         source: z.string().min(1),
         storeId: priceRecordIdSchema.nullable(),
         storeName: z.string().nullable(),
-        // ファビコンを持つ店舗の行だけ /api/stores/{id}/favicon を返す
+        // ファビコンを持つ店舗の行だけ、署名付きの /api/stores/{id}/favicon を返す
         storeFaviconUrl: z.string().nullable(),
         url: z.url().nullable(),
         recordedAt: utcDateTimeSchema,

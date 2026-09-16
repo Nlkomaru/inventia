@@ -90,7 +90,7 @@ storesApp.openAPIRegistry.registerPath({
     summary: "List stores",
     operationId: "listStores",
     description:
-        "Lists stores ordered by name then id with stable cursor pagination. This endpoint only reads data. q filters by name with a case-insensitive partial match; % and _ in q are matched literally. A cursor is only valid for the q it was made with. faviconUrl is the path of the favicon endpoint and is null while no image is stored; the object storage key is never part of any response.",
+        "Lists stores ordered by name then id with stable cursor pagination. This endpoint only reads data. q filters by name with a case-insensitive partial match; % and _ in q are matched literally. A cursor is only valid for the q it was made with. faviconUrl is a signed path of the favicon endpoint (exp and sig query parameters) that a browser can load without an API token, valid for about a week and identical within a UTC day; it is null while no image is stored, and the object storage key is never part of any response.",
     request: { query: storeListInputSchema },
     responses: {
         200: {
@@ -253,7 +253,7 @@ storesApp.openAPIRegistry.registerPath({
     summary: "Get the stored store favicon",
     operationId: "getStoreFavicon",
     description:
-        "Returns the stored favicon of one store as image bytes, with the content type it was uploaded with. This endpoint only reads data. It is the value of faviconUrl on the store and on price records, so lists can show the image without knowing the object storage key. The response is marked private and may be cached by the caller for an hour; the entity tag comes from object storage and a request whose If-None-Match matches it is answered with 304 without transferring the image again.",
+        "Returns the stored favicon of one store as image bytes, with the content type it was uploaded with. This endpoint only reads data. It is the value of faviconUrl on the store and on price records, so lists can show the image without knowing the object storage key. A request that carries the exp and sig query parameters from that faviconUrl is served without an API token, so an <img> can load it; without them, or once exp has passed, the usual Authorization header is required. The response is marked private and may be cached by the caller for an hour; the entity tag comes from object storage and a request whose If-None-Match matches it is answered with 304 without transferring the image again.",
     request: { params: z.object({ id: storeIdParameter }) },
     responses: {
         200: {
@@ -468,7 +468,7 @@ const readUploadedFile = async (c: StoresContext): Promise<File> => {
 
 storesApp.get("/", async (c) => {
     try {
-        return c.json(await listStores(c.env.DB, c.req.query()), 200);
+        return c.json(await listStores(c.env, c.req.query()), 200);
     } catch (error) {
         return errorResponse(c, error);
     }
@@ -497,7 +497,7 @@ storesApp.post("/reindex", async (c) => {
 
 storesApp.get("/:id", async (c) => {
     try {
-        return c.json(await getStore(c.env.DB, c.req.param("id")), 200);
+        return c.json(await getStore(c.env, c.req.param("id")), 200);
     } catch (error) {
         return errorResponse(c, error);
     }

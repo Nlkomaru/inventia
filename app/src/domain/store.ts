@@ -87,7 +87,8 @@ export const storeDtoSchema = z
         id: storeIdSchema,
         name: storeNameSchema,
         url: z.url().nullable(),
-        // ファビコンがあるときだけ /api/stores/{id}/favicon を返す。URL は保存しない
+        // ファビコンがあるときだけ、署名付きの /api/stores/{id}/favicon を返す。
+        // ブラウザの <img> が API トークン無しで読めるようにするための URL で、保存しない
         faviconUrl: z.string().nullable(),
         createdAt: z.iso.datetime(),
         updatedAt: z.iso.datetime(),
@@ -112,7 +113,7 @@ export type StoreListInput = z.infer<typeof storeListInputSchema>;
 export type StoreCursor = z.infer<typeof storeCursorSchema>;
 export type StoreDto = z.infer<typeof storeDtoSchema>;
 
-/** ファビコンの配信パス。R2 のオブジェクトキーは公開しない。 */
+/** ファビコンの配信パス（署名なし）。R2 のオブジェクトキーは公開しない。 */
 export const storeFaviconPath = (id: string): string =>
     `/api/stores/${encodeURIComponent(id)}/favicon`;
 

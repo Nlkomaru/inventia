@@ -9,7 +9,7 @@ import {
     type ErrorComponentProps,
     useRouter,
 } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -42,6 +42,7 @@ import {
     locationListQueryOptions,
     receiptDetailQueryOptions,
     receiptKeys,
+    receiptStoreQueryOptions,
     stockHistoryKeys,
 } from "../-api/receipt-queries";
 import {
@@ -119,6 +120,11 @@ function ReceiptIntakePage() {
     const { data: locations } = useSuspenseQuery(locationListQueryOptions());
     const detailQuery = useQuery(receiptDetailQueryOptions(receiptId));
     const receipt = detailQuery.data ?? null;
+    // 読み取った店名が登録済みの店舗と一致すれば、反映前からファビコンを見せる
+    const storeQuery = useQuery(
+        receiptStoreQueryOptions(receipt?.storeName ?? null),
+    );
+    const storeFaviconUrl = storeQuery.data?.faviconUrl ?? null;
 
     const [file, setFile] = useState<File | null>(null);
     const [fileError, setFileError] = useState<string | null>(null);
@@ -468,6 +474,15 @@ function ReceiptIntakePage() {
                             <SummaryItem
                                 label="店舗"
                                 value={receipt.storeName ?? "—"}
+                                icon={
+                                    storeFaviconUrl === null ? null : (
+                                        <img
+                                            alt=""
+                                            className="size-4 shrink-0 rounded-sm object-contain"
+                                            src={storeFaviconUrl}
+                                        />
+                                    )
+                                }
                             />
                             <SummaryItem
                                 label="購入日時"
@@ -805,11 +820,23 @@ function ReceiptIntakePage() {
     );
 }
 
-function SummaryItem({ label, value }: { label: string; value: string }) {
+function SummaryItem({
+    label,
+    value,
+    icon = null,
+}: {
+    label: string;
+    value: string;
+    /** 値の前に添える装飾。読み上げには含めないので alt は空にしておく */
+    icon?: ReactNode;
+}) {
     return (
         <div className="flex flex-col gap-0.5">
             <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="break-words text-sm font-medium">{value}</dd>
+            <dd className="flex items-center gap-2 break-words text-sm font-medium">
+                {icon}
+                <span>{value}</span>
+            </dd>
         </div>
     );
 }
