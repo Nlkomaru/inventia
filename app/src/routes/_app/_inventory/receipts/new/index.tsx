@@ -142,12 +142,17 @@ function ReceiptIntakePage() {
     const [starting, setStarting] = useState(false);
 
     const uploadMutation = useMutation({
-        mutationFn: (input: File) => uploadReceiptImage(input),
+        mutationFn: (input: File) => {
+            const data = new FormData();
+            data.append("file", input);
+            return uploadReceiptImage({ data });
+        },
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: receiptKeys.lists() }),
     });
     const parseMutation = useMutation({
-        mutationFn: (input: string) => parseReceipt(input),
+        mutationFn: (input: string) =>
+            parseReceipt({ data: { receiptId: input } }),
         onSuccess: (detail) => {
             queryClient.setQueryData(receiptKeys.detail(detail.id), detail);
             return queryClient.invalidateQueries({
@@ -158,7 +163,7 @@ function ReceiptIntakePage() {
     // 反映は在庫・ロット・価格を動かすため、在庫系のキャッシュもまとめて無効化する
     const applyMutation = useMutation({
         mutationFn: (input: { receiptId: string; input: ReceiptApplyInput }) =>
-            applyReceipt(input.receiptId, input.input),
+            applyReceipt({ data: input }),
         onSuccess: (result) => {
             queryClient.setQueryData(
                 receiptKeys.detail(result.receipt.id),
