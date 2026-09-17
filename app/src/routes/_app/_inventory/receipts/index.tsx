@@ -144,7 +144,8 @@ function ReceiptListPage() {
         [announce],
     );
     const deleteMutation = useMutation({
-        mutationFn: (receiptId: string) => deleteReceipt(receiptId),
+        mutationFn: (receiptId: string) =>
+            deleteReceipt({ data: { receiptId } }),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: receiptKeys.all }),
     });

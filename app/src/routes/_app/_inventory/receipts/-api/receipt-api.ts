@@ -4,50 +4,14 @@ import type { CategoryDto } from "@/domain/category";
 import type { ItemDto } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
 import {
-    type ReceiptApplyInput,
     type ReceiptApplyResult,
     type ReceiptDetailDto,
     type ReceiptDto,
     type ReceiptListDto,
     receiptApplyInputSchema,
-    receiptApplyResultSchema,
-    receiptDetailDtoSchema,
-    receiptDtoSchema,
     receiptStatusSchema,
 } from "@/domain/receipt";
 import type { StoreDto } from "@/domain/store";
-
-const apiErrorSchema = z.object({
-    error: z
-        .object({
-            message: z.string().optional(),
-        })
-        .optional(),
-});
-
-const request = async <T>(
-    url: string,
-    schema: z.ZodType<T>,
-    fallbackMessage: string,
-    init: RequestInit,
-): Promise<T> => {
-    const response = await fetch(url, init);
-    if (!response.ok) {
-        const body = apiErrorSchema.safeParse(
-            await response.json().catch(() => ({})),
-        );
-        throw new Error(
-            body.success && body.data.error?.message
-                ? body.data.error.message
-                : fallbackMessage,
-        );
-    }
-    return schema.parse(await response.json());
-};
-
-// 読み取りは server function から service を直接呼ぶ。SSR から自分の公開 URL を
-// fetch すると Cloudflare Access に阻まれるため、HTTP API 経由にしない。
-// `cloudflare:workers` と service はクライアントバンドルへ漏らさないよう動的 import する。
 
 const receiptListInputSchema = z.object({
     status: receiptStatusSchema.optional(),
@@ -56,6 +20,14 @@ const receiptListInputSchema = z.object({
 });
 
 export type ReceiptListInput = z.infer<typeof receiptListInputSchema>;
+const receiptIdInputSchema = z.object({
+    receiptId: z.string().trim().min(1),
+});
+
+const receiptApplyRequestSchema = z.object({
+    receiptId: receiptIdInputSchema.shape.receiptId,
+    input: receiptApplyInputSchema,
+});
 
 export const listReceiptsPage = createServerFn({ method: "GET" })
     .validator(receiptListInputSchema)
@@ -155,51 +127,102 @@ export const listLocationTree = createServerFn({ method: "GET" }).handler(
     },
 );
 
-// 更新系はブラウザから HTTP API を呼ぶ（Access の cookie が付く経路）。
-// content-type はブラウザに boundary 付きで決めさせるため、multipart では指定しない。
-export const uploadReceiptImage = (file: File): Promise<ReceiptDto> => {
-    const body = new FormData();
-    body.append("file", file);
-    return request(
-        "/api/receipts",
-        receiptDtoSchema,
-        "レシート画像をアップロードできませんでした",
-        { method: "POST", body },
-    );
-};
+// /api は API トークン必須のため、レシート取込画面の更新系も server function
+// から service を直接呼ぶ。画像だけは FormData のまま送って File を保持する。
+export const uploadReceiptImage = createServerFn({ method: "POST" })
+    .validator((data: FormData) => data)
+    .handler(async ({ data }): Promise<ReceiptDto> => {
+        const file = data.get("file");
+        if (file === null) {
+            throw new Error(
+                "レシート画像が送信されていません。file パートに画像を添付してください。",
+            );
+        }
+        if (!(file instanceof File)) {
+            throw new Error(
+                "file パートがファイルではありません。レシート画像を file パートに添付してください。",
+            );
+        }
+        const [{ env }, { uploadReceipt, ReceiptServiceError }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/receiptService"),
+            ]);
+        try {
+            return await uploadReceipt(env, {
+                bytes: await file.arrayBuffer(),
+                contentType: file.type,
+            });
+        } catch (error) {
+            if (error instanceof ReceiptServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("レシート画像をアップロードできませんでした。");
+        }
+    });
 
 /**
- * AI 解析と商品照合を実行する。解析に失敗した場合も HTTP は成功し、
+ * AI 解析と商品照合を実行する。解析に失敗した場合も正常応答を返し、
  * status = 'failed' と errorMessage を持つ詳細が返る。
  */
-export const parseReceipt = (receiptId: string): Promise<ReceiptDetailDto> =>
-    request(
-        `/api/receipts/${encodeURIComponent(receiptId)}/parse`,
-        receiptDetailDtoSchema,
-        "レシートを解析できませんでした",
-        { method: "POST" },
-    );
+export const parseReceipt = createServerFn({ method: "POST" })
+    .validator(receiptIdInputSchema)
+    .handler(async ({ data }): Promise<ReceiptDetailDto> => {
+        const [
+            { env },
+            { parseReceipt: parse, ReceiptServiceError },
+            { createInProcessMcpToolSet },
+        ] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/receiptService"),
+            import("@/api/mcp/in-process"),
+        ]);
+        try {
+            return await parse(env, data.receiptId, {
+                createToolSet: () => createInProcessMcpToolSet(env),
+            });
+        } catch (error) {
+            if (error instanceof ReceiptServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("レシートを解析できませんでした。");
+        }
+    });
 
-export const applyReceipt = (
-    receiptId: string,
-    input: ReceiptApplyInput,
-): Promise<ReceiptApplyResult> =>
-    request(
-        `/api/receipts/${encodeURIComponent(receiptId)}/apply`,
-        receiptApplyResultSchema,
-        "レシートの内容を反映できませんでした",
-        {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(receiptApplyInputSchema.parse(input)),
-        },
-    );
+export const applyReceipt = createServerFn({ method: "POST" })
+    .validator(receiptApplyRequestSchema)
+    .handler(async ({ data }): Promise<ReceiptApplyResult> => {
+        const [{ env }, { applyReceipt: apply, ReceiptServiceError }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/receiptService"),
+            ]);
+        try {
+            return await apply(env.DB, data.receiptId, data.input, env);
+        } catch (error) {
+            if (error instanceof ReceiptServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("レシートの内容を反映できませんでした。");
+        }
+    });
 
 /** 反映を開始したレシートは service 側で拒否される（在庫の根拠を残すため）。 */
-export const deleteReceipt = (receiptId: string): Promise<{ deleted: true }> =>
-    request(
-        `/api/receipts/${encodeURIComponent(receiptId)}`,
-        z.object({ deleted: z.literal(true) }),
-        "レシートを削除できませんでした",
-        { method: "DELETE" },
-    );
+export const deleteReceipt = createServerFn({ method: "POST" })
+    .validator(receiptIdInputSchema)
+    .handler(async ({ data }): Promise<{ deleted: true }> => {
+        const [{ env }, { deleteReceipt: remove, ReceiptServiceError }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/receiptService"),
+            ]);
+        try {
+            await remove(env, data.receiptId);
+            return { deleted: true };
+        } catch (error) {
+            if (error instanceof ReceiptServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("レシートを削除できませんでした。");
+        }
+    });
