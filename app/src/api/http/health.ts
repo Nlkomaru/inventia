@@ -1,10 +1,18 @@
-import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { healthSchema } from "../../domain/health";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { getHealth } from "../../services/healthService";
 import type { ApiBindings } from "../bindings";
 
 export const healthApp = new OpenAPIHono<ApiBindings>();
-const healthOpenApiSchema = healthSchema.openapi("Health");
+// domain の zod は OpenAPI 拡張を持たないため、Worker bundle では .openapi()
+// を呼べない。HTTP 契約用の schema は @hono/zod-openapi で組み立てる。
+const healthOpenApiSchema = z
+    .object({
+        status: z.literal("ok"),
+        service: z.literal("inventia-api"),
+        deployedAt: z.string().datetime().nullable(),
+        checkedAt: z.string().datetime(),
+    })
+    .openapi("Health");
 
 const healthRoute = createRoute({
     method: "get",
