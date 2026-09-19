@@ -16,21 +16,25 @@ import {
     type PriceRecordCreateInput,
     type PriceRecordDto,
     type PriceRecordListInput,
+    type PriceRecordUpdateInput,
     priceBatchInputSchema,
     priceComparisonListInputSchema,
     priceRecordCreateInputSchema,
     priceRecordListInputSchema,
+    priceRecordUpdateInputSchema,
 } from "../domain/price";
 import { storeFaviconPath } from "../domain/store";
 import {
     type AllPriceRecordRow,
     findItemPricingContext,
+    findPriceRecordById,
     insertPriceRecord,
     listAllPriceRecords as listAllPriceRecordRows,
     listPriceRecords as listPriceRecordRows,
     listPriceRecordsByUnitPrice,
     type PriceComparisonRecordRow,
     type PriceRecordRow,
+    updatePriceRecord as updatePriceRecordRow,
 } from "../repositories/priceRepository";
 import { findStoreById } from "../repositories/storeRepository";
 import { type SignedImageUrlEnv, signImageUrl } from "./signedImageUrlService";
@@ -44,12 +48,14 @@ export type PriceServiceErrorCode =
     | "PRICE_INVALID_INPUT"
     | "PRICE_INVALID_CURSOR"
     | "PRICE_ITEM_NOT_FOUND"
+    | "PRICE_RECORD_NOT_FOUND"
     | "PRICE_STORE_NOT_FOUND";
 
 const statusByCode: Record<PriceServiceErrorCode, 400 | 404> = {
     PRICE_INVALID_INPUT: 400,
     PRICE_INVALID_CURSOR: 400,
     PRICE_ITEM_NOT_FOUND: 404,
+    PRICE_RECORD_NOT_FOUND: 404,
     PRICE_STORE_NOT_FOUND: 404,
 };
 
@@ -78,6 +84,14 @@ const parseCreateInput = (input: unknown): PriceRecordCreateInput => {
         ...result.data,
         recordedAt: canonicalUtcDateTime(result.data.recordedAt),
     };
+};
+
+const parseUpdateInput = (input: unknown): PriceRecordUpdateInput => {
+    const result = priceRecordUpdateInputSchema.safeParse(input);
+    if (!result.success) {
+        throw invalidInput("価格履歴の入力値を確認してください");
+    }
+    return result.data;
 };
 
 const parseListInput = (input: unknown): PriceRecordListInput => {
@@ -154,6 +168,63 @@ export type AllPriceRecordListResponse = {
     nextCursor: string | null;
 };
 
+/**
+ * 店舗参照と自由記述の取得元を解決し、内容量を品目の基準単位へ換算する。
+ * 作成と訂正で同じ規則を使い、表示経路による単価のずれを防ぐ。
+ */
+const normalizeWritableInput = async (
+    env: PriceEnv,
+    item: Pick<PriceRecordRow, "baseUnit" | "baseDimension">,
+    input: Pick<
+        PriceRecordUpdateInput,
+        | "contentAmount"
+        | "contentUnit"
+        | "setCount"
+        | "packaging"
+        | "price"
+        | "source"
+        | "storeId"
+        | "url"
+    >,
+) => {
+    const contentAmount = normalizeContentAmount(
+        input.contentAmount,
+        input.contentUnit,
+        item.baseUnit,
+        item.baseDimension,
+    );
+    if (contentAmount === null) {
+        throw invalidInput(
+            "内容量単位が商品の基準単位と互換性がないか、整数へ変換できません",
+        );
+    }
+    const store =
+        input.storeId === undefined || input.storeId === null
+            ? null
+            : await findStoreById(env.DB, input.storeId);
+    if (input.storeId && !store) {
+        throw new PriceServiceError(
+            "PRICE_STORE_NOT_FOUND",
+            "指定された店舗が見つかりません",
+        );
+    }
+    const source = input.source ?? store?.name;
+    if (source === undefined) {
+        throw invalidInput(
+            "店舗（storeId）か取得元（source）を指定してください",
+        );
+    }
+    return {
+        contentAmount,
+        setCount: input.setCount,
+        packaging: input.packaging ?? null,
+        price: input.price,
+        source,
+        storeId: store?.id ?? null,
+        url: input.url ?? null,
+    };
+};
+
 export const createPriceRecord = async (
     env: PriceEnv,
     input: unknown,
@@ -166,43 +237,40 @@ export const createPriceRecord = async (
             "指定された商品が見つかりません",
         );
     }
-    const normalizedContentAmount = normalizeContentAmount(
-        parsed.contentAmount,
-        parsed.contentUnit,
-        item.baseUnit,
-        item.baseDimension,
-    );
-    if (normalizedContentAmount === null) {
-        throw invalidInput(
-            "内容量単位が商品の基準単位と互換性がないか、整数へ変換できません",
-        );
-    }
-    // 店舗を指定した行では店名を source へ転記し、価格比較を 1 テーブルで完結させる
-    const store =
-        parsed.storeId === undefined || parsed.storeId === null
-            ? null
-            : await findStoreById(env.DB, parsed.storeId);
-    if (parsed.storeId && !store) {
-        throw new PriceServiceError(
-            "PRICE_STORE_NOT_FOUND",
-            "指定された店舗が見つかりません",
-        );
-    }
-    const source = parsed.source ?? store?.name;
-    if (source === undefined) {
-        throw invalidInput(
-            "店舗（storeId）か取得元（source）を指定してください",
-        );
-    }
-    const { contentUnit: _contentUnit, ...normalizedInput } = parsed;
     return toDto(
         env,
         await insertPriceRecord(env.DB, {
-            ...normalizedInput,
-            contentAmount: normalizedContentAmount,
-            source,
-            storeId: store?.id ?? null,
+            ...(await normalizeWritableInput(env, item, parsed)),
+            itemId: parsed.itemId,
+            recordedAt: parsed.recordedAt,
         }),
+    );
+};
+
+/**
+ * 内容量・価格などの入力誤りを訂正する。観測日時は入力にも SQL の UPDATE にも
+ * 含めず、履歴の順序と購入時点を保持する。
+ */
+export const updatePriceRecord = async (
+    env: PriceEnv,
+    priceRecordId: string,
+    input: unknown,
+): Promise<PriceRecordDto> => {
+    const parsed = parseUpdateInput(input);
+    const record = await findPriceRecordById(env.DB, priceRecordId);
+    if (!record || record.itemId !== parsed.itemId) {
+        throw new PriceServiceError(
+            "PRICE_RECORD_NOT_FOUND",
+            "指定された価格履歴が見つかりません",
+        );
+    }
+    return toDto(
+        env,
+        await updatePriceRecordRow(
+            env.DB,
+            priceRecordId,
+            await normalizeWritableInput(env, record, parsed),
+        ),
     );
 };
 

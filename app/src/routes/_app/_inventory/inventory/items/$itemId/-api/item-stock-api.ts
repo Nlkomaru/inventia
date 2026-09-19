@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { type ItemLotListDto, itemLotListDtoSchema } from "@/domain/lot";
-import { type PriceRecordDto, priceRecordDtoSchema } from "@/domain/price";
 import {
     type StockMovementDto,
     type StockMovementReason,
@@ -137,33 +136,5 @@ export const updateLotExpiry = (
             method: "PATCH",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ expiryDate }),
-        },
-    );
-
-export interface CreatePriceRecordInput {
-    contentAmount: number;
-    contentUnit: string;
-    setCount: number;
-    price: number;
-    packaging: string | null;
-    storeId: string | null;
-    source?: string;
-    url: string | null;
-    recordedAt: string;
-}
-
-/** この品目の価格を 1 件記録する。単価は読み出し時に計算されるため保存しない。 */
-export const createPriceRecord = (
-    itemId: string,
-    input: CreatePriceRecordInput,
-): Promise<PriceRecordDto> =>
-    request(
-        `/api/items/${encodeURIComponent(itemId)}/prices`,
-        priceRecordDtoSchema,
-        "価格を記録できませんでした",
-        {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(input),
         },
     );

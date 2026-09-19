@@ -8,6 +8,7 @@ import {
     compareUnitPrices,
     createPriceRecord,
     listPriceRecords,
+    updatePriceRecord,
 } from "../services/priceService";
 import {
     insertPriceRecord,
@@ -305,5 +306,56 @@ describe("価格記録の取得元URL", () => {
         expect(record.storeId).toBe(store.id);
         expect(record.source).toBe(store.name);
         expect(record.url).toBe("https://example.com/products/1");
+    });
+});
+
+describe("価格記録の訂正", () => {
+    it("記録日時を保ったまま内容量と価格を訂正する", async () => {
+        const itemId = await createTestItem({
+            baseUnit: "g",
+            baseDimension: "mass",
+        });
+        const original = await createPriceRecord(env, {
+            itemId,
+            contentAmount: 500,
+            contentUnit: "g",
+            setCount: 1,
+            price: 250,
+            source: "訂正前",
+            recordedAt: "2026-09-01T12:00:00.000Z",
+        });
+
+        const corrected = await updatePriceRecord(env, original.id, {
+            itemId,
+            contentAmount: 2,
+            contentUnit: "kg",
+            setCount: 3,
+            packaging: "詰め替え",
+            price: 900,
+            source: "訂正後",
+            storeId: null,
+            url: "https://example.com/products/corrected",
+        });
+
+        expect(corrected).toMatchObject({
+            contentAmount: 2000,
+            setCount: 3,
+            packaging: "詰め替え",
+            price: 900,
+            source: "訂正後",
+            storeId: null,
+            url: "https://example.com/products/corrected",
+            recordedAt: original.recordedAt,
+            createdAt: original.createdAt,
+        });
+
+        const history = await listPriceRecords(env, { itemId, limit: 1 });
+        expect(history.items).toHaveLength(1);
+        expect(history.items[0]).toMatchObject({
+            id: original.id,
+            recordedAt: original.recordedAt,
+            contentAmount: 2000,
+            price: 900,
+        });
     });
 });

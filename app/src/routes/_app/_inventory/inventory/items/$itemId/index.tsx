@@ -49,6 +49,7 @@ import {
 import { ItemIssueForm } from "./-components/item-issue-form";
 import { ItemLotExpiryForm } from "./-components/item-lot-expiry-form";
 import { ItemMovementNoteEditor } from "./-components/item-movement-note-editor";
+import { ItemPriceEditDialog } from "./-components/item-price-edit-dialog";
 import { ItemPriceForm } from "./-components/item-price-form";
 import { ItemReceiveForm } from "./-components/item-receive-form";
 
@@ -415,6 +416,9 @@ function ItemDetailPage() {
                                         単価
                                     </TableHead>
                                     <TableHead>記録日時</TableHead>
+                                    <TableHead className="text-right">
+                                        操作
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -459,6 +463,12 @@ function ItemDetailPage() {
                                         </TableCell>
                                         <TableCell className="align-top whitespace-nowrap">
                                             {formatDateTime(record.recordedAt)}
+                                        </TableCell>
+                                        <TableCell className="text-right align-top">
+                                            <ItemPriceEditDialog
+                                                item={item}
+                                                record={record}
+                                            />
                                         </TableCell>
                                     </TableRow>
                                 ))}
