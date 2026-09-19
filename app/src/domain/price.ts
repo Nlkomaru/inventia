@@ -49,6 +49,14 @@ export const priceRecordCreateInputSchema = z
     })
     .strict();
 
+/**
+ * A correction never changes the observation timestamp. `recordedAt` is omitted
+ * from this boundary so callers cannot accidentally re-date price history.
+ */
+export const priceRecordUpdateInputSchema = priceRecordCreateInputSchema.omit({
+    recordedAt: true,
+});
+
 export const priceRecordCursorSchema = z
     .object({
         itemId: priceRecordIdSchema,
@@ -184,6 +192,14 @@ export type PriceRecordDimension = z.infer<typeof priceRecordDimensionSchema>;
 export type PriceContentUnit = z.infer<typeof priceContentUnitSchema>;
 export type PriceRecordCreateInput = z.infer<
     typeof priceRecordCreateInputSchema
+>;
+
+export type PriceRecordUpdateInput = z.infer<
+    typeof priceRecordUpdateInputSchema
+>;
+export type NormalizedPriceRecordUpdateInput = Omit<
+    PriceRecordUpdateInput,
+    "contentUnit"
 >;
 export type NormalizedPriceRecordCreateInput = Omit<
     PriceRecordCreateInput,

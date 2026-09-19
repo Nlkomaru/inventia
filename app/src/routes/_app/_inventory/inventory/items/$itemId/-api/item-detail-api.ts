@@ -7,7 +7,11 @@ import { z } from "zod";
 import type { CategoryDto } from "@/domain/category";
 import type { ItemDetailDto } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
-import type { PriceRecordDto } from "@/domain/price";
+import {
+    type PriceRecordDto,
+    priceRecordCreateInputSchema,
+    priceRecordUpdateInputSchema,
+} from "@/domain/price";
 import type { StockHistoryResult } from "@/domain/stock";
 
 // 読み取りは server function から service を直接呼ぶ。SSR から自分の公開 URL を
@@ -96,6 +100,12 @@ const itemPriceRecordsInputSchema = z.object({
     limit: z.number().int().min(1).max(100),
 });
 
+const createItemPriceRecordInputSchema = priceRecordCreateInputSchema;
+
+const updateItemPriceRecordInputSchema = priceRecordUpdateInputSchema.extend({
+    priceRecordId: z.string().trim().min(1).max(128),
+});
+
 export const listItemPriceRecords = createServerFn({ method: "GET" })
     .validator(itemPriceRecordsInputSchema)
     .handler(
@@ -109,6 +119,31 @@ export const listItemPriceRecords = createServerFn({ method: "GET" })
             return listPriceRecords(env, data);
         },
     );
+
+/** 読み取りと同じ server function 境界で価格観測を追加する。 */
+export const createItemPriceRecord = createServerFn({ method: "POST" })
+    .validator(createItemPriceRecordInputSchema)
+    .handler(async ({ data }): Promise<PriceRecordDto> => {
+        const [{ env }, { createPriceRecord }] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/priceService"),
+        ]);
+        return createPriceRecord(env, data);
+    });
+
+/**
+ * 記録日時を受け取らない訂正入口。service と repository も同じ不変条件を持つ。
+ */
+export const updateItemPriceRecord = createServerFn({ method: "POST" })
+    .validator(updateItemPriceRecordInputSchema)
+    .handler(async ({ data }): Promise<PriceRecordDto> => {
+        const [{ env }, { updatePriceRecord }] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/priceService"),
+        ]);
+        const { priceRecordId, ...input } = data;
+        return updatePriceRecord(env, priceRecordId, input);
+    });
 
 /** 価格の記録先として選ぶ店舗の一覧。店舗は数が限られるため全件を集める。 */
 export const listStoreOptions = createServerFn({ method: "GET" }).handler(

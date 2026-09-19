@@ -2,6 +2,7 @@ import { newId } from "../domain/id";
 import type {
     AllPriceRecordCursor,
     NormalizedPriceRecordCreateInput,
+    NormalizedPriceRecordUpdateInput,
     PriceComparisonCursor,
     PriceRecordCursor,
     PriceRecordDimension,
@@ -351,4 +352,41 @@ export const insertPriceRecord = async (
     return inserted;
 };
 
+/**
+ * 価格観測の訂正。観測日時・作成日時・購入明細への紐付けは履歴の意味を保つため変更しない。
+ */
+export const updatePriceRecord = async (
+    db: D1Database,
+    id: string,
+    input: NormalizedPriceRecordUpdateInput & { source: string },
+): Promise<PriceRecordRow> => {
+    await db
+        .prepare(
+            `UPDATE price_records
+             SET content_amount = ?2,
+                 set_count = ?3,
+                 packaging = ?4,
+                 price = ?5,
+                 source = ?6,
+                 store_id = ?7,
+                 url = ?8
+             WHERE id = ?1`,
+        )
+        .bind(
+            id,
+            input.contentAmount,
+            input.setCount,
+            input.packaging ?? null,
+            input.price,
+            input.source,
+            input.storeId ?? null,
+            input.url ?? null,
+        )
+        .run();
+    const updated = await findPriceRecordById(db, id);
+    if (!updated) {
+        throw new Error("Updated price record could not be read back");
+    }
+    return updated;
+};
 export type { PriceRecordListInput };

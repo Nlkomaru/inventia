@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -18,16 +18,22 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import type { ItemDetailDto } from "@/domain/item";
-import { type PriceContentUnit, priceContentUnitSchema } from "@/domain/price";
+import {
+    canonicalPriceContentUnit,
+    type PriceContentUnit,
+    type PriceRecordCreateInput,
+    type PriceRecordDto,
+    priceContentUnitSchema,
+} from "@/domain/price";
 import { parsePositiveInteger, toIsoFromDate } from "@/lib/expiry-input";
+import {
+    createItemPriceRecord,
+    updateItemPriceRecord,
+} from "../-api/item-detail-api";
 import {
     itemPriceRecordKeys,
     storeOptionsQueryOptions,
 } from "../-api/item-detail-queries";
-import {
-    type CreatePriceRecordInput,
-    createPriceRecord,
-} from "../-api/item-stock-api";
 
 // 店舗を選ばない選択肢の値。Select は空文字を未選択として扱うため別の値にする
 const noStoreValue = "__none__";
@@ -58,12 +64,30 @@ const contentUnitOptions = (item: ItemDetailDto): PriceContentUnit[] => {
     return parsed.success ? [parsed.data] : [];
 };
 
+type PriceRecordFormInput = Omit<
+    PriceRecordCreateInput,
+    "itemId" | "recordedAt"
+> & {
+    recordedAt?: string;
+};
+
+type ItemPriceFormProps = {
+    item: ItemDetailDto;
+    record?: PriceRecordDto;
+    actions?: (submitButton: ReactNode) => ReactNode;
+    onSaved?: () => void;
+};
+
 /**
- * この品目の価格を 1 件記録する。単価は保存せず読み出し時に計算されるため、
- * ここでは「1 個あたりの内容量 × セット数」と価格だけを受け取る。
- * 店舗を選ぶと店名が取得元として転記される。
+ * 価格観測の追加と訂正で同じ入力規則を使う。訂正時には記録日時を表示だけにし、
+ * 入力・更新リクエストのどちらにも含めない。
  */
-export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
+export function ItemPriceForm({
+    item,
+    record,
+    actions,
+    onSaved,
+}: ItemPriceFormProps) {
     const queryClient = useQueryClient();
     const storesQuery = useQuery(storeOptionsQueryOptions());
     const units = useMemo(() => contentUnitOptions(item), [item]);
@@ -81,28 +105,62 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
         ],
         [storesQuery.data],
     );
-    const [contentAmount, setContentAmount] = useState("");
-    const [contentUnit, setContentUnit] = useState<PriceContentUnit | "">(
-        () => units[0] ?? "",
+    const defaultContentUnit =
+        canonicalPriceContentUnit(item.baseUnit) ?? units[0] ?? "";
+    const [contentAmount, setContentAmount] = useState(
+        () => record?.contentAmount.toString() ?? "",
     );
-    const [setCount, setSetCount] = useState("1");
-    const [price, setPrice] = useState("");
-    const [packaging, setPackaging] = useState("");
-    const [storeId, setStoreId] = useState(noStoreValue);
-    const [source, setSource] = useState("");
-    const [url, setUrl] = useState("");
+    const [contentUnit, setContentUnit] = useState<PriceContentUnit | "">(
+        () => defaultContentUnit,
+    );
+    const [setCount, setSetCount] = useState(
+        () => record?.setCount.toString() ?? "1",
+    );
+    const [price, setPrice] = useState(() => record?.price.toString() ?? "");
+    const [packaging, setPackaging] = useState(() => record?.packaging ?? "");
+    const [storeId, setStoreId] = useState(
+        () => record?.storeId ?? noStoreValue,
+    );
+    const [source, setSource] = useState(() =>
+        record?.storeId === null || record?.source !== record?.storeName
+            ? (record?.source ?? "")
+            : "",
+    );
+    const [url, setUrl] = useState(() => record?.url ?? "");
     const [recordedAt, setRecordedAt] = useState(todayInputValue);
     const [fieldError, setFieldError] = useState<string | null>(null);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
+    const fieldPrefix = record ? `price-edit-${record.id}` : "price";
 
     const mutation = useMutation({
-        mutationFn: (input: CreatePriceRecordInput) =>
-            createPriceRecord(item.id, input),
-        onSuccess: () =>
-            queryClient.invalidateQueries({
+        mutationFn: async (input: PriceRecordFormInput) => {
+            if (record) {
+                return updateItemPriceRecord({
+                    data: {
+                        ...input,
+                        itemId: item.id,
+                        priceRecordId: record.id,
+                    },
+                });
+            }
+            if (!input.recordedAt) {
+                throw new Error("記録日を正しく入力してください");
+            }
+            return createItemPriceRecord({
+                data: {
+                    ...input,
+                    itemId: item.id,
+                    recordedAt: input.recordedAt,
+                },
+            });
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
                 queryKey: itemPriceRecordKeys.item(item.id),
-            }),
+            });
+            onSaved?.();
+        },
     });
 
     // 個数の品目で基準単位が価格の単位表に無い場合、API が単位を受け付けられない。
@@ -124,7 +182,7 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
         const amount = parsePositiveInteger(contentAmount);
         const count = parsePositiveInteger(setCount);
         const priceValue = Number(price.trim());
-        const recordedAtIso = toIsoFromDate(recordedAt);
+        const recordedAtIso = record ? null : toIsoFromDate(recordedAt);
         if (amount === null) {
             setFieldError("内容量は 1 以上の整数で入力してください");
             return;
@@ -141,8 +199,12 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
             setFieldError("価格は 0 以上の整数で入力してください");
             return;
         }
-        if (recordedAtIso === null) {
+        if (!record && recordedAtIso === null) {
             setFieldError("記録日を正しく入力してください");
+            return;
+        }
+        if (contentUnit === "") {
+            setFieldError("内容量の単位を選択してください");
             return;
         }
         const trimmedSource = source.trim();
@@ -152,43 +214,67 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
             setFieldError("店舗を選ぶか、取得元を入力してください");
             return;
         }
+        const input = {
+            contentAmount: amount,
+            contentUnit,
+            setCount: count,
+            price: priceValue,
+            packaging: packaging.trim() === "" ? null : packaging.trim(),
+            storeId: selectedStoreId,
+            url: trimmedUrl === "" ? null : trimmedUrl,
+            // 店舗を選んだときは service が店名を転記するため送らない
+            ...(selectedStoreId === null
+                ? { source: trimmedSource }
+                : trimmedSource === ""
+                  ? {}
+                  : { source: trimmedSource }),
+            ...(recordedAtIso === null ? {} : { recordedAt: recordedAtIso }),
+        };
         try {
-            await mutation.mutateAsync({
-                contentAmount: amount,
-                contentUnit,
-                setCount: count,
-                price: priceValue,
-                packaging: packaging.trim() === "" ? null : packaging.trim(),
-                storeId: selectedStoreId,
-                url: trimmedUrl === "" ? null : trimmedUrl,
-                // 店舗を選んだときは service が店名を転記するため送らない
-                ...(selectedStoreId === null
-                    ? { source: trimmedSource }
-                    : trimmedSource === ""
-                      ? {}
-                      : { source: trimmedSource }),
-                recordedAt: recordedAtIso,
-            });
-            setNotice("価格を記録しました");
-            setContentAmount("");
-            setSetCount("1");
-            setPrice("");
-            setPackaging("");
-            setUrl("");
+            await mutation.mutateAsync(input);
+            if (record) {
+                setNotice("価格を訂正しました");
+            } else {
+                setNotice("価格を記録しました");
+                setContentAmount("");
+                setSetCount("1");
+                setPrice("");
+                setPackaging("");
+                setUrl("");
+            }
         } catch (cause) {
-            setSubmitError(errorMessage(cause, "価格を記録できませんでした"));
+            setSubmitError(
+                errorMessage(
+                    cause,
+                    record
+                        ? "価格を訂正できませんでした"
+                        : "価格を記録できませんでした",
+                ),
+            );
         }
     };
+
+    const submitButton = (
+        <Button disabled={mutation.isPending} type="submit">
+            {mutation.isPending
+                ? record
+                    ? "訂正中…"
+                    : "記録中…"
+                : record
+                  ? "変更を保存"
+                  : "価格を記録"}
+        </Button>
+    );
 
     return (
         <form className="flex flex-col gap-4" onSubmit={submit}>
             <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Field>
-                    <FieldLabel htmlFor="price-content-amount">
+                    <FieldLabel htmlFor={`${fieldPrefix}-content-amount`}>
                         1 個あたりの内容量
                     </FieldLabel>
                     <Input
-                        id="price-content-amount"
+                        id={`${fieldPrefix}-content-amount`}
                         inputMode="numeric"
                         onChange={(event) =>
                             setContentAmount(event.target.value)
@@ -197,7 +283,9 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
                     />
                 </Field>
                 <Field>
-                    <FieldLabel htmlFor="price-content-unit">単位</FieldLabel>
+                    <FieldLabel htmlFor={`${fieldPrefix}-content-unit`}>
+                        単位
+                    </FieldLabel>
                     <Select
                         items={unitItems}
                         onValueChange={(value) => {
@@ -208,7 +296,7 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
                         }}
                         value={contentUnit}
                     >
-                        <SelectTrigger id="price-content-unit">
+                        <SelectTrigger id={`${fieldPrefix}-content-unit`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -223,31 +311,37 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
                     </Select>
                 </Field>
                 <Field>
-                    <FieldLabel htmlFor="price-set-count">セット数</FieldLabel>
+                    <FieldLabel htmlFor={`${fieldPrefix}-set-count`}>
+                        セット数
+                    </FieldLabel>
                     <Input
-                        id="price-set-count"
+                        id={`${fieldPrefix}-set-count`}
                         inputMode="numeric"
                         onChange={(event) => setSetCount(event.target.value)}
                         value={setCount}
                     />
                 </Field>
                 <Field>
-                    <FieldLabel htmlFor="price-value">価格（円）</FieldLabel>
+                    <FieldLabel htmlFor={`${fieldPrefix}-value`}>
+                        価格（円）
+                    </FieldLabel>
                     <Input
-                        id="price-value"
+                        id={`${fieldPrefix}-value`}
                         inputMode="numeric"
                         onChange={(event) => setPrice(event.target.value)}
                         value={price}
                     />
                 </Field>
                 <Field>
-                    <FieldLabel htmlFor="price-store">店舗</FieldLabel>
+                    <FieldLabel htmlFor={`${fieldPrefix}-store`}>
+                        店舗
+                    </FieldLabel>
                     <Select
                         items={storeItems}
                         onValueChange={(value) => setStoreId(String(value))}
                         value={storeId}
                     >
-                        <SelectTrigger id="price-store">
+                        <SelectTrigger id={`${fieldPrefix}-store`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -264,32 +358,40 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
                         </SelectContent>
                     </Select>
                 </Field>
+                {record ? (
+                    <p className="self-end text-sm text-muted-foreground">
+                        記録日時は変更されません。
+                    </p>
+                ) : (
+                    <Field>
+                        <FieldLabel htmlFor={`${fieldPrefix}-recorded-at`}>
+                            記録日
+                        </FieldLabel>
+                        <DatePicker
+                            calendarLabel="記録日をカレンダーから選ぶ"
+                            id={`${fieldPrefix}-recorded-at`}
+                            onValueChange={setRecordedAt}
+                            value={recordedAt}
+                        />
+                    </Field>
+                )}
                 <Field>
-                    <FieldLabel htmlFor="price-recorded-at">記録日</FieldLabel>
-                    <DatePicker
-                        calendarLabel="記録日をカレンダーから選ぶ"
-                        id="price-recorded-at"
-                        onValueChange={setRecordedAt}
-                        value={recordedAt}
-                    />
-                </Field>
-                <Field>
-                    <FieldLabel htmlFor="price-source">
+                    <FieldLabel htmlFor={`${fieldPrefix}-source`}>
                         取得元（店舗を選ばない場合）
                     </FieldLabel>
                     <Input
-                        id="price-source"
+                        id={`${fieldPrefix}-source`}
                         onChange={(event) => setSource(event.target.value)}
                         placeholder="店舗名など"
                         value={source}
                     />
                 </Field>
                 <Field>
-                    <FieldLabel htmlFor="price-url">
+                    <FieldLabel htmlFor={`${fieldPrefix}-url`}>
                         商品ページURL（任意）
                     </FieldLabel>
                     <Input
-                        id="price-url"
+                        id={`${fieldPrefix}-url`}
                         inputMode="url"
                         onChange={(event) => setUrl(event.target.value)}
                         placeholder="https://example.com/product"
@@ -298,9 +400,11 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
                     />
                 </Field>
                 <Field>
-                    <FieldLabel htmlFor="price-packaging">包装</FieldLabel>
+                    <FieldLabel htmlFor={`${fieldPrefix}-packaging`}>
+                        包装
+                    </FieldLabel>
                     <Input
-                        id="price-packaging"
+                        id={`${fieldPrefix}-packaging`}
                         onChange={(event) => setPackaging(event.target.value)}
                         placeholder="ボトル、詰め替えなど"
                         value={packaging}
@@ -315,11 +419,7 @@ export function ItemPriceForm({ item }: { item: ItemDetailDto }) {
                 </p>
             )}
 
-            <div>
-                <Button disabled={mutation.isPending} type="submit">
-                    {mutation.isPending ? "記録中…" : "価格を記録"}
-                </Button>
-            </div>
+            {actions ? actions(submitButton) : <div>{submitButton}</div>}
         </form>
     );
 }

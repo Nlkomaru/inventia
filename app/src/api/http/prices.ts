@@ -7,12 +7,14 @@ import {
     priceRecordDtoSchema,
     priceRecordListInputSchema,
     priceRecordListOutputSchema,
+    priceRecordUpdateInputSchema,
 } from "../../domain/price";
 import {
     createPriceRecord,
     listAllPriceRecords,
     listPriceRecords,
     PriceServiceError,
+    updatePriceRecord,
 } from "../../services/priceService";
 import type { ApiBindings } from "../bindings";
 
@@ -38,7 +40,19 @@ const itemIdParameter = z
         param: { name: "itemId", in: "path" },
         example: "019fecc7-da09-768f-b6e8-45904d46b277",
     });
+const priceRecordIdParameter = z
+    .string()
+    .trim()
+    .min(1)
+    .max(128)
+    .openapi({
+        param: { name: "priceRecordId", in: "path" },
+        example: "019fecc7-da09-768f-b6e8-45904d46b277",
+    });
 const priceCreateBodySchema = priceRecordCreateInputSchema.omit({
+    itemId: true,
+});
+const priceUpdateBodySchema = priceRecordUpdateInputSchema.omit({
     itemId: true,
 });
 const priceListQuerySchema = priceRecordListInputSchema.omit({
@@ -54,7 +68,7 @@ const errorResponses = {
     },
     404: {
         description:
-            "The referenced record does not exist. Codes: PRICE_ITEM_NOT_FOUND (the item does not exist), PRICE_STORE_NOT_FOUND (storeId does not match any store; create the store first).",
+            "The referenced record does not exist. Codes: PRICE_ITEM_NOT_FOUND (the item does not exist), PRICE_RECORD_NOT_FOUND (the price record does not belong to the item), PRICE_STORE_NOT_FOUND (storeId does not match any store; create the store first).",
         content: responseContent(priceErrorSchema),
     },
     409: {
@@ -104,6 +118,33 @@ pricesApp.openAPIRegistry.registerPath({
     responses: {
         201: {
             description: "The created price observation.",
+            content: responseContent(priceRecordDtoSchema),
+        },
+        ...errorResponses,
+    },
+});
+
+pricesApp.openAPIRegistry.registerPath({
+    method: "patch",
+    path: "/{itemId}/prices/{priceRecordId}",
+    tags: ["Prices"],
+    summary: "Correct an item price",
+    description:
+        "Corrects a price observation's package content, price, source, store, packaging, or URL. The observed timestamp is immutable and is neither accepted nor changed.",
+    request: {
+        params: z.object({
+            itemId: itemIdParameter,
+            priceRecordId: priceRecordIdParameter,
+        }),
+        body: {
+            required: true,
+            content: responseContent(priceUpdateBodySchema),
+        },
+    },
+    responses: {
+        200: {
+            description:
+                "The corrected price observation with its original recordedAt.",
             content: responseContent(priceRecordDtoSchema),
         },
         ...errorResponses,
@@ -208,6 +249,21 @@ pricesApp.post("/:itemId/prices", async (c) => {
                 withItemId(c.req.param("itemId"), await parseJson(c)),
             ),
             201,
+        );
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+pricesApp.patch("/:itemId/prices/:priceRecordId", async (c) => {
+    try {
+        return c.json(
+            await updatePriceRecord(
+                c.env,
+                c.req.param("priceRecordId"),
+                withItemId(c.req.param("itemId"), await parseJson(c)),
+            ),
+            200,
         );
     } catch (error) {
         return errorResponse(c, error);
