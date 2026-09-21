@@ -1,21 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
-import type {
-    StoreCreateInput,
-    StoreDto,
-    StoreUpdateInput,
+import { z } from "zod";
+import {
+    type StoreCreateInput,
+    type StoreDto,
+    type StoreUpdateInput,
+    storeCreateInputSchema,
+    storeIdSchema,
+    storeUpdateInputSchema,
 } from "@/domain/store";
 
 type StoreListResponse = { items: StoreDto[]; nextCursor: string | null };
-type ApiError = { error?: { message?: string } };
-
-const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
-    const response = await fetch(url, init);
-    if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as ApiError;
-        throw new Error(body.error?.message ?? "店舗の更新に失敗しました");
-    }
-    return (await response.json()) as T;
-};
 
 // Cloudflare Access が公開 URL に掛かるため、読み取りは server function から
 // service を直接呼ぶ。件数が少ないマスタなので全件をまとめて取得し、
@@ -40,37 +34,125 @@ export const listAllStores = createServerFn({ method: "GET" }).handler(
     },
 );
 
-export const createStore = (input: StoreCreateInput) =>
-    request<StoreDto>("/api/stores", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(input),
+const createStoreServerFn = createServerFn({ method: "POST" })
+    .validator(storeCreateInputSchema)
+    .handler(async ({ data }): Promise<StoreDto> => {
+        const [{ env }, { createStore, StoreServiceError }] = await Promise.all(
+            [import("cloudflare:workers"), import("@/services/storeService")],
+        );
+        try {
+            return await createStore(env, data);
+        } catch (error) {
+            if (error instanceof StoreServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("店舗の更新に失敗しました");
+        }
     });
 
-export const updateStore = (id: string, input: StoreUpdateInput) =>
-    request<StoreDto>(`/api/stores/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(input),
+const updateStoreServerFn = createServerFn({ method: "POST" })
+    .validator(
+        z.object({
+            id: storeIdSchema,
+            input: storeUpdateInputSchema,
+        }),
+    )
+    .handler(async ({ data }): Promise<StoreDto> => {
+        const [{ env }, { updateStore, StoreServiceError }] = await Promise.all(
+            [import("cloudflare:workers"), import("@/services/storeService")],
+        );
+        try {
+            return await updateStore(env, data.id, data.input);
+        } catch (error) {
+            if (error instanceof StoreServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("店舗の更新に失敗しました");
+        }
     });
 
-/** 価格記録から参照されている店舗は service 側で拒否される（409）。 */
-export const deleteStore = (id: string) =>
-    request<{ deleted: true }>(`/api/stores/${encodeURIComponent(id)}`, {
-        method: "DELETE",
+const deleteStoreServerFn = createServerFn({ method: "POST" })
+    .validator(storeIdSchema)
+    .handler(async ({ data }): Promise<{ deleted: true }> => {
+        const [{ env }, { deleteStore, StoreServiceError }] = await Promise.all(
+            [import("cloudflare:workers"), import("@/services/storeService")],
+        );
+        try {
+            await deleteStore(env, data);
+            return { deleted: true };
+        } catch (error) {
+            if (error instanceof StoreServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("店舗の更新に失敗しました");
+        }
     });
 
-// content-type はブラウザに boundary 付きで決めさせるため、multipart では指定しない。
-export const uploadStoreFavicon = (id: string, file: File) => {
-    const body = new FormData();
-    body.append("file", file);
-    return request<StoreDto>(`/api/stores/${encodeURIComponent(id)}/favicon`, {
-        method: "PUT",
-        body,
+const uploadStoreFaviconServerFn = createServerFn({ method: "POST" })
+    .validator((data: FormData) => data)
+    .handler(async ({ data }): Promise<StoreDto> => {
+        const id = data.get("id");
+        const file = data.get("file");
+        if (!(file instanceof File)) {
+            throw new Error("ファビコン画像を file パートに添付してください。");
+        }
+        const [{ env }, { uploadStoreFavicon, StoreServiceError }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/storeService"),
+            ]);
+        try {
+            return await uploadStoreFavicon(env, id, {
+                bytes: await file.arrayBuffer(),
+                contentType: file.type,
+            });
+        } catch (error) {
+            if (error instanceof StoreServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("店舗の更新に失敗しました");
+        }
     });
+
+const deleteStoreFaviconServerFn = createServerFn({ method: "POST" })
+    .validator(storeIdSchema)
+    .handler(async ({ data }): Promise<StoreDto> => {
+        const [{ env }, { deleteStoreFavicon, StoreServiceError }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/storeService"),
+            ]);
+        try {
+            return await deleteStoreFavicon(env, data);
+        } catch (error) {
+            if (error instanceof StoreServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("店舗の更新に失敗しました");
+        }
+    });
+
+export const createStore = (input: StoreCreateInput): Promise<StoreDto> =>
+    createStoreServerFn({ data: input });
+
+export const updateStore = (
+    id: string,
+    input: StoreUpdateInput,
+): Promise<StoreDto> => updateStoreServerFn({ data: { id, input } });
+
+/** 価格記録から参照されている店舗は service 側で拒否される。 */
+export const deleteStore = (id: string): Promise<{ deleted: true }> =>
+    deleteStoreServerFn({ data: id });
+
+export const uploadStoreFavicon = (
+    id: string,
+    file: File,
+): Promise<StoreDto> => {
+    const data = new FormData();
+    data.append("id", id);
+    data.append("file", file);
+    return uploadStoreFaviconServerFn({ data });
 };
 
-export const deleteStoreFavicon = (id: string) =>
-    request<StoreDto>(`/api/stores/${encodeURIComponent(id)}/favicon`, {
-        method: "DELETE",
-    });
+export const deleteStoreFavicon = (id: string): Promise<StoreDto> =>
+    deleteStoreFaviconServerFn({ data: id });

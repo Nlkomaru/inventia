@@ -1,9 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import {
     type CategoryCreateInput,
     type CategoryDto,
     type CategoryUpdateInput,
+    categoryCreateInputSchema,
     categoryIdSchema,
+    categoryUpdateInputSchema,
 } from "@/domain/category";
 import type { ItemDto } from "@/domain/item";
 
@@ -14,17 +17,6 @@ export type CategoryItemDto = ItemDto;
 export type CategoryTreeResult = {
     items: CategoryDto[];
     truncated: boolean;
-};
-
-type ApiError = { error?: { message?: string } };
-
-const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
-    const response = await fetch(url, init);
-    if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as ApiError;
-        throw new Error(body.error?.message ?? "カテゴリの更新に失敗しました");
-    }
-    return (await response.json()) as T;
 };
 
 export const listCategoryTree = createServerFn({ method: "GET" }).handler(
@@ -38,22 +30,79 @@ export const listCategoryTree = createServerFn({ method: "GET" }).handler(
     },
 );
 
-export const createCategory = (input: CategoryCreateInput) =>
-    request<CategoryDto>("/api/categories", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(input),
+// 更新も読み取りと同じ server function 境界から service を直接呼ぶ。
+// 画面は API トークンを持たず、/api の HTTP 経路を通らない。
+const createCategoryServerFn = createServerFn({ method: "POST" })
+    .validator(categoryCreateInputSchema)
+    .handler(async ({ data }): Promise<CategoryDto> => {
+        const [{ env }, { createCategory: create, CategoryServiceError }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/categoryService"),
+            ]);
+        try {
+            return await create(env.DB, data);
+        } catch (error) {
+            if (error instanceof CategoryServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("カテゴリの更新に失敗しました");
+        }
     });
 
-export const updateCategory = (id: string, input: CategoryUpdateInput) =>
-    request<CategoryDto>(`/api/categories/${id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(input),
+const updateCategoryServerFn = createServerFn({ method: "POST" })
+    .validator(
+        z.object({
+            id: categoryIdSchema,
+            input: categoryUpdateInputSchema,
+        }),
+    )
+    .handler(async ({ data }): Promise<CategoryDto> => {
+        const [{ env }, { updateCategory: update, CategoryServiceError }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/categoryService"),
+            ]);
+        try {
+            return await update(env.DB, data.id, data.input);
+        } catch (error) {
+            if (error instanceof CategoryServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("カテゴリの更新に失敗しました");
+        }
     });
 
-export const deleteCategory = (id: string) =>
-    request<{ deleted: true }>(`/api/categories/${id}`, { method: "DELETE" });
+const deleteCategoryServerFn = createServerFn({ method: "POST" })
+    .validator(categoryIdSchema)
+    .handler(async ({ data }): Promise<{ deleted: true }> => {
+        const [{ env }, { removeCategory, CategoryServiceError }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/categoryService"),
+            ]);
+        try {
+            await removeCategory(env.DB, data);
+            return { deleted: true };
+        } catch (error) {
+            if (error instanceof CategoryServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("カテゴリの更新に失敗しました");
+        }
+    });
+
+export const createCategory = (
+    input: CategoryCreateInput,
+): Promise<CategoryDto> => createCategoryServerFn({ data: input });
+
+export const updateCategory = (
+    id: string,
+    input: CategoryUpdateInput,
+): Promise<CategoryDto> => updateCategoryServerFn({ data: { id, input } });
+
+export const deleteCategory = (id: string): Promise<{ deleted: true }> =>
+    deleteCategoryServerFn({ data: id });
 
 /**
  * カテゴリー 1 つに直接紐づく品目。下位カテゴリーの分は含めない
