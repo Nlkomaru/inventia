@@ -2,39 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { ItemDto } from "@/domain/item";
 import type { ItemLotDto } from "@/domain/lot";
-import {
-    type StockOperationResult,
-    stockOperationResultSchema,
-    stocktakeSchema,
-} from "@/domain/stock";
-
-const apiErrorSchema = z.object({
-    error: z
-        .object({
-            message: z.string().optional(),
-        })
-        .optional(),
-});
-
-const request = async <T>(
-    url: string,
-    schema: z.ZodType<T>,
-    fallbackMessage: string,
-    init?: RequestInit,
-): Promise<T> => {
-    const response = await fetch(url, init);
-    if (!response.ok) {
-        const body = apiErrorSchema.safeParse(
-            await response.json().catch(() => ({})),
-        );
-        throw new Error(
-            body.success && body.data.error?.message
-                ? body.data.error.message
-                : fallbackMessage,
-        );
-    }
-    return schema.parse(await response.json());
-};
+import { type StockOperationResult, stocktakeSchema } from "@/domain/stock";
 
 // 読み取りは server function から service を直接呼ぶ。SSR から自分の公開 URL を
 // fetch すると Cloudflare Access に阻まれるため、HTTP API 経由にしない。
@@ -81,22 +49,41 @@ export interface StocktakeRequestInput {
     idempotencyKey: string;
 }
 
+// 更新も読み取りと同じ server function 境界から service を直接呼ぶ。
+// 画面は API トークンを持たず、/api の HTTP 経路を通らない。
+const recordStocktakeServerFn = createServerFn({ method: "POST" })
+    .validator(
+        z.object({
+            // itemId の正規化と検証は service が持つ（INVALID_ID の文言も service 側）
+            itemId: z.string(),
+            input: stocktakeSchema,
+        }),
+    )
+    .handler(async ({ data }): Promise<StockOperationResult> => {
+        const [{ env }, { stocktake, StockServiceError }] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/stockService"),
+        ]);
+        try {
+            return await stocktake(env.DB, data.itemId, data.input);
+        } catch (error) {
+            if (error instanceof StockServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("棚卸しを記録できませんでした");
+        }
+    });
+
 export const recordStocktake = (
     itemId: string,
     input: StocktakeRequestInput,
-): Promise<StockOperationResult> => {
-    const body = stocktakeSchema.parse({
-        lots: input.lots,
-        idempotencyKey: input.idempotencyKey,
-    });
-    return request(
-        `/api/items/${encodeURIComponent(itemId)}/stocktake`,
-        stockOperationResultSchema,
-        "棚卸しを記録できませんでした",
-        {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(body),
+): Promise<StockOperationResult> =>
+    recordStocktakeServerFn({
+        data: {
+            itemId,
+            input: stocktakeSchema.parse({
+                lots: input.lots,
+                idempotencyKey: input.idempotencyKey,
+            }),
         },
-    );
-};
+    });

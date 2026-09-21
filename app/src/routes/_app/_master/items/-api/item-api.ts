@@ -7,47 +7,15 @@ import {
     type ItemDto,
     type ItemUpdateInput,
     itemCreateSchema,
-    itemDtoSchema,
     itemListQuerySchema,
     itemUpdateSchema,
 } from "@/domain/item";
 import type { LocationDto } from "@/domain/location";
 
-const apiErrorSchema = z.object({
-    error: z
-        .object({
-            message: z.string().optional(),
-        })
-        .optional(),
-});
-
-const itemDeleteOutputSchema = z.object({
-    deleted: z.literal(true),
-});
-
 const itemMasterListInputSchema = itemListQuerySchema.pick({
     sort: true,
     sortDirection: true,
 });
-
-const request = async <T>(
-    url: string,
-    schema: z.ZodType<T>,
-    init?: RequestInit,
-): Promise<T> => {
-    const response = await fetch(url, init);
-    if (!response.ok) {
-        const body = apiErrorSchema.safeParse(
-            await response.json().catch(() => ({})),
-        );
-        throw new Error(
-            body.success && body.data.error?.message
-                ? body.data.error.message
-                : "品目の更新に失敗しました",
-        );
-    }
-    return schema.parse(await response.json());
-};
 
 // Cloudflare Access が公開 URL に掛かるため、読み取りは server function から
 // service を直接呼ぶ。cloudflare:workers と services はクライアントバンドルへ
@@ -180,24 +148,91 @@ export const getItemRelabelImpact = createServerFn({ method: "GET" })
         };
     });
 
-export const createItem = (input: ItemCreateInput): Promise<ItemDto> =>
-    request("/api/items", itemDtoSchema, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(itemCreateSchema.parse(input)),
+const createItemServerFn = createServerFn({ method: "POST" })
+    .validator(itemCreateSchema)
+    .handler(async ({ data }): Promise<ItemDto> => {
+        const [{ env }, { createItem, ItemServiceError }, { indexItem }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/itemService"),
+                import("@/services/itemSearchService"),
+            ]);
+        try {
+            const created = await createItem(env.DB, data);
+            // 索引更新は best-effort（service 内で例外を握り潰す）。HTTP 経由と
+            // 同じく、画面から作った品目も意味検索の対象へ入れておく
+            await indexItem(env, created.id);
+            return created;
+        } catch (error) {
+            if (error instanceof ItemServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("品目の更新に失敗しました");
+        }
     });
+
+const updateItemServerFn = createServerFn({ method: "POST" })
+    .validator(
+        z.object({
+            itemId: z.string().min(1),
+            input: itemUpdateSchema,
+        }),
+    )
+    .handler(async ({ data }): Promise<ItemDto> => {
+        const [{ env }, { updateItem, ItemServiceError }, { indexItem }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/itemService"),
+                import("@/services/itemSearchService"),
+            ]);
+        try {
+            const updated = await updateItem(env.DB, data.itemId, data.input);
+            // 埋め込み対象は品目名だけなので、name を送っていない更新では索引を触らない
+            if (data.input.name !== undefined) {
+                await indexItem(env, updated.id);
+            }
+            return updated;
+        } catch (error) {
+            if (error instanceof ItemServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("品目の更新に失敗しました");
+        }
+    });
+
+const deleteItemServerFn = createServerFn({ method: "POST" })
+    .validator(z.object({ itemId: z.string().min(1) }))
+    .handler(async ({ data }): Promise<{ deleted: true }> => {
+        const [
+            { env },
+            { deleteItem, ItemServiceError },
+            { removeItemFromIndex },
+        ] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/itemService"),
+            import("@/services/itemSearchService"),
+        ]);
+        try {
+            await deleteItem(env.DB, data.itemId);
+            // 索引更新は best-effort。消した品目を意味検索の結果に残さない
+            await removeItemFromIndex(env, data.itemId);
+            return { deleted: true };
+        } catch (error) {
+            if (error instanceof ItemServiceError) {
+                throw new Error(error.message);
+            }
+            throw new Error("品目の更新に失敗しました");
+        }
+    });
+
+// 呼び出し側の互換性のため、公開する関数は入力の並びを変えない薄いラッパーに留める
+export const createItem = (input: ItemCreateInput): Promise<ItemDto> =>
+    createItemServerFn({ data: input });
 
 export const updateItem = (
     id: string,
     input: ItemUpdateInput,
-): Promise<ItemDto> =>
-    request(`/api/items/${encodeURIComponent(id)}`, itemDtoSchema, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(itemUpdateSchema.parse(input)),
-    });
+): Promise<ItemDto> => updateItemServerFn({ data: { itemId: id, input } });
 
 export const deleteItem = (id: string): Promise<{ deleted: true }> =>
-    request(`/api/items/${encodeURIComponent(id)}`, itemDeleteOutputSchema, {
-        method: "DELETE",
-    });
+    deleteItemServerFn({ data: { itemId: id } });
