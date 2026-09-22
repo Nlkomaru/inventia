@@ -652,7 +652,7 @@ export interface ReceiptParseOptions {
  * この値は往復が終わらない場合の歯止めである。少なすぎると明細を返す前に
  * 打ち切られるため、行数ぶんの品目照合が収まる余裕を持たせる。
  */
-const receiptParseMaxSteps = 20;
+const receiptParseMaxSteps = 40;
 
 export const parseReceipt = async (
     env: ReceiptEnv,
