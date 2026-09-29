@@ -295,7 +295,7 @@ function StockHistoryPage() {
                         履歴がありません。
                     </p>
                 ) : (
-                    <Table aria-label="在庫履歴">
+                    <Table aria-label="在庫履歴" className="min-w-[1080px]">
                         <TableHeader className="bg-muted/50">
                             <TableRow>
                                 <SortableTableHead
@@ -327,11 +327,15 @@ function StockHistoryPage() {
                                 >
                                     差分
                                 </SortableTableHead>
-                                <TableHead className="px-5">
+                                <TableHead className="px-5 whitespace-nowrap">
                                     ロット内訳
                                 </TableHead>
-                                <TableHead className="px-5">用途</TableHead>
-                                <TableHead className="px-5">連携先</TableHead>
+                                <TableHead className="min-w-[10rem] px-5 whitespace-nowrap">
+                                    用途
+                                </TableHead>
+                                <TableHead className="px-5 whitespace-nowrap">
+                                    連携先
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -365,26 +369,26 @@ function StockHistoryPage() {
                                         <TableCell className="px-5 py-3 text-right align-top whitespace-nowrap">
                                             {formatDelta(movement.delta)} {unit}
                                         </TableCell>
-                                        <TableCell className="px-5 py-3 align-top">
+                                        <TableCell className="px-5 py-3 align-top whitespace-nowrap">
                                             {movement.allocations.length ===
                                             0 ? (
                                                 "—"
                                             ) : (
-                                                <ul className="flex flex-col gap-1">
+                                                <ul className="flex min-w-[15rem] flex-col gap-1">
                                                     {movement.allocations.map(
                                                         (allocation) => (
                                                             <li
-                                                                className="grid grid-cols-[10rem_minmax(0,1fr)] items-baseline gap-x-2"
+                                                                className="flex items-baseline gap-x-3"
                                                                 key={
                                                                     allocation.lotId
                                                                 }
                                                             >
-                                                                <span className="whitespace-nowrap">
+                                                                <span className="w-40 shrink-0 whitespace-nowrap">
                                                                     {formatExpiry(
                                                                         allocation.expiryDate,
                                                                     )}
                                                                 </span>
-                                                                <span className="font-mono whitespace-nowrap tabular-nums">
+                                                                <span className="shrink-0 font-mono whitespace-nowrap tabular-nums">
                                                                     {formatDelta(
                                                                         allocation.delta,
                                                                     )}{" "}
@@ -396,7 +400,7 @@ function StockHistoryPage() {
                                                 </ul>
                                             )}
                                         </TableCell>
-                                        <TableCell className="px-5 py-3 align-top">
+                                        <TableCell className="min-w-[10rem] max-w-[20rem] px-5 py-3 align-top break-words whitespace-normal">
                                             {movement.note ?? "—"}
                                         </TableCell>
                                         {/* 外部 ID は連携先アプリ用の値なので表示しない */}
