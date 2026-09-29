@@ -158,6 +158,15 @@ function ItemDetailPage() {
                 <p className="mt-2 text-sm text-muted-foreground">
                     {category.name} / {location.name}
                 </p>
+                <p className="mt-3">
+                    <Link
+                        className="text-sm underline underline-offset-4"
+                        params={{ itemId: item.id }}
+                        to="/items/$itemId"
+                    >
+                        品目の情報を見る
+                    </Link>
+                </p>
             </header>
 
             <Card>
