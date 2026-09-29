@@ -15,8 +15,9 @@ import {
     getReceipt,
     getReceiptImage,
     listReceipts,
-    parseReceipt,
     ReceiptServiceError,
+    runReceiptParse,
+    startReceiptParse,
     uploadReceipt,
 } from "../../services/receiptService";
 import type { ApiBindings } from "../bindings";
@@ -126,14 +127,14 @@ receiptsApp.openAPIRegistry.registerPath({
     summary: "Extract and match the lines of a receipt",
     operationId: "parseReceipt",
     description:
-        "Reads the stored image with the configured OpenRouter multimodal model and saves the extracted lines. Side effects: the stored image is sent to that third-party model, the receipt's existing lines are replaced by the extracted ones, the store name, purchase time, total price and model id are stored on the receipt, and every line that the user has not confirmed yet is re-matched against existing items. No inventory, price or purchase data changes; nothing reaches stock until the apply endpoint is called. Running it again on a receipt that was already parsed discards the previous lines together with their unconfirmed matches, which is why it is refused once an apply has started: replacing the lines would give them new ids and let already applied stock be counted a second time. An apply and a parse never interleave on one receipt: a parse is refused once an apply has started, and an apply is refused while a parse is running. Expiry dates are only extracted when printed on the receipt for that product or when the model can derive them from the product type; a stored line never carries a date that contradicts its expiry.source, so a value labelled as printed really was read from the receipt. They remain suggestions that the confirmation screen must let the user edit or clear.",
+        "Starts reading the stored image with the configured OpenRouter multimodal model and returns immediately with status parsing. The extraction itself continues after the response on the Workers side, so poll GET /receipts/{id} until the status leaves parsing: a successful extraction leaves status parsed, a failure leaves status failed with errorMessage carrying what the user can do about it (store an image-reading API key, retake the photo, retry later). Side effects: the stored image is sent to that third-party model, the receipt's existing lines are replaced by the extracted ones, the store name, purchase time, total price and model id are stored on the receipt, and every line that the user has not confirmed yet is re-matched against existing items. No inventory, price or purchase data changes; nothing reaches stock until the apply endpoint is called. Running it again on a receipt that was already parsed discards the previous lines together with their unconfirmed matches, which is why it is refused once an apply has started: replacing the lines would give them new ids and let already applied stock be counted again.",
     request: {
         params: z.object({ id: receiptIdParameter }),
     },
     responses: {
         200: {
             description:
-                "The receipt with its lines and match candidates. Extraction failures are reported in this same body, not as an error response: the receipt then has status failed and errorMessage carries what the user can do about it (store an image-reading API key, retake the photo, retry later). A successful extraction leaves status parsed. The candidates under each line's match are ranked suggestions only; a line is never confirmed by similarity alone. Every line of a freshly parsed receipt has applied null and the receipt has appliedTotalPrice null, because a parse replaces the lines and is refused once an apply has started.",
+                "The receipt right after the parse started, usually with status parsing. Poll GET /receipts/{id} for the result: status parsed carries the extracted lines and match candidates, status failed carries errorMessage. The candidates under each line's match are ranked suggestions only; a line is never confirmed by similarity alone. Every line of a freshly parsed receipt has applied null and the receipt has appliedTotalPrice null, because a parse replaces the lines and is refused once an apply has started.",
             content: responseContent(receiptDetailDtoSchema),
         },
         400: jsonError("RECEIPT_INVALID_INPUT: the receipt id is empty."),
@@ -470,16 +471,19 @@ receiptsApp.get("/:id/image", async (c) => {
 
 receiptsApp.post("/:id/parse", async (c) => {
     try {
-        // 解析の失敗は status = 'failed' として 200 で返す契約であり、
-        // ここでエラー応答へ写さない
-        return c.json(
-            await parseReceipt(c.env, c.req.param("id"), {
+        // 重い AI 呼び出しは waitUntil へ委ね、応答は parsing の詳細だけを
+        // すぐ返す。結果は GET /receipts/:id のポーリングで追う
+        await startReceiptParse(c.env.DB, c.req.param("id"));
+        c.executionCtx.waitUntil(
+            runReceiptParse(c.env, c.req.param("id"), {
                 // tool を実際に渡すかは連携設定で決まる。transport の構築は
                 // API 層が持ち、service を MCP 実装へ依存させない
                 createToolSet: () => createInProcessMcpToolSet(c.env),
             }),
-            200,
         );
+        // 解析の失敗は status = 'failed' として 200 で返す契約であり、
+        // ここでエラー応答へ写さない
+        return c.json(await getReceipt(c.env, c.req.param("id")), 200);
     } catch (error) {
         return errorResponse(c, error);
     }

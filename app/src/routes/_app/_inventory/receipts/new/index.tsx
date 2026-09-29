@@ -31,6 +31,7 @@ import type {
 import { buildHierarchyLabels } from "@/lib/hierarchy";
 import {
     applyReceipt,
+    getReceiptDetail,
     parseReceipt,
     uploadReceiptImage,
 } from "../-api/receipt-api";
@@ -71,7 +72,7 @@ import {
     validateReviewRows,
 } from "./-functions/receipt-review-form";
 
-// 取込途中のレシートを URL に持たせる。解析は最大 60 秒かかるため、
+// 取込途中のレシートを URL に持たせる。解析は最大 5 分かかるため、
 // 再読み込みやスマホの画面復帰で状態を失わないようにする。
 const receiptSearchSchema = z.object({
     receiptId: z.string().min(1).optional().catch(undefined),
@@ -150,9 +151,25 @@ function ReceiptIntakePage() {
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: receiptKeys.lists() }),
     });
+    // 解析の serverFn は parsing への遷移だけ行い、重い AI 呼び出しは Workers 側の
+    // waitUntil へ委ねてすぐ返す。結果は詳細のポーリングで追い、parsed / failed で止める
     const parseMutation = useMutation({
-        mutationFn: (input: string) =>
-            parseReceipt({ data: { receiptId: input } }),
+        mutationFn: async (input: string) => {
+            const started = await parseReceipt({ data: { receiptId: input } });
+            let detail = started;
+            // waitUntil の完了を待つ。タイムアウト側も 5 分あるため、こちらも
+            // 同じだけ待てる回数だけ回す
+            for (let attempt = 0; attempt < 60; attempt++) {
+                if (detail.status === "parsed" || detail.status === "failed") {
+                    return detail;
+                }
+                const { promise, resolve } = Promise.withResolvers<void>();
+                setTimeout(resolve, 5000);
+                await promise;
+                detail = await getReceiptDetail({ data: { receiptId: input } });
+            }
+            return detail;
+        },
         onSuccess: (detail) => {
             queryClient.setQueryData(receiptKeys.detail(detail.id), detail);
             return queryClient.invalidateQueries({
@@ -258,7 +275,14 @@ function ReceiptIntakePage() {
     const runParse = async (id: string) => {
         setParseError(null);
         try {
-            await parseMutation.mutateAsync(id);
+            const detail = await parseMutation.mutateAsync(id);
+            // waitUntil 側の失敗は status = 'failed' として返るため、
+            // ここでは例外にならない。利用者向けの文言をそのまま出す
+            if (detail.status === "failed") {
+                setParseError(
+                    detail.errorMessage ?? "レシートを解析できませんでした",
+                );
+            }
         } catch (cause) {
             setParseError(
                 errorMessage(cause, "レシートを解析できませんでした"),

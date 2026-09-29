@@ -142,8 +142,8 @@ export type ReceiptReadEnv = Pick<ReceiptEnv, "DB"> & SignedImageUrlEnv;
 /** 類似度候補の母集合の上限。これを超える品目数では候補提示が一部欠ける。 */
 export const receiptMatchItemLimit = 2000;
 
-/** 解析全体のタイムアウト。リトライを含めてこの時間で打ち切る。 */
-export const receiptParseTimeoutMs = 60_000;
+/** 解析全体のタイムアウト。リトライを含めてこの時間で打ち切る。Workers の HTTP 呼び出しに壁時間の上限は無いため、40 step の tool 往復が収まる余裕を持たせる。 */
+export const receiptParseTimeoutMs = 300_000;
 
 // 上流の例外文字列・API 応答・API key を保存も返却もしないため、
 // 失敗理由は利用者が次に取れる行動を書いた固定文へ写す
@@ -655,13 +655,11 @@ export interface ReceiptParseOptions {
  */
 const receiptParseMaxSteps = 40;
 
-export const parseReceipt = async (
-    env: ReceiptEnv,
+export const startReceiptParse = async (
+    db: D1Database,
     receiptId: string,
-    options: ReceiptParseOptions = {},
-): Promise<ReceiptDetailDto> => {
-    const fetcher = options.fetcher ?? fetch;
-    const receipt = await requireReceipt(env.DB, receiptId);
+): Promise<ReceiptRow> => {
+    const receipt = await requireReceipt(db, receiptId);
     if (receipt.status === "applied" || receipt.purchaseId !== null) {
         // 反映が始まった後に明細を作り直すと、行 ID が変わって在庫の
         // 行単位冪等性が失われ、適用済みの行がもう一度加算される
@@ -670,9 +668,11 @@ export const parseReceipt = async (
             "反映を開始したレシートは再解析できません。取込履歴で反映結果を確認してください。",
         );
     }
-    // 反映処理と同時に走らないよう、状態遷移を条件付き UPDATE で確保する
+    // 反映処理と同時に走らないよう、状態遷移を条件付き UPDATE で確保する。
+    // ここでは parsing への遷移だけを行い、重い AI 呼び出しは呼び出し側が
+    // waitUntil へ委ねた runReceiptParse で進める
     if (
-        !(await updateReceiptStatus(env.DB, receipt.id, {
+        !(await updateReceiptStatus(db, receipt.id, {
             status: "parsing",
             errorMessage: null,
         }))
@@ -682,6 +682,39 @@ export const parseReceipt = async (
             "このレシートは別の操作の途中です。画面を再読み込みしてから実行してください。",
         );
     }
+    const started = await findReceipt(db, receipt.id);
+    if (!started) {
+        throw new ReceiptServiceError(
+            "RECEIPT_NOT_FOUND",
+            "レシートが見つかりません。",
+        );
+    }
+    return started;
+};
+
+export const parseReceipt = async (
+    env: ReceiptEnv,
+    receiptId: string,
+    options: ReceiptParseOptions = {},
+): Promise<ReceiptDetailDto> => {
+    // parsing への遷移だけを先に確保する。二重起動はここで 409 になる
+    await startReceiptParse(env.DB, receiptId);
+    return await runReceiptParse(env, receiptId, options);
+};
+
+/**
+ * parsing 状態のレシートの AI 解析だけを進める。`startReceiptParse` で遷移を
+ * 確保した後に呼ぶことを想定し、ここでは状態遷移を行わない。`waitUntil` へ
+ * 委ねた処理が失敗しても呼び出し側の応答は変えず、結果は status と
+ * errorMessage に残して画面のポーリングで追う。
+ */
+export const runReceiptParse = async (
+    env: ReceiptEnv,
+    receiptId: string,
+    options: ReceiptParseOptions = {},
+): Promise<ReceiptDetailDto> => {
+    const fetcher = options.fetcher ?? fetch;
+    const receipt = await requireReceipt(env.DB, receiptId);
     try {
         const status = await getOpenRouterIntegrationStatus(env.DB);
         let apiKey: string;
