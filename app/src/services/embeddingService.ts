@@ -3,7 +3,7 @@ import {
     openRouterEmbeddingDimensions,
     openRouterEmbeddingModel,
 } from "../domain/integration";
-import { getOpenRouterApiKey } from "./integrationService";
+import { getOpenRouterEmbeddingApiKey } from "./integrationService";
 
 const embeddingInputSchema = z.union([
     z.string().min(1).max(100_000),
@@ -52,11 +52,11 @@ export const createOpenRouterEmbeddings = async (
 
     let apiKey: string;
     try {
-        apiKey = await getOpenRouterApiKey(db, encryptionSecret);
+        apiKey = await getOpenRouterEmbeddingApiKey(db, encryptionSecret);
     } catch {
         throw new EmbeddingServiceError(
             "EMBEDDING_NOT_CONFIGURED",
-            "OpenRouter API key を連携設定から保存してください。",
+            "OpenRouter の埋め込み用 API key を連携設定から保存してください。",
         );
     }
 

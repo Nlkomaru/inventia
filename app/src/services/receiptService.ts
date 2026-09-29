@@ -75,8 +75,8 @@ import {
 } from "../repositories/receiptRepository";
 import { listCategoryTree } from "./categoryService";
 import {
-    getOpenRouterApiKey,
     getOpenRouterIntegrationStatus,
+    getOpenRouterVisionApiKey,
 } from "./integrationService";
 import { type ItemSearchEnv, indexItems } from "./itemSearchService";
 import { createItem, ItemServiceError } from "./itemService";
@@ -148,7 +148,8 @@ export const receiptParseTimeoutMs = 60_000;
 // 上流の例外文字列・API 応答・API key を保存も返却もしないため、
 // 失敗理由は利用者が次に取れる行動を書いた固定文へ写す
 const parseFailureMessages = {
-    notConfigured: "OpenRouter API key を連携設定から保存してください。",
+    notConfigured:
+        "OpenRouter の画像読み取り用 API key を連携設定から保存してください。",
     imageMissing:
         "レシート画像を読み込めませんでした。もう一度アップロードしてください。",
     provider:
@@ -685,7 +686,7 @@ export const parseReceipt = async (
         const status = await getOpenRouterIntegrationStatus(env.DB);
         let apiKey: string;
         try {
-            apiKey = await getOpenRouterApiKey(
+            apiKey = await getOpenRouterVisionApiKey(
                 env.DB,
                 env.SETTINGS_ENCRYPTION_KEY,
             );

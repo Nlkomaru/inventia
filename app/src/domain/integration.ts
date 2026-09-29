@@ -2,8 +2,9 @@ import { z } from "zod";
 import { receiptParsePromptSchema } from "./receipt";
 
 export const openRouterProvider = "openrouter" as const;
-export const openRouterEmbeddingModel =
-    "openai/text-embedding-3-small" as const;
+// Perplexity が OpenRouter 上で公開する埋め込みモデル ID。MRL 対応のため
+// 出力 1536 次元へ切り詰めて使い、D1 ではなく Vectorize 側の次元と合わせること。
+export const openRouterEmbeddingModel = "perplexity/pplx-embed-v1-4b" as const;
 export const openRouterEmbeddingDimensions = 1536 as const;
 
 // レシート読み取り等に使うマルチモーダル LLM の既定値。
@@ -30,6 +31,12 @@ export const openRouterChatModelSchema = z
 // undefined は「今回は変更しない」を表すため、両者を区別できる形にする
 export const openRouterIntegrationUpdateSchema = z
     .object({
+        // 埋め込み用。画像読み取りへ流用しない
+        embeddingApiKey: openRouterApiKeySchema.optional(),
+        // レシート画像読み取り用。埋め込みへ流用しない
+        visionApiKey: openRouterApiKeySchema.optional(),
+        // 旧来の単一キー入力。両方のキーとして同時に保存する互換手段で、
+        // 片方だけ変えたい場合は使わず embeddingApiKey / visionApiKey を使う
         apiKey: openRouterApiKeySchema.optional(),
         chatModel: openRouterChatModelSchema.optional(),
         receiptPrompt: receiptParsePromptSchema.nullable().optional(),
@@ -37,19 +44,24 @@ export const openRouterIntegrationUpdateSchema = z
     .strict()
     .refine(
         (value) =>
+            value.embeddingApiKey !== undefined ||
+            value.visionApiKey !== undefined ||
             value.apiKey !== undefined ||
             value.chatModel !== undefined ||
             value.receiptPrompt !== undefined,
         {
             message:
-                "apiKey、chatModel、receiptPrompt のいずれかを指定してください。API key を入力しなくても他の設定だけ保存できます。",
+                "embeddingApiKey、visionApiKey、apiKey、chatModel、receiptPrompt のいずれかを指定してください。API key を入力しなくても他の設定だけ保存できます。",
         },
     );
 
 export const openRouterIntegrationStatusSchema = z
     .object({
         provider: z.literal(openRouterProvider),
-        configured: z.boolean(),
+        // 埋め込み key の保存状態。ベクトル検索の可否だけを表す
+        embeddingConfigured: z.boolean(),
+        // 画像読み取り key の保存状態。レシート解析の可否だけを表す
+        visionConfigured: z.boolean(),
         model: z.literal(openRouterEmbeddingModel),
         dimensions: z.literal(openRouterEmbeddingDimensions),
         chatModel: z.string(),
@@ -57,7 +69,10 @@ export const openRouterIntegrationStatusSchema = z
         // 解析へ実際に渡る指示。未設定なら既定の内容がそのまま入る
         receiptPrompt: z.string().min(1),
         receiptPromptConfigured: z.boolean(),
-        updatedAt: z.string().datetime().nullable(),
+        // 埋め込み key の最終更新。未設定なら null
+        embeddingUpdatedAt: z.string().datetime().nullable(),
+        // 画像読み取り key の最終更新。未設定なら null
+        visionUpdatedAt: z.string().datetime().nullable(),
     })
     .strict();
 

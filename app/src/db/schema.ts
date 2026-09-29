@@ -572,9 +572,7 @@ export const priceRecords = sqliteTable(
 export const integrationCredentials = sqliteTable(
     "integration_credentials",
     {
-        provider: text("provider", { enum: ["openrouter"] })
-            .primaryKey()
-            .notNull(),
+        provider: text("provider").primaryKey().notNull(),
         ciphertext: text("ciphertext").notNull(),
         initializationVector: text("initialization_vector").notNull(),
         encryptionVersion: integer("encryption_version").notNull().default(1),
@@ -584,7 +582,7 @@ export const integrationCredentials = sqliteTable(
     (t) => [
         check(
             "ck_integration_credentials_provider",
-            sql`${t.provider} = 'openrouter'`,
+            sql`${t.provider} = 'openrouter' OR ${t.provider} = 'openrouter-embedding' OR ${t.provider} = 'openrouter-vision'`,
         ),
         check(
             "ck_integration_credentials_encryption_version",

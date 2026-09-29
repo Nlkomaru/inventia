@@ -192,7 +192,7 @@ export const registerInventoryTools = (
         {
             title: "Search inventory by meaning",
             description:
-                "Finds inventory items whose stored name is semantically similar to the query, using a vector index built from item names. Use this as the primary inventory lookup when the query may use different wording from the stored item name. Only items that have been indexed can be returned. Indexing runs best-effort whenever an item is created or updated, so an item can be missing from the index when the OpenRouter API key was not configured or the indexing call failed; the item-reindexing endpoint recovers from that by rebuilding the index for every item. There is no cursor: results are cut off at topK (default 20, maximum 100) because the underlying vector query has no paging.",
+                "Finds inventory items whose stored name is semantically similar to the query, using a vector index built from item names. Use this as the primary inventory lookup when the query may use different wording from the stored item name. Only items that have been indexed can be returned. Indexing runs best-effort whenever an item is created or updated, so an item can be missing from the index when the OpenRouter embedding API key was not configured or the indexing call failed; the item-reindexing endpoint recovers from that by rebuilding the index for every item. There is no cursor: results are cut off at topK (default 20, maximum 100) because the underlying vector query has no paging.",
             inputSchema: itemSemanticSearchQuerySchema,
             outputSchema: itemSemanticSearchResultSchema,
         },

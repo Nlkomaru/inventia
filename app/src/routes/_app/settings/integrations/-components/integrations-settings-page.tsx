@@ -77,7 +77,8 @@ export function IntegrationsSettingsPage() {
     const models = modelsQuery.data?.models ?? [];
     const modelsError = modelsQuery.error;
 
-    const [apiKey, setApiKey] = useState("");
+    const [embeddingApiKey, setEmbeddingApiKey] = useState("");
+    const [visionApiKey, setVisionApiKey] = useState("");
     // 保存前の編集値だけをローカルに持ち、確定値は status クエリを唯一の情報源にする。
     const [chatModelDraft, setChatModelDraft] = useState<string | null>(null);
     const chatModel = chatModelDraft ?? status.chatModel;
@@ -96,7 +97,12 @@ export function IntegrationsSettingsPage() {
         receiptPromptTrimmed.length === 0
             ? null
             : receiptParsePromptSchema.safeParse(receiptPromptTrimmed);
-    const validation = apiKey ? openRouterApiKeySchema.safeParse(apiKey) : null;
+    const embeddingValidation = embeddingApiKey
+        ? openRouterApiKeySchema.safeParse(embeddingApiKey)
+        : null;
+    const visionValidation = visionApiKey
+        ? openRouterApiKeySchema.safeParse(visionApiKey)
+        : null;
     const chatModelValidation = openRouterChatModelSchema.safeParse(chatModel);
 
     const modelItems = useMemo(
@@ -120,13 +126,23 @@ export function IntegrationsSettingsPage() {
         event.preventDefault();
         setMessage(null);
         setError(null);
-        const parsedApiKey = apiKey
-            ? openRouterApiKeySchema.safeParse(apiKey)
+        const parsedEmbeddingApiKey = embeddingApiKey
+            ? openRouterApiKeySchema.safeParse(embeddingApiKey)
             : null;
-        if (parsedApiKey && !parsedApiKey.success) {
+        const parsedVisionApiKey = visionApiKey
+            ? openRouterApiKeySchema.safeParse(visionApiKey)
+            : null;
+        if (parsedEmbeddingApiKey && !parsedEmbeddingApiKey.success) {
             setError(
-                parsedApiKey.error.issues[0]?.message ??
-                    "API key を確認してください。",
+                parsedEmbeddingApiKey.error.issues[0]?.message ??
+                    "埋め込み用 API key を確認してください。",
+            );
+            return;
+        }
+        if (parsedVisionApiKey && !parsedVisionApiKey.success) {
+            setError(
+                parsedVisionApiKey.error.issues[0]?.message ??
+                    "画像読み取り用 API key を確認してください。",
             );
             return;
         }
@@ -139,7 +155,12 @@ export function IntegrationsSettingsPage() {
         }
         // API key を入力していなくてもモデルだけ保存できる。
         const payload = {
-            ...(parsedApiKey ? { apiKey: parsedApiKey.data } : {}),
+            ...(parsedEmbeddingApiKey
+                ? { embeddingApiKey: parsedEmbeddingApiKey.data }
+                : {}),
+            ...(parsedVisionApiKey
+                ? { visionApiKey: parsedVisionApiKey.data }
+                : {}),
             chatModel: chatModelValidation.data,
         };
         try {
@@ -147,9 +168,10 @@ export function IntegrationsSettingsPage() {
             // 編集値を捨てた時点で再取得済みの状態が表示されるようにする。
             await saveMutation.mutateAsync(payload);
             setChatModelDraft(null);
-            setApiKey("");
+            setEmbeddingApiKey("");
+            setVisionApiKey("");
             setMessage(
-                parsedApiKey
+                parsedEmbeddingApiKey || parsedVisionApiKey
                     ? "OpenRouter API key とモデルを保存しました。"
                     : "モデルを保存しました。",
             );
@@ -209,45 +231,99 @@ export function IntegrationsSettingsPage() {
                         </h2>
                     </div>
                     <FieldGroup>
-                        <Field data-invalid={validation?.success === false}>
-                            <FieldLabel htmlFor="openrouter-api-key">
-                                API key
+                        <Field
+                            data-invalid={
+                                embeddingValidation?.success === false
+                            }
+                        >
+                            <FieldLabel htmlFor="openrouter-embedding-api-key">
+                                埋め込み用 API key（ベクトル検索）
                             </FieldLabel>
                             <Input
-                                aria-invalid={validation?.success === false}
+                                aria-invalid={
+                                    embeddingValidation?.success === false
+                                }
                                 autoComplete="new-password"
-                                id="openrouter-api-key"
+                                id="openrouter-embedding-api-key"
                                 onChange={(event) =>
-                                    setApiKey(event.target.value)
+                                    setEmbeddingApiKey(event.target.value)
                                 }
                                 placeholder={
-                                    status.configured
+                                    status.embeddingConfigured
                                         ? "新しい key で置き換える"
                                         : "OpenRouter API key"
                                 }
                                 spellCheck={false}
                                 type="password"
-                                value={apiKey}
+                                value={embeddingApiKey}
                             />
                             <FieldDescription>
-                                API key
-                                はサーバー側で暗号化して保存され、保存後に画面や
+                                埋め込み用 API key
+                                はベクトル検索にだけ使い、サーバー側で暗号化して保存され、保存後に画面や
                                 API へ再表示されません。
                             </FieldDescription>
                             <FieldDescription>
-                                {status.configured
+                                {status.embeddingConfigured
                                     ? `設定済み（最終更新: ${new Date(
-                                          status.updatedAt ?? "",
+                                          status.embeddingUpdatedAt ?? "",
                                       ).toLocaleString(
                                           "ja-JP",
                                           updatedAtFormat,
                                       )}）`
-                                    : "未設定です。"}
+                                    : "未設定です。未設定のままではベクトル検索と再索引が 503 になります。"}
                             </FieldDescription>
                             <FieldError
                                 errors={
-                                    validation?.success === false
-                                        ? validation.error.issues
+                                    embeddingValidation?.success === false
+                                        ? embeddingValidation.error.issues
+                                        : undefined
+                                }
+                            />
+                        </Field>
+
+                        <Field
+                            data-invalid={visionValidation?.success === false}
+                        >
+                            <FieldLabel htmlFor="openrouter-vision-api-key">
+                                画像読み取り用 API key（レシート解析）
+                            </FieldLabel>
+                            <Input
+                                aria-invalid={
+                                    visionValidation?.success === false
+                                }
+                                autoComplete="new-password"
+                                id="openrouter-vision-api-key"
+                                onChange={(event) =>
+                                    setVisionApiKey(event.target.value)
+                                }
+                                placeholder={
+                                    status.visionConfigured
+                                        ? "新しい key で置き換える"
+                                        : "OpenRouter API key"
+                                }
+                                spellCheck={false}
+                                type="password"
+                                value={visionApiKey}
+                            />
+                            <FieldDescription>
+                                画像読み取り用 API key
+                                はレシート解析とモデル一覧の取得にだけ使い、サーバー側で暗号化して保存され、保存後に画面や
+                                API へ再表示されません。
+                            </FieldDescription>
+                            <FieldDescription>
+                                {status.visionConfigured
+                                    ? `設定済み（最終更新: ${new Date(
+                                          status.visionUpdatedAt ?? "",
+                                      ).toLocaleString(
+                                          "ja-JP",
+                                          updatedAtFormat,
+                                      )}）`
+                                    : "未設定です。未設定のままではレシート解析が失敗します。"}
+                            </FieldDescription>
+                            <FieldError
+                                errors={
+                                    visionValidation?.success === false
+                                        ? visionValidation.error.issues
                                         : undefined
                                 }
                             />

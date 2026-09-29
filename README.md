@@ -126,8 +126,8 @@ Store production secrets with
 `pnpm --filter inventia exec wrangler secret put <NAME>`; keep non-secret
 variables and bindings in `app/wrangler.jsonc`.
 
-The OpenRouter settings page stores its API key encrypted in D1. Production
-deployments sync the repository Actions secrets `SETTINGS_ENCRYPTION_KEY` and
+The OpenRouter settings page stores two purpose-scoped API keys encrypted in D1: the embedding key (`perplexity/pplx-embed-v1-4b`, 1536 dimensions) used only for vector search, and the image-reading key used only for receipt parsing. Save each key separately from the settings page; submitting the legacy `apiKey` field writes the same value to both slots for migration. Vector search and semantic reindexing require the embedding key, while receipt parsing requires the image-reading key. After switching the embedding model, rebuild both vector indexes with POST `/api/items/reindex` and POST `/api/stores/reindex` because stored vectors keep the previous model's dimensions.
+Production deployments sync the repository Actions secrets `SETTINGS_ENCRYPTION_KEY` and
 `OPENROUTER_MANAGEMENT_KEY` to the Worker through `cloudflare/wrangler-action`.
 `OPENROUTER_WORKSPACE_ID` is a non-secret Wrangler variable configured in
 `app/wrangler.jsonc` and identifies the workspace used by the usage dashboard.
@@ -139,7 +139,7 @@ OPENROUTER_MANAGEMENT_KEY=<OpenRouter-management-key>
 ```
 
 Never commit either value. Keep `SETTINGS_ENCRYPTION_KEY` stable; after rotating
-it, save the OpenRouter API key again from the settings page. The key also
+it, save both OpenRouter API keys again from the settings page. The key also
 derives the signature of image URLs (store favicons and receipt photos), so
 rotating it only invalidates
 URLs that were already handed out; they are re-issued on the next read.
