@@ -133,7 +133,7 @@ receiptsApp.openAPIRegistry.registerPath({
     responses: {
         200: {
             description:
-                "The receipt with its lines and match candidates. Extraction failures are reported in this same body, not as an error response: the receipt then has status failed and errorMessage carries what the user can do about it (store an API key, retake the photo, retry later). A successful extraction leaves status parsed. The candidates under each line's match are ranked suggestions only; a line is never confirmed by similarity alone. Every line of a freshly parsed receipt has applied null and the receipt has appliedTotalPrice null, because a parse replaces the lines and is refused once an apply has started.",
+                "The receipt with its lines and match candidates. Extraction failures are reported in this same body, not as an error response: the receipt then has status failed and errorMessage carries what the user can do about it (store an image-reading API key, retake the photo, retry later). A successful extraction leaves status parsed. The candidates under each line's match are ranked suggestions only; a line is never confirmed by similarity alone. Every line of a freshly parsed receipt has applied null and the receipt has appliedTotalPrice null, because a parse replaces the lines and is refused once an apply has started.",
             content: responseContent(receiptDetailDtoSchema),
         },
         400: jsonError("RECEIPT_INVALID_INPUT: the receipt id is empty."),

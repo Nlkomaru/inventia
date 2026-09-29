@@ -49,11 +49,11 @@ const getOpenRouterRoute = createRoute({
     summary: "Get OpenRouter integration status",
     operationId: "getOpenRouterIntegrationStatus",
     description:
-        "Returns the embedding model, the selected multimodal chat model, the instructions used to read receipts and whether the API key is stored. `chatModel` and `receiptPrompt` fall back to the built-in defaults while `chatModelConfigured` and `receiptPromptConfigured` are false, so `receiptPrompt` always holds the text that a parse would actually send. `receiptToolsEnabled` reports whether receipt parsing may call the read-only inventory tools. The API key is never returned.",
+        "Returns the embedding model, the selected multimodal chat model, the instructions used to read receipts and whether each purpose-scoped API key is stored. `embeddingConfigured` reports the embedding key used for vector search, `visionConfigured` reports the image-reading key used for receipt parsing, and neither key is ever returned. `chatModel` and `receiptPrompt` fall back to the built-in defaults while `chatModelConfigured` and `receiptPromptConfigured` are false, so `receiptPrompt` always holds the text that a parse would actually send. `receiptToolsEnabled` reports whether receipt parsing may call the read-only inventory tools.",
     responses: {
         200: {
             description:
-                "The OpenRouter integration status. The API key is never returned.",
+                "The OpenRouter integration status. Neither API key is ever returned.",
             content: jsonContent(openRouterIntegrationStatusSchema),
         },
         500: {
@@ -70,7 +70,7 @@ const listOpenRouterModelsRoute = createRoute({
     summary: "List selectable OpenRouter multimodal models",
     operationId: "listOpenRouterVisionModels",
     description:
-        "Lists the image-capable models published by OpenRouter so that a client can offer them as choices for `chatModel`. The stored API key is used only to authenticate the upstream request and is never returned.",
+        "Lists the image-capable models published by OpenRouter so that a client can offer them as choices for `chatModel`. The stored image-reading API key is used only to authenticate the upstream request and is never returned.",
     responses: {
         200: {
             description: "The image-capable models offered by OpenRouter.",
@@ -126,7 +126,7 @@ const updateOpenRouterRoute = createRoute({
     summary: "Configure the OpenRouter integration",
     operationId: "updateOpenRouterIntegration",
     description:
-        "Stores the API key, the multimodal chat model, the receipt reading instructions and whether receipt parsing may call tools. Every field is optional and at least one is required, so any one of them can be saved on its own; the fields that are left out keep their stored values. Send `receiptPrompt` as null to go back to the built-in instructions, which is also what happens when the submitted text is only whitespace or matches the default. Only the API key needs server-side encryption, so the other fields can be saved while `SETTINGS_ENCRYPTION_KEY` is missing. The API key is encrypted server-side and never returned or logged. The embedding model is fixed and cannot be changed.",
+        "Stores the purpose-scoped OpenRouter API keys, the multimodal chat model, the receipt reading instructions and whether receipt parsing may call tools. Every field is optional and at least one is required, so any one of them can be saved on its own; the fields that are left out keep their stored values. `embeddingApiKey` is used only for vector search, `visionApiKey` only for receipt image reading, and the legacy `apiKey` writes the same value to both slots for migration. Send `receiptPrompt` as null to go back to the built-in instructions, which is also what happens when the submitted text is only whitespace or matches the default. Only the API keys need server-side encryption, so the other fields can be saved while `SETTINGS_ENCRYPTION_KEY` is missing. The API keys are encrypted server-side and never returned or logged. The embedding model is fixed and cannot be changed.",
     request: {
         body: {
             required: true,
@@ -140,7 +140,7 @@ const updateOpenRouterRoute = createRoute({
         },
         400: {
             description:
-                "The API key, one of the model ids or the receipt instructions are invalid, or no field was provided.",
+                "One of the API keys, one of the model ids or the receipt instructions are invalid, or no field was provided.",
             content: jsonContent(errorSchema),
         },
         503: {

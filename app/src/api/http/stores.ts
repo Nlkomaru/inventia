@@ -303,14 +303,14 @@ storesApp.openAPIRegistry.registerPath({
     summary: "Rebuild the store name index",
     operationId: "reindexStores",
     description:
-        "Rebuilds the embedding index for every store. Side effects: an embedding is generated for each store name through the configured OpenRouter key and written to the vector index; no store, price or inventory data changes. Indexing otherwise runs best-effort when a store is created or renamed, so a store is missing from the index when the API key was not configured at that moment or the call failed — and a store that is missing is resolved as a new store the next time a receipt names it, which creates a duplicate. Run this once after the index is introduced and after restoring an API key. indexed and failed count the stores in each outcome.",
+        "Rebuilds the embedding index for every store. Side effects: an embedding is generated for each store name through the configured OpenRouter embedding key and written to the vector index; no store, price or inventory data changes. Indexing otherwise runs best-effort when a store is created or renamed, so a store is missing from the index when the embedding API key was not configured at that moment or the call failed — and a store that is missing is resolved as a new store the next time a receipt names it, which creates a duplicate. Run this once after the index is introduced and after restoring an API key. indexed and failed count the stores in each outcome.",
     responses: {
         200: {
             description: "The number of stores indexed and failed.",
             content: responseContent(storeReindexOutputSchema),
         },
         503: jsonError(
-            "EMBEDDING_NOT_CONFIGURED: no OpenRouter API key is stored, so no embedding could be generated. Save the key on the integrations settings page and retry.",
+            "EMBEDDING_NOT_CONFIGURED: no OpenRouter embedding API key is stored, so no embedding could be generated. Save the key on the integrations settings page and retry.",
         ),
         502: jsonError(
             "EMBEDDING_REQUEST_FAILED or EMBEDDING_INVALID_RESPONSE: the embedding provider could not be reached or answered unusably. Retry later.",

@@ -88,7 +88,7 @@ itemsApp.openAPIRegistry.registerPath({
     summary: "Search inventory items by meaning",
     operationId: "searchItemsSemantic",
     description:
-        "Finds items whose stored name is semantically similar to q, using embeddings generated from item names and matched through Cloudflare Vectorize. This is a supplement to GET /api/items's name search (the q parameter there), not a replacement: it can match items even when the query uses different wording than the stored name, but only items that have been indexed can be returned. Indexing runs best-effort whenever an item is created or updated, so an item can be missing from these results when the OpenRouter API key was not configured at index time or the indexing call itself failed; POST /api/items/reindex recovers from that by rebuilding the index for every item. There is no cursor and no nextCursor in the response: results are cut off at topK (default 20, maximum 100) because the underlying vector query has no paging.",
+        "Finds items whose stored name is semantically similar to q, using embeddings generated from item names and matched through Cloudflare Vectorize. This is a supplement to GET /api/items's name search (the q parameter there), not a replacement: it can match items even when the query uses different wording than the stored name, but only items that have been indexed can be returned. Indexing runs best-effort whenever an item is created or updated, so an item can be missing from these results when the OpenRouter embedding API key was not configured at index time or the indexing call itself failed; POST /api/items/reindex recovers from that by rebuilding the index for every item. There is no cursor and no nextCursor in the response: results are cut off at topK (default 20, maximum 100) because the underlying vector query has no paging.",
     request: { query: itemSemanticSearchQuerySchema },
     responses: {
         200: {
@@ -100,7 +100,7 @@ itemsApp.openAPIRegistry.registerPath({
             "VALIDATION_ERROR: q is empty or over 200 characters, or topK is out of range (1-100).",
         ),
         503: jsonError(
-            "EMBEDDING_NOT_CONFIGURED: the OpenRouter API key is not stored. Save it from the integration settings, or use POST /api/items/reindex once it is saved.",
+            "EMBEDDING_NOT_CONFIGURED: the OpenRouter embedding API key is not stored. Save it from the integration settings, or use POST /api/items/reindex once it is saved.",
         ),
         502: jsonError(
             "The embedding provider could not complete the request. Codes: EMBEDDING_PROVIDER_ERROR (OpenRouter could not be reached or returned an error), EMBEDDING_INVALID_RESPONSE (the response could not be read). Retry later.",
@@ -115,7 +115,7 @@ itemsApp.openAPIRegistry.registerPath({
     summary: "Rebuild the semantic search index",
     operationId: "reindexItems",
     description:
-        "Rebuilds the semantic search index used by GET /api/items/search/semantic: regenerates the embedding for every item from its current name and upserts it into Vectorize, in batches of up to 100 items. Side effects: calls the configured OpenRouter embeddings API once per batch and overwrites the stored vectors, so it takes time and OpenRouter usage proportional to the number of items. Use it to recover items missed by the best-effort per-item indexing, for example right after the OpenRouter API key is configured for the first time. A batch that fails for a transient reason is counted in failed and does not stop the remaining batches, so a positive failed leaves some items unindexed and worth retrying; if the OpenRouter API key is not configured, every batch would fail the same way, so the whole run stops immediately and the response is 503 instead of a misleadingly successful 200.",
+        "Rebuilds the semantic search index used by GET /api/items/search/semantic: regenerates the embedding for every item from its current name and upserts it into Vectorize, in batches of up to 100 items. Side effects: calls the configured OpenRouter embeddings API once per batch and overwrites the stored vectors, so it takes time and OpenRouter usage proportional to the number of items. Use it to recover items missed by the best-effort per-item indexing, for example right after the OpenRouter embedding API key is configured for the first time. A batch that fails for a transient reason is counted in failed and does not stop the remaining batches, so a positive failed leaves some items unindexed and worth retrying; if the OpenRouter embedding API key is not configured, every batch fails with EMBEDDING_NOT_CONFIGURED.",
     responses: {
         200: {
             description:
@@ -123,7 +123,7 @@ itemsApp.openAPIRegistry.registerPath({
             content: responseContent(itemReindexResultSchema),
         },
         503: jsonError(
-            "EMBEDDING_NOT_CONFIGURED: the OpenRouter API key is not stored. Save it from the integration settings, then retry.",
+            "EMBEDDING_NOT_CONFIGURED: the OpenRouter embedding API key is not stored. Save it from the integration settings, then retry.",
         ),
         ...serverErrorResponses,
     },

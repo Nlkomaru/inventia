@@ -1,7 +1,16 @@
 import { openRouterProvider } from "../domain/integration";
 
+/** 埋め込み key の保存先。画像読み取り key とは行を分ける。 */
+export const openRouterEmbeddingProvider = "openrouter-embedding" as const;
+/** レシート画像読み取り key の保存先。埋め込み key とは行を分ける。 */
+export const openRouterVisionProvider = "openrouter-vision" as const;
+export type OpenRouterCredentialProvider =
+    | typeof openRouterProvider
+    | typeof openRouterEmbeddingProvider
+    | typeof openRouterVisionProvider;
+
 export interface IntegrationCredentialRecord {
-    provider: typeof openRouterProvider;
+    provider: OpenRouterCredentialProvider;
     ciphertext: string;
     initializationVector: string;
     encryptionVersion: 1;
@@ -18,14 +27,21 @@ interface IntegrationCredentialRow {
     updatedAt: string;
 }
 
+const isCredentialProvider = (
+    provider: string,
+): provider is OpenRouterCredentialProvider =>
+    provider === openRouterProvider ||
+    provider === openRouterEmbeddingProvider ||
+    provider === openRouterVisionProvider;
+
 const toCredentialRecord = (
     row: IntegrationCredentialRow,
 ): IntegrationCredentialRecord | null => {
-    if (row.provider !== openRouterProvider || row.encryptionVersion !== 1) {
+    if (!isCredentialProvider(row.provider) || row.encryptionVersion !== 1) {
         return null;
     }
     return {
-        provider: openRouterProvider,
+        provider: row.provider,
         ciphertext: row.ciphertext,
         initializationVector: row.initializationVector,
         encryptionVersion: 1,
@@ -80,6 +96,7 @@ const toSettingsRecord = (
 
 export const getOpenRouterCredential = async (
     db: D1Database,
+    provider: OpenRouterCredentialProvider = openRouterProvider,
 ): Promise<IntegrationCredentialRecord | null> => {
     const row = await db
         .prepare(
@@ -93,7 +110,7 @@ export const getOpenRouterCredential = async (
             FROM integration_credentials
             WHERE provider = ?1`,
         )
-        .bind(openRouterProvider)
+        .bind(provider)
         .first<IntegrationCredentialRow>();
     return row ? toCredentialRecord(row) : null;
 };
@@ -104,6 +121,7 @@ export const upsertOpenRouterCredential = async (
         IntegrationCredentialRecord,
         "provider" | "encryptionVersion" | "createdAt"
     > & { createdAt: string },
+    provider: OpenRouterCredentialProvider = openRouterProvider,
 ): Promise<void> => {
     await db
         .prepare(
@@ -122,7 +140,7 @@ export const upsertOpenRouterCredential = async (
                 updated_at = excluded.updated_at`,
         )
         .bind(
-            openRouterProvider,
+            provider,
             credential.ciphertext,
             credential.initializationVector,
             credential.createdAt,

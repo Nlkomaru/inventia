@@ -18,6 +18,9 @@ import {
     getOpenRouterCredential,
     getOpenRouterSettings,
     type IntegrationSettingsRecord,
+    type OpenRouterCredentialProvider,
+    openRouterEmbeddingProvider,
+    openRouterVisionProvider,
     upsertOpenRouterCredential,
     upsertOpenRouterSettings,
 } from "../repositories/integrationRepository";
@@ -95,6 +98,7 @@ const importEncryptionKey = async (secret: string | undefined) => {
 const encryptApiKey = async (
     apiKey: string,
     encryptionSecret: string,
+    provider: string,
 ): Promise<{ ciphertext: string; initializationVector: string }> => {
     const key = await importEncryptionKey(encryptionSecret);
     const initializationVector = crypto.getRandomValues(
@@ -104,9 +108,7 @@ const encryptApiKey = async (
         {
             name: "AES-GCM",
             iv: toArrayBuffer(initializationVector),
-            additionalData: toArrayBuffer(
-                textEncoder.encode(openRouterProvider),
-            ),
+            additionalData: toArrayBuffer(textEncoder.encode(provider)),
         },
         key,
         toArrayBuffer(textEncoder.encode(apiKey)),
@@ -121,6 +123,7 @@ const decryptApiKey = async (
     ciphertext: string,
     initializationVector: string,
     encryptionSecret: string,
+    provider: string,
 ): Promise<string> => {
     const encryptedBytes = base64ToBytes(ciphertext);
     const initializationVectorBytes = base64ToBytes(initializationVector);
@@ -133,9 +136,7 @@ const decryptApiKey = async (
             {
                 name: "AES-GCM",
                 iv: toArrayBuffer(initializationVectorBytes),
-                additionalData: toArrayBuffer(
-                    textEncoder.encode(openRouterProvider),
-                ),
+                additionalData: toArrayBuffer(textEncoder.encode(provider)),
             },
             key,
             toArrayBuffer(encryptedBytes),
@@ -147,11 +148,13 @@ const decryptApiKey = async (
 };
 
 const toStatus = (
-    credentialUpdatedAt: string | null,
+    embeddingUpdatedAt: string | null,
+    visionUpdatedAt: string | null,
     settings: IntegrationSettingsRecord | null,
 ): OpenRouterIntegrationStatus => ({
     provider: openRouterProvider,
-    configured: credentialUpdatedAt !== null,
+    embeddingConfigured: embeddingUpdatedAt !== null,
+    visionConfigured: visionUpdatedAt !== null,
     model: openRouterEmbeddingModel,
     dimensions: openRouterEmbeddingDimensions,
     chatModel: settings?.chatModel ?? openRouterDefaultChatModel,
@@ -159,7 +162,8 @@ const toStatus = (
     // 解析へ渡る実効値を返す。未設定なら既定の指示がそのまま入る
     receiptPrompt: settings?.receiptPrompt ?? receiptParseDefaultInstructions,
     receiptPromptConfigured: settings?.receiptPrompt != null,
-    updatedAt: credentialUpdatedAt,
+    embeddingUpdatedAt,
+    visionUpdatedAt,
 });
 
 /**
@@ -180,11 +184,17 @@ const normalizeReceiptPrompt = (value: string | null): string | null => {
 export const getOpenRouterIntegrationStatus = async (
     db: D1Database,
 ): Promise<OpenRouterIntegrationStatus> => {
-    const [credential, settings] = await Promise.all([
-        getOpenRouterCredential(db),
+    const [embedding, vision, legacy, settings] = await Promise.all([
+        getOpenRouterCredential(db, openRouterEmbeddingProvider),
+        getOpenRouterCredential(db, openRouterVisionProvider),
+        getOpenRouterCredential(db, openRouterProvider),
         getOpenRouterSettings(db),
     ]);
-    return toStatus(credential?.updatedAt ?? null, settings);
+    return toStatus(
+        embedding?.updatedAt ?? legacy?.updatedAt ?? null,
+        vision?.updatedAt ?? legacy?.updatedAt ?? null,
+        settings,
+    );
 };
 
 export const updateOpenRouterIntegration = async (
@@ -199,19 +209,89 @@ export const updateOpenRouterIntegration = async (
             parsed.error.issues[0]?.message ?? "入力内容を確認してください。",
         );
     }
-    const { apiKey, chatModel, receiptPrompt } = parsed.data;
+    const { embeddingApiKey, visionApiKey, apiKey, chatModel, receiptPrompt } =
+        parsed.data;
+    const embeddingValue = embeddingApiKey ?? apiKey;
+    const visionValue = visionApiKey ?? apiKey;
     // 暗号化を先に行い、鍵が無いときにモデルだけ保存された状態を作らない。
-    const encrypted =
-        apiKey === undefined
+    const embeddingEncrypted =
+        embeddingValue === undefined
             ? null
-            : await encryptApiKey(apiKey, encryptionSecret);
+            : await encryptApiKey(
+                  embeddingValue,
+                  encryptionSecret,
+                  openRouterEmbeddingProvider,
+              );
+    const visionEncrypted =
+        visionValue === undefined
+            ? null
+            : await encryptApiKey(
+                  visionValue,
+                  encryptionSecret,
+                  openRouterVisionProvider,
+              );
     const now = new Date().toISOString();
-    if (encrypted) {
-        await upsertOpenRouterCredential(db, {
-            ...encrypted,
-            createdAt: now,
-            updatedAt: now,
-        });
+    // 移行前の単一キー行が残っていれば、新しい用途別スロットへ複写する。
+    // 暗号文は provider を additionalData に束縛しているため復号して作り直し、
+    // 読み取り側を新スロットへ切り替えても検索と解析が止まらないようにする。
+    const legacy = await getOpenRouterCredential(db, openRouterProvider);
+    if (legacy) {
+        const legacyApiKey = await decryptApiKey(
+            legacy.ciphertext,
+            legacy.initializationVector,
+            encryptionSecret,
+            legacy.provider,
+        );
+        const [currentEmbedding, currentVision] = await Promise.all([
+            getOpenRouterCredential(db, openRouterEmbeddingProvider),
+            getOpenRouterCredential(db, openRouterVisionProvider),
+        ]);
+        if (!currentEmbedding) {
+            const encrypted = await encryptApiKey(
+                legacyApiKey,
+                encryptionSecret,
+                openRouterEmbeddingProvider,
+            );
+            await upsertOpenRouterCredential(
+                db,
+                { ...encrypted, createdAt: now, updatedAt: now },
+                openRouterEmbeddingProvider,
+            );
+        }
+        if (!currentVision) {
+            const encrypted = await encryptApiKey(
+                legacyApiKey,
+                encryptionSecret,
+                openRouterVisionProvider,
+            );
+            await upsertOpenRouterCredential(
+                db,
+                { ...encrypted, createdAt: now, updatedAt: now },
+                openRouterVisionProvider,
+            );
+        }
+    }
+    if (embeddingEncrypted) {
+        await upsertOpenRouterCredential(
+            db,
+            {
+                ...embeddingEncrypted,
+                createdAt: now,
+                updatedAt: now,
+            },
+            openRouterEmbeddingProvider,
+        );
+    }
+    if (visionEncrypted) {
+        await upsertOpenRouterCredential(
+            db,
+            {
+                ...visionEncrypted,
+                createdAt: now,
+                updatedAt: now,
+            },
+            openRouterVisionProvider,
+        );
     }
     if (chatModel !== undefined || receiptPrompt !== undefined) {
         // 1 行を丸ごと書き戻すため、渡されなかった項目は保存済みの値を引き継ぐ
@@ -258,7 +338,7 @@ const readApiKeyForModelList = async (
     encryptionSecret: string,
 ): Promise<string | null> => {
     try {
-        return await getOpenRouterApiKey(db, encryptionSecret);
+        return await getOpenRouterVisionApiKey(db, encryptionSecret);
     } catch {
         return null;
     }
@@ -466,11 +546,14 @@ export const getOpenRouterUsage = async (
 };
 
 /** Returns the credential only to server-side callers that invoke OpenRouter. */
-export const getOpenRouterApiKey = async (
+const readStoredApiKey = async (
     db: D1Database,
     encryptionSecret: string,
+    provider: OpenRouterCredentialProvider,
 ): Promise<string> => {
-    const credential = await getOpenRouterCredential(db);
+    const credential =
+        (await getOpenRouterCredential(db, provider)) ??
+        (await getOpenRouterCredential(db, openRouterProvider));
     if (!credential) {
         throw new Error("OpenRouter is not configured");
     }
@@ -478,6 +561,7 @@ export const getOpenRouterApiKey = async (
         credential.ciphertext,
         credential.initializationVector,
         encryptionSecret,
+        credential.provider,
     );
     const parsed = openRouterApiKeySchema.safeParse(apiKey);
     if (!parsed.success) {
@@ -485,3 +569,27 @@ export const getOpenRouterApiKey = async (
     }
     return parsed.data;
 };
+
+/** 埋め込み key だけを返す。画像読み取り key と混ぜない。 */
+export const getOpenRouterEmbeddingApiKey = async (
+    db: D1Database,
+    encryptionSecret: string,
+): Promise<string> =>
+    readStoredApiKey(db, encryptionSecret, openRouterEmbeddingProvider);
+
+/** 画像読み取り key だけを返す。埋め込み key と混ぜない。 */
+export const getOpenRouterVisionApiKey = async (
+    db: D1Database,
+    encryptionSecret: string,
+): Promise<string> =>
+    readStoredApiKey(db, encryptionSecret, openRouterVisionProvider);
+
+/**
+ * 旧来の単一キー呼び出しの互換手段。移行後は埋め込み key を返す。
+ * 新規の呼び出しでは用途別の getter を使うこと。
+ */
+export const getOpenRouterApiKey = async (
+    db: D1Database,
+    encryptionSecret: string,
+): Promise<string> =>
+    readStoredApiKey(db, encryptionSecret, openRouterEmbeddingProvider);
