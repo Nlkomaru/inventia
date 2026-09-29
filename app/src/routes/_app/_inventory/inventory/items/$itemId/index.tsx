@@ -28,7 +28,6 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import type { ItemDetailDto } from "@/domain/item";
 import { sortLotsFefo } from "@/domain/lot";
 import {
     type PriceRecordDto,
@@ -58,12 +57,6 @@ const soonWithinDays = 7;
 
 // 幅は他の画面と揃える。ここだけ狭いと一覧から入ったときに幅が変わって見える
 const pageClassName = "flex w-full flex-col gap-6 p-4 sm:p-6 lg:p-8";
-
-const dimensionLabels: Record<ItemDetailDto["baseDimension"], string> = {
-    mass: "重量",
-    volume: "体積",
-    count: "個数",
-};
 
 // 履歴一覧の画面と同じ文言。ルート配下の表示はルートごとに閉じる
 const reasonLabels: Record<StockMovementReason, string> = {
@@ -168,61 +161,6 @@ function ItemDetailPage() {
                     </Link>
                 </p>
             </header>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>品目の情報</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <dl className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <dt className="text-sm text-muted-foreground">
-                                カテゴリ
-                            </dt>
-                            <dd className="mt-1 text-sm">{category.name}</dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm text-muted-foreground">
-                                保管場所
-                            </dt>
-                            <dd className="mt-1 text-sm">{location.name}</dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm text-muted-foreground">
-                                基準単位
-                            </dt>
-                            <dd className="mt-1 text-sm">
-                                {item.baseUnit}（
-                                {dimensionLabels[item.baseDimension]}）
-                            </dd>
-                        </div>
-                        <div className="sm:col-span-2">
-                            <dt className="text-sm text-muted-foreground">
-                                メモ
-                            </dt>
-                            <dd className="mt-1 text-sm whitespace-pre-wrap">
-                                {item.memo ?? "—"}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm text-muted-foreground">
-                                登録日時
-                            </dt>
-                            <dd className="mt-1 text-sm">
-                                {formatDateTime(item.createdAt)}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm text-muted-foreground">
-                                最終更新
-                            </dt>
-                            <dd className="mt-1 text-sm">
-                                {formatDateTime(item.updatedAt)}
-                            </dd>
-                        </div>
-                    </dl>
-                </CardContent>
-            </Card>
 
             <Card>
                 <CardHeader>

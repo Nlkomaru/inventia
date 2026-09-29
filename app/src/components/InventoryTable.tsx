@@ -42,7 +42,6 @@ const columnLabels: Record<string, string> = {
     currentQuantity: "現在庫（合計）",
     earliestExpiryDate: "最短期限",
     lots: "ロット内訳",
-    master: "品目マスタ",
 };
 
 export type ExpiryState = "expired" | "soon" | "scheduled" | "none";
@@ -241,12 +240,6 @@ export type InventoryTableProps = {
      * 省略すると品目名はテキストのまま表示する。
      */
     renderItemName?: (item: ItemDto, name: string) => ReactNode;
-    /**
-     * 品目マスタへの導線。マスタ表の「在庫詳細」と対になる描画。
-     * ルーターに依存させないため、リンク要素は呼び出し側で組み立てる。
-     * 省略すると列自体を作らない。
-     */
-    renderItemMasterLink?: (item: ItemDto) => ReactNode;
 };
 
 export function InventoryTable({
@@ -257,7 +250,6 @@ export function InventoryTable({
     loading = false,
     soonWithinDays = defaultSoonWithinDays,
     renderItemName,
-    renderItemMasterLink,
 }: InventoryTableProps) {
     // 期限判定の基準時刻。行ごとに Date.now() を読むと同一描画内で基準が
     // ずれるため、マウント時に 1 回だけ求める
@@ -366,23 +358,11 @@ export function InventoryTable({
                         />
                     ),
                 }),
-                ...(renderItemMasterLink
-                    ? [
-                          columnHelper.display({
-                              id: "master",
-                              header: columnLabels.master,
-                              enableSorting: false,
-                              cell: ({ row }) =>
-                                  renderItemMasterLink(row.original),
-                          }),
-                      ]
-                    : []),
             ]),
         [
             categoryLabels,
             locationLabels,
             lotsByItemId,
-            renderItemMasterLink,
             now,
             renderItemName,
             soonWithinDays,
@@ -402,9 +382,7 @@ export function InventoryTable({
             <Table
                 aria-busy={loading}
                 aria-label="在庫一覧"
-                className={
-                    renderItemMasterLink ? "min-w-[1080px]" : "min-w-[980px]"
-                }
+                className="min-w-[980px]"
             >
                 <TableHeader className="bg-muted/50">
                     {table.getHeaderGroups().map((headerGroup) => (

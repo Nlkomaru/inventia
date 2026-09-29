@@ -315,9 +315,8 @@ export const LotsUnavailable: Story = {
 
 
 /**
- * 品目名を在庫詳細へのリンクにし、品目マスタへの導線を足した表示。
- * アプリ側は TanStack Router の `Link` を渡すが、story はルーターを
- * 持たないため素の `<a>` で同じ見た目を示す。
+ * 品目名を詳細ページへのリンクにした表示。アプリ側は TanStack Router の
+ * `Link` を渡すが、story はルーターを持たないため素の `<a>` で同じ見た目を示す。
  */
 export const LinkedItemNames: Story = {
     args: {
@@ -327,14 +326,6 @@ export const LinkedItemNames: Story = {
                 href={`/inventory/items/${item.id}`}
             >
                 {name}
-            </a>
-        ),
-        renderItemMasterLink: (item) => (
-            <a
-                className="text-sm whitespace-nowrap underline-offset-4 hover:underline"
-                href={`/items/${item.id}`}
-            >
-                品目詳細
             </a>
         ),
     },

@@ -112,7 +112,7 @@ export const Route = createFileRoute("/_app/_inventory/inventory/items/")({
     errorComponent: InventoryError,
 });
 
-// 品目名から在庫詳細へ入れるようにする。共有コンポーネントはルーターに
+// 品目名から詳細ページへ入れるようにする。共有コンポーネントはルーターに
 // 依存させないため、リンク要素はルート側で組み立てて渡す
 const renderItemName = (item: ItemDto, name: string) => (
     <Link
@@ -121,18 +121,6 @@ const renderItemName = (item: ItemDto, name: string) => (
         to="/inventory/items/$itemId"
     >
         {name}
-    </Link>
-);
-
-// 品目マスタへの導線。マスタ表の「在庫詳細」と対になる
-const renderItemMasterLink = (item: ItemDto) => (
-    <Link
-        aria-label={`${item.name}の品目詳細`}
-        className="text-sm whitespace-nowrap underline-offset-4 hover:underline"
-        params={{ itemId: item.id }}
-        to="/items/$itemId"
-    >
-        品目詳細
     </Link>
 );
 
@@ -452,7 +440,6 @@ function InventoryPage() {
                 locationLabels={locationLabels}
                 lotsByItemId={lotsByItemId}
                 renderItemName={renderItemName}
-                renderItemMasterLink={renderItemMasterLink}
                 soonWithinDays={soonWithinDays}
             />
         </main>
