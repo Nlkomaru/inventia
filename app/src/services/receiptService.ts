@@ -142,8 +142,8 @@ export type ReceiptReadEnv = Pick<ReceiptEnv, "DB"> & SignedImageUrlEnv;
 /** 類似度候補の母集合の上限。これを超える品目数では候補提示が一部欠ける。 */
 export const receiptMatchItemLimit = 2000;
 
-/** 解析全体のタイムアウト。リトライを含めてこの時間で打ち切る。 */
-export const receiptParseTimeoutMs = 60_000;
+/** 解析全体のタイムアウト。リトライを含めてこの時間で打ち切る。Workers の HTTP 呼び出しに壁時間の上限は無いため、40 step の tool 往復が収まる余裕を持たせる。 */
+export const receiptParseTimeoutMs = 300_000;
 
 // 上流の例外文字列・API 応答・API key を保存も返却もしないため、
 // 失敗理由は利用者が次に取れる行動を書いた固定文へ写す
@@ -670,7 +670,8 @@ export const parseReceipt = async (
             "反映を開始したレシートは再解析できません。取込履歴で反映結果を確認してください。",
         );
     }
-    // 反映処理と同時に走らないよう、状態遷移を条件付き UPDATE で確保する
+    // 反映処理と同時に走らないよう、状態遷移を条件付き UPDATE で確保する。
+    // 応答後の waitUntil は 30 秒で終了するため、解析結果の保存まで await する。
     if (
         !(await updateReceiptStatus(env.DB, receipt.id, {
             status: "parsing",

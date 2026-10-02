@@ -162,8 +162,8 @@ export const uploadReceiptImage = createServerFn({ method: "POST" })
     });
 
 /**
- * AI 解析と商品照合を実行する。解析に失敗した場合も正常応答を返し、
- * status = 'failed' と errorMessage を持つ詳細が返る。
+ * AI 解析と結果の保存が完了してから詳細を返す。
+ * 応答後の waitUntil は最大 30 秒のため、5 分の解析には使わない。
  */
 export const parseReceipt = createServerFn({ method: "POST" })
     .validator(receiptIdInputSchema)

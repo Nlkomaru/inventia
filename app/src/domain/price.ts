@@ -5,9 +5,9 @@ export const priceRecordDimensions = ["mass", "volume", "count"] as const;
 export const priceRecordDimensionSchema = z.enum(priceRecordDimensions);
 
 /**
- * The deliberately small set of units accepted at the price boundary.
- * Mass and volume are normalized through their smallest supported unit;
- * count units are discrete and therefore cannot be converted between names.
+ * 換算表と正規表記を兼ねる、既知の単位の有限集合。質量・体積はここに載る
+ * 表記だけを換算でき、個数は換算しないため、ここに載る汎用の個数単位以外にも
+ * 品目ごとの基準単位（玉、袋、箱など利用者の語彙）がありうる。
  */
 export const priceContentUnits = [
     "g",
@@ -21,7 +21,21 @@ export const priceContentUnits = [
     "冊",
     "件",
 ] as const;
-export const priceContentUnitSchema = z.enum(priceContentUnits);
+
+/**
+ * 投入境界で受け付ける内容量の単位。品目の baseUnit と同じ上限（1〜50 文字）の
+ * 自由文字列にする。質量・体積は換算表に載る表記だけが換算に成功し、個数は
+ * 品目の基準単位と完全に同じ表記だけが恒等変換になる。有限の単位集合は
+ * priceContentUnits に残し、換算と正規化の型安全を保つ。
+ */
+export const priceContentUnitSchema = z
+    .string()
+    .trim()
+    .min(1)
+    .max(50)
+    .describe(
+        "Contents unit label. A mass or volume item accepts a convertible unit (g, kg, mL, L, compared without regard to letter case); a count item requires the label to equal the item's own base unit exactly (for example 玉, 袋, 箱).",
+    );
 
 const priceRecordIdSchema = z.string().trim().min(1).max(128);
 const positiveIntegerSchema = z.int().min(1);
@@ -189,7 +203,8 @@ export type PriceBatchInput = z.infer<typeof priceBatchInputSchema>;
 export type PriceBatchOutput = z.infer<typeof priceBatchOutputSchema>;
 
 export type PriceRecordDimension = z.infer<typeof priceRecordDimensionSchema>;
-export type PriceContentUnit = z.infer<typeof priceContentUnitSchema>;
+/** 換算表に載る既知の単位。入力境界の contentUnit は任意の文字列を取りうる。 */
+export type PriceContentUnit = (typeof priceContentUnits)[number];
 export type PriceRecordCreateInput = z.infer<
     typeof priceRecordCreateInputSchema
 >;

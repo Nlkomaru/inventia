@@ -107,7 +107,7 @@ pricesApp.openAPIRegistry.registerPath({
     tags: ["Prices"],
     summary: "Record an item price",
     description:
-        "Adds a price observation. Unit price is calculated when the record is read and is not stored. Send storeId to link the record to a store, source to name the origin as free text, or both; when only storeId is sent the store name is copied into source. Omitting both is refused.",
+        "Adds a price observation. Unit price is calculated when the record is read and is not stored. Send storeId to link the record to a store, source to name the origin as free text, or both; when only storeId is sent the store name is copied into source. Omitting both is refused. contentUnit must match the item's base unit: a mass or volume item accepts g, kg, mL or L (compared without regard to letter case) and the amount is converted to the base unit before storing, while a count item requires the label to equal its base unit exactly (for example 玉, 袋, 箱).",
     request: {
         params: z.object({ itemId: itemIdParameter }),
         body: {
@@ -130,7 +130,7 @@ pricesApp.openAPIRegistry.registerPath({
     tags: ["Prices"],
     summary: "Correct an item price",
     description:
-        "Corrects a price observation's package content, price, source, store, packaging, or URL. The observed timestamp is immutable and is neither accepted nor changed.",
+        "Corrects a price observation's package content, price, source, store, packaging, or URL. The observed timestamp is immutable and is neither accepted nor changed. contentUnit follows the same rule as recording a price: a mass or volume item accepts g, kg, mL or L (compared without regard to letter case), while a count item requires the label to equal its base unit exactly.",
     request: {
         params: z.object({
             itemId: itemIdParameter,

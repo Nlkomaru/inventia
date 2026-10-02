@@ -71,8 +71,7 @@ import {
     validateReviewRows,
 } from "./-functions/receipt-review-form";
 
-// 取込途中のレシートを URL に持たせる。解析は最大 60 秒かかるため、
-// 再読み込みやスマホの画面復帰で状態を失わないようにする。
+// 取込途中のレシートを URL に持たせ、再読み込み後も保存済みの状態を追う。
 const receiptSearchSchema = z.object({
     receiptId: z.string().min(1).optional().catch(undefined),
 });
@@ -258,7 +257,14 @@ function ReceiptIntakePage() {
     const runParse = async (id: string) => {
         setParseError(null);
         try {
-            await parseMutation.mutateAsync(id);
+            const detail = await parseMutation.mutateAsync(id);
+            // 解析失敗は status = 'failed' の詳細として返るため、
+            // 利用者向けの文言をそのまま出す。
+            if (detail.status === "failed") {
+                setParseError(
+                    detail.errorMessage ?? "レシートを解析できませんでした",
+                );
+            }
         } catch (cause) {
             setParseError(
                 errorMessage(cause, "レシートを解析できませんでした"),

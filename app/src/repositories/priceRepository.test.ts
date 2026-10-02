@@ -43,9 +43,9 @@ const createTestItem = async (input: {
  * 価格履歴（TS）と価格比較（SQL）で式が割れると、同じ 1 件の記録が経路によって
  * 1000 倍ずれた値で読まれる。
  *
- * 内容量は基準単位で保存済みの値なので、単位表に無い基準単位（袋など）も試せる
- * よう repository の insertPriceRecord へ直接書く（service の contentUnit は
- * 単位表の enum で、袋を通せない）。
+ * 内容量は基準単位で保存済みの値なので、repository へ直接書けば単位表に無い
+ * 基準単位（袋など）も試せる（service 経由の作成は contentUnit が品目の基準単位と
+ * 一致していれば通るため、そこは別の describe で固定する）。
  * 質量・体積で単位表に無い基準単位（袋 / mass など）は calculateUnitPrice が
  * 例外を投げるため突き合わせようがないが、価格記録の作成もつけ替えも同じ換算を
  * 通すので、その組み合わせは書き込み側で作れない。
@@ -357,5 +357,150 @@ describe("価格記録の訂正", () => {
             contentAmount: 2000,
             price: 900,
         });
+    });
+});
+
+/**
+ * 個数の単位は換算できないため、品目の基準単位と完全に同じ表記でのみ記録できる。
+ * 単位表（domain/price.ts の priceContentUnits）は g / kg / mL / L と汎用の
+ * 個数単位しか持たないが、実際の品目は 玉・袋・箱 のような利用者の語彙で数える。
+ * service の作成と訂正の両方がその表記を受け付け、単価が 1 個あたりで導かれ、
+ * 履歴から同じ値で読み戻せることを固定する。
+ */
+describe("単位表に無い個数の単位の価格記録", () => {
+    const arbitraryCountUnits = ["玉", "袋", "箱"];
+
+    for (const unit of arbitraryCountUnits) {
+        it(`基準単位 ${unit} の品目に contentUnit ${unit} で作成して読み戻せる`, async () => {
+            const itemId = await createTestItem({
+                baseUnit: unit,
+                baseDimension: "count",
+            });
+
+            const created = await createPriceRecord(env, {
+                itemId,
+                contentAmount: 10,
+                contentUnit: unit,
+                price: 400,
+                source: "テスト",
+                recordedAt: "2026-08-20T00:00:00.000Z",
+            });
+
+            expect(created).toMatchObject({
+                itemId,
+                contentAmount: 10,
+                baseUnit: unit,
+                baseDimension: "count",
+                unitPrice: 40,
+            });
+
+            const history = await listPriceRecords(env, { itemId });
+            expect(history.items).toHaveLength(1);
+            expect(history.items[0]).toMatchObject({
+                id: created.id,
+                contentAmount: 10,
+                unitPrice: 40,
+            });
+
+            const comparison = await compareUnitPrices(env, { itemId });
+            expect(comparison.items[0]?.unitPrice).toBeCloseTo(40, 10);
+        });
+    }
+
+    it("訂正でも品目の基準単位と同じ contentUnit を使える", async () => {
+        const itemId = await createTestItem({
+            baseUnit: "袋",
+            baseDimension: "count",
+        });
+        const original = await createPriceRecord(env, {
+            itemId,
+            contentAmount: 1,
+            contentUnit: "袋",
+            setCount: 2,
+            price: 300,
+            source: "訂正前",
+            recordedAt: "2026-09-01T12:00:00.000Z",
+        });
+        // 300 円 / (1 袋 × 2) = 150 円 / 袋
+        expect(original.unitPrice).toBeCloseTo(150, 10);
+
+        const corrected = await updatePriceRecord(env, original.id, {
+            itemId,
+            contentAmount: 2,
+            contentUnit: "袋",
+            setCount: 1,
+            price: 900,
+            source: "訂正後",
+            storeId: null,
+        });
+
+        expect(corrected).toMatchObject({
+            contentAmount: 2,
+            price: 900,
+            recordedAt: original.recordedAt,
+        });
+        expect(corrected.unitPrice).toBeCloseTo(450, 10);
+
+        const history = await listPriceRecords(env, { itemId, limit: 1 });
+        expect(history.items[0]).toMatchObject({
+            id: original.id,
+            contentAmount: 2,
+            price: 900,
+        });
+        expect(history.items[0]?.unitPrice).toBeCloseTo(450, 10);
+    });
+
+    it("品目の基準単位と違う個数単位での作成は拒む", async () => {
+        const itemId = await createTestItem({
+            baseUnit: "玉",
+            baseDimension: "count",
+        });
+
+        await expect(
+            createPriceRecord(env, {
+                itemId,
+                contentAmount: 1,
+                contentUnit: "袋",
+                price: 100,
+                source: "テスト",
+                recordedAt: "2026-08-20T00:00:00.000Z",
+            }),
+        ).rejects.toMatchObject({ code: "PRICE_INVALID_INPUT" });
+
+        const history = await listPriceRecords(env, { itemId });
+        expect(history.items).toHaveLength(0);
+    });
+
+    it("訂正で品目の基準単位と違う個数単位へ差し替えるのは拒み、元の値を保つ", async () => {
+        const itemId = await createTestItem({
+            baseUnit: "玉",
+            baseDimension: "count",
+        });
+        const original = await createPriceRecord(env, {
+            itemId,
+            contentAmount: 3,
+            contentUnit: "玉",
+            price: 600,
+            source: "テスト",
+            recordedAt: "2026-08-20T00:00:00.000Z",
+        });
+
+        await expect(
+            updatePriceRecord(env, original.id, {
+                itemId,
+                contentAmount: 1,
+                contentUnit: "箱",
+                price: 999,
+                source: "テスト",
+            }),
+        ).rejects.toMatchObject({ code: "PRICE_INVALID_INPUT" });
+
+        const history = await listPriceRecords(env, { itemId, limit: 1 });
+        expect(history.items[0]).toMatchObject({
+            id: original.id,
+            contentAmount: 3,
+            price: 600,
+        });
+        expect(history.items[0]?.unitPrice).toBeCloseTo(200, 10);
     });
 });
