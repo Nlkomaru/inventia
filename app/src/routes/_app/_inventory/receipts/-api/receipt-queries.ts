@@ -80,6 +80,9 @@ export const receiptDetailQueryOptions = (receiptId: string) =>
         queryKey: receiptKeys.detail(receiptId),
         queryFn: () => getReceiptDetail({ data: { receiptId } }),
         enabled: receiptId !== "",
+        // 再読み込み後も解析結果を追い、終端状態になったら止める。
+        refetchInterval: (query) =>
+            query.state.data?.status === "parsing" ? 5000 : false,
     });
 
 export const itemListQueryOptions = () =>

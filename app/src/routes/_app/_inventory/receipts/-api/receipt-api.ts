@@ -162,22 +162,15 @@ export const uploadReceiptImage = createServerFn({ method: "POST" })
     });
 
 /**
- * AI 解析を開始する。Workers 側で `waitUntil` へ重い処理を委ね、応答は
- * `status = 'parsing'` の詳細だけをすぐ返す。ボタンの serverFn 呼び出しは
- * 長時間待たずに終わり、結果は `getReceiptDetail` のポーリングで追う。
- * 開始に失敗した場合だけ例外を投げる。
+ * AI 解析と結果の保存が完了してから詳細を返す。
+ * 応答後の waitUntil は最大 30 秒のため、5 分の解析には使わない。
  */
 export const parseReceipt = createServerFn({ method: "POST" })
     .validator(receiptIdInputSchema)
     .handler(async ({ data }): Promise<ReceiptDetailDto> => {
         const [
-            { env, waitUntil },
-            {
-                startReceiptParse,
-                runReceiptParse,
-                getReceipt,
-                ReceiptServiceError,
-            },
+            { env },
+            { parseReceipt: parse, ReceiptServiceError },
             { createInProcessMcpToolSet },
         ] = await Promise.all([
             import("cloudflare:workers"),
@@ -185,21 +178,15 @@ export const parseReceipt = createServerFn({ method: "POST" })
             import("@/api/mcp/in-process"),
         ]);
         try {
-            await startReceiptParse(env.DB, data.receiptId);
+            return await parse(env, data.receiptId, {
+                createToolSet: () => createInProcessMcpToolSet(env),
+            });
         } catch (error) {
             if (error instanceof ReceiptServiceError) {
                 throw new Error(error.message);
             }
             throw new Error("レシートを解析できませんでした。");
         }
-        // AI 呼び出しは応答を返した後に続け、結果は status と errorMessage に
-        // 残る。失敗してもここの応答は変えず、画面はポーリングで追う
-        waitUntil(
-            runReceiptParse(env, data.receiptId, {
-                createToolSet: () => createInProcessMcpToolSet(env),
-            }),
-        );
-        return await getReceipt(env, data.receiptId);
     });
 
 export const applyReceipt = createServerFn({ method: "POST" })
