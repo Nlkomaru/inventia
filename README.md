@@ -86,6 +86,26 @@ batches the same way: `resolve_inventory_items`, `resolve_stores` and
 `list_receipt_examples` take a list of names and answer them in one call instead of one
 search per name.
 
+### 価格の内容量単位
+
+価格の登録・訂正 API の `contentUnit` は 1〜50 文字の単位名を受け付けます。
+個数 (`count`) の品目では、品目の基準単位と同じ名前を指定してください。
+「玉」「袋」「箱」など、固定の単位一覧にない名前も画面と API の両方で利用できます。
+異なる個数単位同士の換算は行いません。質量・体積は引き続き `g` / `kg` /
+`mL` / `L` の互換単位で指定し、基準単位へ換算します。
+
+### レシート解析
+
+`POST /api/receipts/{id}/parse` は解析と照合結果の保存が完了してから応答します。
+モデル呼び出しはリトライと tool 呼び出しを含めて最大 5 分です。クライアントの
+タイムアウトに余裕を持たせ、応答まで接続を維持してください。成功時は `parsed`、
+解析失敗時は `failed` と対処方法を含む `errorMessage` を返します。
+
+長時間の解析は、応答後最大 30 秒で終了する Workers の `waitUntil` では実行しません。
+画面を再読み込みした場合、取込中のレシートは 5 秒間隔で詳細を再取得しますが、
+接続の切断をまたぐ解析の継続は保証されません。以前の処理で「解析中」のまま残った
+レシートは、取込画面の「解析する」から再実行できます。
+
 ## Verification
 
 ```bash

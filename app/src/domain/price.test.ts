@@ -3,6 +3,7 @@ import {
     calculateUnitPrice,
     getPriceUnitDefinition,
     normalizeContentAmount,
+    priceContentUnitSchema,
     priceUnitDefinitions,
 } from "./price";
 
@@ -126,6 +127,26 @@ describe("calculateUnitPrice の表記ゆれ", () => {
         // 作れない。導けないことを黙って 0 などにしない点を固定する
         expect(() => calculateUnitPrice(400, 10, 1, "mass", "袋")).toThrow(
             RangeError,
+        );
+    });
+});
+
+describe("priceContentUnitSchema の受け入れ範囲", () => {
+    // 品目の基準単位は品目マスタと同じ 1〜50 文字の自由文字列。個数を数える
+    // 商品は利用者の語彙（玉、袋、箱 など）で数えるため、単位表の enum に
+    // 閉じると品目の基準単位をそのまま送れず価格を記録できなくなる
+    it("単位表に無い個数の単位も前後の空白を落として受け付ける", () => {
+        for (const unit of ["玉", "袋", "箱", "パック", "ケース"]) {
+            expect(priceContentUnitSchema.parse(unit)).toBe(unit);
+        }
+        expect(priceContentUnitSchema.parse(" 玉 ")).toBe("玉");
+    });
+
+    it("空文字と 50 文字を超える表記は拒む", () => {
+        expect(priceContentUnitSchema.safeParse("").success).toBe(false);
+        expect(priceContentUnitSchema.safeParse("   ").success).toBe(false);
+        expect(priceContentUnitSchema.safeParse("あ".repeat(51)).success).toBe(
+            false,
         );
     });
 });

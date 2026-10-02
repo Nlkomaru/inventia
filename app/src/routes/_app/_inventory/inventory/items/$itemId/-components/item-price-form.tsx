@@ -20,10 +20,8 @@ import {
 import type { ItemDetailDto } from "@/domain/item";
 import {
     canonicalPriceContentUnit,
-    type PriceContentUnit,
     type PriceRecordCreateInput,
     type PriceRecordDto,
-    priceContentUnitSchema,
 } from "@/domain/price";
 import { parsePositiveInteger, toIsoFromDate } from "@/lib/expiry-input";
 import {
@@ -50,18 +48,17 @@ const todayInputValue = (): string => {
 
 /**
  * 内容量に選べる単位。基準単位へ整数で換算できる組み合わせだけを出す。
- * 個数は換算しないため基準単位そのものしか使えない（domain の
- * normalizeContentAmount と同じ規則）。
+ * 個数は換算しないため、品目の基準単位そのものだけを使える（玉、袋、箱など
+ * 単位表に無い名前でもよい。domain の normalizeContentAmount と同じ規則）。
  */
-const contentUnitOptions = (item: ItemDetailDto): PriceContentUnit[] => {
+const contentUnitOptions = (item: ItemDetailDto): string[] => {
     if (item.baseDimension === "mass") {
         return ["g", "kg"];
     }
     if (item.baseDimension === "volume") {
         return ["mL", "L"];
     }
-    const parsed = priceContentUnitSchema.safeParse(item.baseUnit);
-    return parsed.success ? [parsed.data] : [];
+    return item.baseUnit === "" ? [] : [item.baseUnit];
 };
 
 type PriceRecordFormInput = Omit<
@@ -106,11 +103,13 @@ export function ItemPriceForm({
         [storesQuery.data],
     );
     const defaultContentUnit =
-        canonicalPriceContentUnit(item.baseUnit) ?? units[0] ?? "";
+        item.baseDimension === "count"
+            ? item.baseUnit
+            : (canonicalPriceContentUnit(item.baseUnit) ?? units[0] ?? "");
     const [contentAmount, setContentAmount] = useState(
         () => record?.contentAmount.toString() ?? "",
     );
-    const [contentUnit, setContentUnit] = useState<PriceContentUnit | "">(
+    const [contentUnit, setContentUnit] = useState<string>(
         () => defaultContentUnit,
     );
     const [setCount, setSetCount] = useState(
@@ -163,8 +162,8 @@ export function ItemPriceForm({
         },
     });
 
-    // 個数の品目で基準単位が価格の単位表に無い場合、API が単位を受け付けられない。
-    // 送って 400 にするより、理由をその場で示して入力を止める
+    // 基準単位が未設定の品目では内容量の単位を選べない。API が単位を
+    // 受け付けられないため、理由をその場で示して入力を止める
     if (units.length === 0) {
         return (
             <p className="text-sm text-muted-foreground">
