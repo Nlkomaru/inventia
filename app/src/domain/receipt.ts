@@ -143,8 +143,12 @@ export const receiptOcrResultSchema = z.object({
         .describe(
             "購入店舗のチェーン名。「渋谷道玄坂店」のような支店名は除く。読み取れない場合は null",
         ),
+    // receiptLocalDateTimeToUtc は Z と時差（+09:00 など）を落として現地時刻として
+    // 読むが、JSON Schema の format: "date-time" に引かれてモデルが +09:00 を付ける
+    // ことがある。local: true だけだと Zod が +09:00 を弾いて解析全体が失敗するため、
+    // offset: true も併せて受け付ける
     purchasedAt: z.iso
-        .datetime({ local: true })
+        .datetime({ local: true, offset: true })
         .nullable()
         .describe(
             "レシート記載の購入日時（タイムゾーンなしの ISO 8601、例: 2026-04-01T19:23:00）。印字された現地時刻をそのまま入れ、末尾に Z や +09:00 のような時差を付けない。時刻が読み取れない場合は 00:00:00、日付も読み取れない場合は null",

@@ -161,15 +161,53 @@ const parseFailureMessages = {
 } as const;
 
 /**
+ * スキーマ不一致（AI_NoObjectGeneratedError -> AI_TypeValidationError -> ZodError）の
+ * ときだけ、どのフィールドがどの規則で弾かれたかを cause 連鎖から抜き出す。
+ * AI_TypeValidationError.message にはモデルの出力全文が含まれるため使わず、
+ * 明細文字列を含まない path / code / message の 3 つだけを取り出す。
+ */
+const extractValidationIssues = (
+    error: unknown,
+): { path: string; code: string; message: string }[] | undefined => {
+    let current: unknown = error;
+    for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
+        if ("issues" in current && Array.isArray(current.issues)) {
+            return current.issues.flatMap((issue: unknown) => {
+                if (typeof issue !== "object" || issue === null) {
+                    return [];
+                }
+                const path =
+                    "path" in issue && Array.isArray(issue.path)
+                        ? issue.path.map(String).join(".")
+                        : "";
+                const code =
+                    "code" in issue && typeof issue.code === "string"
+                        ? issue.code
+                        : "";
+                const message =
+                    "message" in issue && typeof issue.message === "string"
+                        ? issue.message
+                        : "";
+                return [{ path, code, message }];
+            });
+        }
+        current = current.cause;
+    }
+    return undefined;
+};
+
+/**
  * 解析失敗の切り分け情報を運用ログにだけ残す。利用者向けメッセージは
  * 固定文のままにし、記録も返却もしない上流の理由をここで観測できるようにする。
  * 画像・明細・API key は出さず、失敗の種類が分かる値に限る。
  */
 const logParseFailure = (receiptId: string, error: unknown): void => {
+    const issues = extractValidationIssues(error);
     console.error("receipt parse failed", {
         receiptId,
         name: error instanceof Error ? error.name : typeof error,
         message: error instanceof Error ? error.message : String(error),
+        ...(issues ? { issues } : {}),
     });
 };
 

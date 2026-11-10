@@ -8,7 +8,9 @@ import {
     receiptApplyLineResultSchema,
     receiptApplyLineSchema,
     receiptDetailDtoSchema,
+    receiptOcrResultSchema,
 } from "../domain/receipt";
+import { receiptLocalDateTimeToUtc } from "../domain/receipt-match";
 import type { ReceiptLineWrite } from "../repositories/receiptRepository";
 import {
     insertReceipt,
@@ -802,6 +804,64 @@ describe("receiptApplyLineSchema の内容量指定", () => {
             }).success,
         ).toBe(true);
         expect(receiptApplyLineSchema.safeParse(baseLine).success).toBe(true);
+    });
+});
+
+describe("receiptOcrResultSchema の購入日時", () => {
+    const baseResult = {
+        storeName: "デリシア",
+        totalPrice: 451,
+        pricesIncludeTax: false,
+        lines: [
+            {
+                name: "※鍋キューブ甘からだしすき",
+                completedName: "鍋キューブ 甘からだしすき",
+                quantity: 8,
+                price: 249,
+                taxRate: 8 as const,
+                stockRelevant: true,
+                expiry: {
+                    printedDate: null,
+                    estimatedDate: "2027-11-10",
+                    source: "estimated" as const,
+                    confidence: "high" as const,
+                    estimateReason:
+                        "未開封の固形鍋つゆ・調味料は購入から約12か月",
+                },
+                stocking: {
+                    categoryName: "調味料",
+                    baseUnit: "個",
+                    baseDimension: "count" as const,
+                },
+            },
+        ],
+    };
+
+    // JSON Schema の format: "date-time" に引かれてモデルが +09:00 や Z を付けても、
+    // スキーマ検証で落とさず receiptLocalDateTimeToUtc へ渡して現地時刻として読ませる
+    it("タイムゾーンなし・+09:00 付き・Z 付き・null の購入日時を受け付ける", () => {
+        for (const purchasedAt of [
+            "2026-11-10T13:09:00",
+            "2026-11-10T13:09:00+09:00",
+            "2026-11-10T13:09:00Z",
+        ]) {
+            const parsed = receiptOcrResultSchema.safeParse({
+                ...baseResult,
+                purchasedAt,
+            });
+            expect(parsed.success).toBe(true);
+            if (parsed.success) {
+                expect(receiptLocalDateTimeToUtc(parsed.data.purchasedAt)).toBe(
+                    "2026-11-10T04:09:00.000Z",
+                );
+            }
+        }
+        expect(
+            receiptOcrResultSchema.safeParse({
+                ...baseResult,
+                purchasedAt: null,
+            }).success,
+        ).toBe(true);
     });
 });
 
