@@ -165,6 +165,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ env.NIKO_CI_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ env.NIKO_CI_AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ""
           AWS_REGION: ${{ env.NIKO_CI_AWS_REGION }}
           BUCKET_NAME: ${{ env.NIKO_CI_BUCKET_NAME }}
           S3_URL: ${{ env.NIKO_CI_S3_URL }}
@@ -236,6 +237,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ env.NIKO_CI_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ env.NIKO_CI_AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ""
           AWS_REGION: ${{ env.NIKO_CI_AWS_REGION }}
           BUCKET_NAME: ${{ env.NIKO_CI_BUCKET_NAME }}
           S3_URL: ${{ env.NIKO_CI_S3_URL }}
