@@ -154,8 +154,7 @@ jobs:
       - name: Build storybook
         run: pnpm --filter ./storybook run build
 
-      # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION / S3_URL / BUCKET_NAME は
-      # secret-manager (SSM Parameter Store) から GITHUB_ENV へ読み込む。
+      # NIKO_CI_* は secret-manager (SSM Parameter Store) から GITHUB_ENV へ読み込む。
       - name: Load Preview Secrets
         uses: nlkomaru/secret-manager@main
         with:
@@ -164,6 +163,11 @@ jobs:
 
       - name: Upload to R2
         env:
+          AWS_ACCESS_KEY_ID: ${{ env.NIKO_CI_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.NIKO_CI_AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ env.NIKO_CI_AWS_REGION }}
+          BUCKET_NAME: ${{ env.NIKO_CI_BUCKET_NAME }}
+          S3_URL: ${{ env.NIKO_CI_S3_URL }}
           COMMIT_SHORT_SHA: ${{ steps.vars.outputs.commit_sha }}
         run: |
           aws configure set default.s3.max_concurrent_requests 50
@@ -208,8 +212,7 @@ jobs:
           sha="${{ github.event.pull_request.head.sha || github.sha }}"
           echo "commit_sha=${sha:0:7}" >> "$GITHUB_OUTPUT"
 
-      # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION / S3_URL / BUCKET_NAME は
-      # secret-manager (SSM Parameter Store) から GITHUB_ENV へ読み込む。
+      # NIKO_CI_* は secret-manager (SSM Parameter Store) から GITHUB_ENV へ読み込む。
       - name: Load Preview Secrets
         uses: nlkomaru/secret-manager@main
         with:
@@ -231,6 +234,11 @@ jobs:
         id: qr
         timeout-minutes: 5
         env:
+          AWS_ACCESS_KEY_ID: ${{ env.NIKO_CI_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.NIKO_CI_AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ env.NIKO_CI_AWS_REGION }}
+          BUCKET_NAME: ${{ env.NIKO_CI_BUCKET_NAME }}
+          S3_URL: ${{ env.NIKO_CI_S3_URL }}
           COMMIT_SHORT_SHA: ${{ steps.vars.outputs.commit_sha }}
           APP_PREVIEW_URL: ${{ needs.deploy-app-preview.outputs.deployment_url }}
           STORYBOOK_PREVIEW_URL: ${{ needs.deploy-storybook-preview.outputs.deployment_url }}
