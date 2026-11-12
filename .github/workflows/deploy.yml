@@ -6,6 +6,10 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  id-token: write
+
 concurrency:
   group: deploy
   cancel-in-progress: false
@@ -44,13 +48,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get secrets from Bitwarden Secrets Manager
-        uses: bitwarden/sm-action@v2
+      - name: Load Production Secrets
+        uses: nlkomaru/secret-manager@main
         with:
-          access_token: ${{ secrets.BWS_ACCESS_TOKEN }}
-          secrets: |
-            2bad9e23-82af-4fba-b514-b49900e1632f > CLOUDFLARE_ACCOUNT_ID
-            f1bf4fa4-0288-4a31-b28b-b499013acdce > CLOUDFLARE_API_KEY
+          project: "inventia"
+          env: "production"
 
       - uses: pnpm/action-setup@v4
         name: Install pnpm
@@ -82,7 +84,7 @@ jobs:
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ env.CLOUDFLARE_API_KEY }}
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
           workingDirectory: app
@@ -92,13 +94,10 @@ jobs:
       - name: Upload Worker secrets
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ env.CLOUDFLARE_API_KEY }}
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           command: whoami
           secrets: |
             SETTINGS_ENCRYPTION_KEY
             OPENROUTER_MANAGEMENT_KEY
           workingDirectory: app
-        env:
-          SETTINGS_ENCRYPTION_KEY: ${{ secrets.SETTINGS_ENCRYPTION_KEY }}
-          OPENROUTER_MANAGEMENT_KEY: ${{ secrets.OPENROUTER_MANAGEMENT_KEY }}
