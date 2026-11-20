@@ -5,6 +5,7 @@ import {
     fetchLocation,
     listItemPriceRecords,
     listItemStockHistory,
+    listRelationCandidateItems,
     listStoreOptions,
 } from "./item-detail-api";
 
@@ -12,6 +13,8 @@ import {
 export const itemKeys = {
     all: ["items"] as const,
     detail: (itemId: string) => [...itemKeys.all, "detail", itemId] as const,
+    relationCandidates: (itemId: string) =>
+        [...itemKeys.all, "relation-candidates", itemId] as const,
 };
 
 // カテゴリと保管場所はマスタ画面と同じ名前空間を共有し、
@@ -110,4 +113,11 @@ export const storeOptionsQueryOptions = () =>
     queryOptions({
         queryKey: storeKeys.options(),
         queryFn: () => listStoreOptions(),
+    });
+
+/** 親子関係の候補品目選択肢。 */
+export const relationCandidatesQueryOptions = (itemId: string) =>
+    queryOptions({
+        queryKey: itemKeys.relationCandidates(itemId),
+        queryFn: () => listRelationCandidateItems({ data: { itemId } }),
     });

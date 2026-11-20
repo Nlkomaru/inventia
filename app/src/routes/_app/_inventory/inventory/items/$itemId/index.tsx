@@ -51,6 +51,7 @@ import { ItemMovementNoteEditor } from "./-components/item-movement-note-editor"
 import { ItemPriceEditDialog } from "./-components/item-price-edit-dialog";
 import { ItemPriceForm } from "./-components/item-price-form";
 import { ItemReceiveForm } from "./-components/item-receive-form";
+import { ItemRelationCard } from "./-components/item-relation-card";
 
 // 期限が近いと見なす日数。在庫一覧の色分けと同じ値を使う
 const soonWithinDays = 7;
@@ -183,6 +184,16 @@ function ItemDetailPage() {
                                     item.baseUnit,
                                 )}
                             </dd>
+                            {item.parentItem !== null ||
+                            item.childItems.length > 0 ? (
+                                <dd className="mt-0.5 font-mono text-xs text-muted-foreground tabular-nums">
+                                    関連合計{" "}
+                                    {formatQuantity(
+                                        item.familyTotalQuantity,
+                                        item.baseUnit,
+                                    )}
+                                </dd>
+                            ) : null}
                         </div>
                         <div>
                             <dt className="text-sm text-muted-foreground">
@@ -293,6 +304,8 @@ function ItemDetailPage() {
                     )}
                 </CardContent>
             </Card>
+
+            <ItemRelationCard item={item} />
 
             <Card>
                 <CardHeader>

@@ -275,6 +275,18 @@ export function InventoryTable({
                                 {categoryLabels?.get(row.original.categoryId) ??
                                     "—"}
                             </p>
+                            {row.original.parentItem ? (
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    親: {row.original.parentItem.name}
+                                    {row.original.parentItem.label
+                                        ? `（${row.original.parentItem.label}）`
+                                        : ""}
+                                </p>
+                            ) : row.original.childItems.length > 0 ? (
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    関連品目 {row.original.childItems.length} 件
+                                </p>
+                            ) : null}
                         </div>
                     ),
                 }),
@@ -314,6 +326,16 @@ export function InventoryTable({
                                         row.original.baseUnit,
                                     )}
                                 </p>
+                                {row.original.parentItem !== null ||
+                                row.original.childItems.length > 0 ? (
+                                    <p className="mt-0.5 whitespace-nowrap font-mono text-xs text-muted-foreground tabular-nums">
+                                        関連合計{" "}
+                                        {formatQuantity(
+                                            row.original.familyTotalQuantity,
+                                            row.original.baseUnit,
+                                        )}
+                                    </p>
+                                ) : null}
                                 {low ? (
                                     <p className="mt-0.5 whitespace-nowrap text-xs font-semibold text-destructive">
                                         {quantity === 0
