@@ -10,7 +10,7 @@ import {
     createOpenRouterEmbeddings,
     EmbeddingServiceError,
 } from "./embeddingService";
-import { toItemDto } from "./itemService";
+import { enrichItemRowsWithRelations } from "./itemService";
 
 /**
  * 品目の埋め込み索引が必要とする binding だけの構造型。`Env` はこの形へ代入できる。
@@ -266,5 +266,5 @@ export const searchItemsByVector = async (
             logIndexFailure("searchItemsByVector cleanup", staleIds, error);
         });
     }
-    return rows.map((row) => toItemDto(row));
+    return enrichItemRowsWithRelations(env.DB, rows);
 };

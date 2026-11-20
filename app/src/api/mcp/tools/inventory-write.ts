@@ -5,6 +5,12 @@ import {
     itemDtoSchema,
     itemUpdateSchema,
 } from "../../../domain/item";
+import {
+    itemRelationDtoSchema,
+    itemRelationLinkSchema,
+    itemRelationUnlinkResultSchema,
+    itemRelationUnlinkSchema,
+} from "../../../domain/itemRelation";
 import { itemLotListDtoSchema, lotUpdateSchema } from "../../../domain/lot";
 import {
     stockAdjustmentSchema,
@@ -20,6 +26,8 @@ import {
 import {
     createItem,
     ItemServiceError,
+    linkItemRelation,
+    unlinkItemRelation,
     updateItem,
 } from "../../../services/itemService";
 import {
@@ -199,6 +207,42 @@ export const registerInventoryWriteTools = (
                 );
             } catch (error) {
                 return serviceError(error, "lot expiry correction failed");
+            }
+        },
+    );
+
+    server.registerTool(
+        "link_item_relation",
+        {
+            title: "Link a child item to a parent item",
+            description:
+                "Links a child item (e.g. a refill or spare such as 醤油予備 or さらさ詰め替え) to a parent item so their combined stock is tracked in familyTotalQuantity. Both items must exist and have the exact same baseUnit and baseDimension. Only a 1-level hierarchy is allowed: the parent cannot already be a child, and the child cannot already have a parent or children.",
+            inputSchema: itemRelationLinkSchema,
+            outputSchema: itemRelationDtoSchema,
+        },
+        async (input) => {
+            try {
+                return mcpSuccess(await linkItemRelation(db, input));
+            } catch (error) {
+                return serviceError(error, "linking item relation failed");
+            }
+        },
+    );
+
+    server.registerTool(
+        "unlink_item_relation",
+        {
+            title: "Unlink a child item from a parent item",
+            description:
+                "Removes the parent-child relation between parentItemId and childItemId. Neither item is deleted.",
+            inputSchema: itemRelationUnlinkSchema,
+            outputSchema: itemRelationUnlinkResultSchema,
+        },
+        async (input) => {
+            try {
+                return mcpSuccess(await unlinkItemRelation(db, input));
+            } catch (error) {
+                return serviceError(error, "unlinking item relation failed");
             }
         },
     );

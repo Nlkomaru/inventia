@@ -26,6 +26,7 @@ import {
     stockRequestDigest,
     stocktakeSchema,
 } from "../domain/stock";
+import { getItemRelationsMap } from "../repositories/itemRepository";
 import { type ItemLotRow, listItemLots } from "../repositories/lotRepository";
 import {
     appendStockOperation,
@@ -593,9 +594,10 @@ export const listStaleStocktakeItems = async (
             parsed,
             staleStocktakeThreshold(parsed.staleAfterDays),
         );
+        const relationsMap = await getItemRelationsMap(db, page.rows);
         return {
             items: page.rows.map((row) => ({
-                ...toItemDto(row),
+                ...toItemDto(row, relationsMap.get(row.id)),
                 lastStocktakeAt: row.lastStocktakeAt,
             })),
             nextCursor: page.nextCursor,

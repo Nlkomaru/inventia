@@ -39,6 +39,7 @@ export const navigationGroups: readonly NavGroup[] = [
         title: "価格",
         items: [
             { title: "価格一覧", url: "/prices" },
+            { title: "価格調査依頼", url: "/price-research" },
             { title: "店舗", url: "/stores" },
         ],
     },

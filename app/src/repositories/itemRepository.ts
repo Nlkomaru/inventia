@@ -5,6 +5,7 @@ import type {
     ItemListSort,
     ItemSortDirection,
     ItemUpdateInput,
+    RelatedItemSummary,
 } from "../domain/item";
 
 export interface ItemRow {
@@ -562,4 +563,272 @@ export const deleteItem = async (
         db.prepare("DELETE FROM items WHERE id = ?").bind(id),
     ]);
     return (results[1]?.meta.changes ?? 0) > 0;
+};
+
+export interface ItemRelationRow {
+    id: string;
+    parentItemId: string;
+    childItemId: string;
+    label: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ItemRelationSummary {
+    familyTotalQuantity: number;
+    parentItem: RelatedItemSummary | null;
+    childItems: RelatedItemSummary[];
+}
+
+interface JoinedRelationRow {
+    parentItemId: string;
+    childItemId: string;
+    label: string | null;
+    parentName: string;
+    parentQuantity: number;
+    parentBaseUnit: string;
+    childName: string;
+    childQuantity: number;
+    childBaseUnit: string;
+}
+
+const joinedRelationSelect = `SELECT r.parent_item_id AS parentItemId,
+		r.child_item_id AS childItemId,
+		r.label AS label,
+		p.name AS parentName,
+		p.current_quantity AS parentQuantity,
+		p.base_unit AS parentBaseUnit,
+		c.name AS childName,
+		c.current_quantity AS childQuantity,
+		c.base_unit AS childBaseUnit
+	FROM item_relations r
+	JOIN items p ON p.id = r.parent_item_id
+	JOIN items c ON c.id = r.child_item_id`;
+
+// IN 句を 2 回並べるクエリ（parent OR child）は 1 チャンク 45 件に抑え、
+// D1 のバインド上限（100）に余裕を残す
+const relationOrChunkSize = 45;
+
+/**
+ * 指定した品目群の親子関係とファミリー合計在庫を一括取得する（N+1 回避）。
+ * 子品目だけが含まれていて親品目が引数に無い場合でも、同じ親に属する
+ * 兄弟品目を追加で 1 クエリ（チャンク分割）だけ引き、familyTotalQuantity を
+ * 正確に算出する。
+ */
+export const getItemRelationsMap = async (
+    db: D1Database,
+    items: readonly { id: string; currentQuantity: number }[],
+): Promise<Map<string, ItemRelationSummary>> => {
+    const map = new Map<string, ItemRelationSummary>();
+    if (items.length === 0) {
+        return map;
+    }
+    const uniqueIds = [...new Set(items.map((item) => item.id))];
+    const orChunks: string[][] = [];
+    for (
+        let offset = 0;
+        offset < uniqueIds.length;
+        offset += relationOrChunkSize
+    ) {
+        orChunks.push(uniqueIds.slice(offset, offset + relationOrChunkSize));
+    }
+    const initialResults = await Promise.all(
+        orChunks.map((chunk) => {
+            const placeholders = chunk.map(() => "?").join(", ");
+            return db
+                .prepare(
+                    `${joinedRelationSelect}
+					WHERE r.parent_item_id IN (${placeholders})
+						OR r.child_item_id IN (${placeholders})
+					ORDER BY c.name COLLATE NOCASE ASC, c.id ASC`,
+                )
+                .bind(...chunk, ...chunk)
+                .all<JoinedRelationRow>();
+        }),
+    );
+
+    const rowsByKey = new Map<string, JoinedRelationRow>();
+    for (const result of initialResults) {
+        for (const row of result.results) {
+            rowsByKey.set(`${row.parentItemId}:${row.childItemId}`, row);
+        }
+    }
+
+    // 子品目として登場した親のうち、最初の IN 句に含まれていなかった親の
+    // 他の子（兄弟品目）も取得し、familyTotalQuantity を正確に合計する
+    const queriedIdSet = new Set(uniqueIds);
+    const missingParentIds = [
+        ...new Set(
+            [...rowsByKey.values()]
+                .map((row) => row.parentItemId)
+                .filter((parentId) => !queriedIdSet.has(parentId)),
+        ),
+    ];
+    if (missingParentIds.length > 0) {
+        const parentChunks: string[][] = [];
+        for (
+            let offset = 0;
+            offset < missingParentIds.length;
+            offset += getItemsByIdsChunkSize
+        ) {
+            parentChunks.push(
+                missingParentIds.slice(offset, offset + getItemsByIdsChunkSize),
+            );
+        }
+        const siblingResults = await Promise.all(
+            parentChunks.map((chunk) => {
+                const placeholders = chunk.map(() => "?").join(", ");
+                return db
+                    .prepare(
+                        `${joinedRelationSelect}
+						WHERE r.parent_item_id IN (${placeholders})
+						ORDER BY c.name COLLATE NOCASE ASC, c.id ASC`,
+                    )
+                    .bind(...chunk)
+                    .all<JoinedRelationRow>();
+            }),
+        );
+        for (const result of siblingResults) {
+            for (const row of result.results) {
+                rowsByKey.set(`${row.parentItemId}:${row.childItemId}`, row);
+            }
+        }
+    }
+
+    const childrenByParent = new Map<string, RelatedItemSummary[]>();
+    const parentByChild = new Map<string, RelatedItemSummary>();
+    const parentQuantityByParent = new Map<string, number>();
+
+    for (const row of rowsByKey.values()) {
+        const list = childrenByParent.get(row.parentItemId) ?? [];
+        list.push({
+            id: row.childItemId,
+            name: row.childName,
+            currentQuantity: row.childQuantity,
+            baseUnit: row.childBaseUnit,
+            label: row.label,
+        });
+        childrenByParent.set(row.parentItemId, list);
+        parentQuantityByParent.set(row.parentItemId, row.parentQuantity);
+        parentByChild.set(row.childItemId, {
+            id: row.parentItemId,
+            name: row.parentName,
+            currentQuantity: row.parentQuantity,
+            baseUnit: row.parentBaseUnit,
+            label: row.label,
+        });
+    }
+
+    const familyTotalByParent = new Map<string, number>();
+    for (const [parentId, children] of childrenByParent.entries()) {
+        const parentQty = parentQuantityByParent.get(parentId) ?? 0;
+        const childrenQty = children.reduce(
+            (sum, child) => sum + child.currentQuantity,
+            0,
+        );
+        familyTotalByParent.set(parentId, parentQty + childrenQty);
+    }
+
+    for (const item of items) {
+        const parentItem = parentByChild.get(item.id) ?? null;
+        const childItems = childrenByParent.get(item.id) ?? [];
+        let familyTotalQuantity = item.currentQuantity;
+        if (parentItem) {
+            familyTotalQuantity =
+                familyTotalByParent.get(parentItem.id) ?? item.currentQuantity;
+        } else if (childItems.length > 0) {
+            familyTotalQuantity =
+                familyTotalByParent.get(item.id) ?? item.currentQuantity;
+        }
+        map.set(item.id, {
+            familyTotalQuantity,
+            parentItem,
+            childItems,
+        });
+    }
+
+    return map;
+};
+
+export const hasParentItemRelation = async (
+    db: D1Database,
+    itemId: string,
+): Promise<boolean> =>
+    Boolean(
+        await db
+            .prepare(
+                "SELECT id FROM item_relations WHERE child_item_id = ? LIMIT 1",
+            )
+            .bind(itemId)
+            .first<{ id: string }>(),
+    );
+
+export const hasChildItemRelations = async (
+    db: D1Database,
+    itemId: string,
+): Promise<boolean> =>
+    Boolean(
+        await db
+            .prepare(
+                "SELECT id FROM item_relations WHERE parent_item_id = ? LIMIT 1",
+            )
+            .bind(itemId)
+            .first<{ id: string }>(),
+    );
+
+export const hasAnyItemRelation = async (
+    db: D1Database,
+    itemId: string,
+): Promise<boolean> =>
+    Boolean(
+        await db
+            .prepare(
+                `SELECT id FROM item_relations
+				WHERE parent_item_id = ? OR child_item_id = ? LIMIT 1`,
+            )
+            .bind(itemId, itemId)
+            .first<{ id: string }>(),
+    );
+
+export const insertItemRelation = async (
+    db: D1Database,
+    input: {
+        parentItemId: string;
+        childItemId: string;
+        label: string | null;
+    },
+): Promise<ItemRelationRow> => {
+    const id = newId();
+    const now = new Date().toISOString();
+    await db
+        .prepare(
+            `INSERT INTO item_relations
+					(id, parent_item_id, child_item_id, label, created_at, updated_at)
+				 VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(id, input.parentItemId, input.childItemId, input.label, now, now)
+        .run();
+    return {
+        id,
+        parentItemId: input.parentItemId,
+        childItemId: input.childItemId,
+        label: input.label,
+        createdAt: now,
+        updatedAt: now,
+    };
+};
+
+export const deleteItemRelation = async (
+    db: D1Database,
+    parentItemId: string,
+    childItemId: string,
+): Promise<boolean> => {
+    const result = await db
+        .prepare(
+            `DELETE FROM item_relations
+			WHERE parent_item_id = ? AND child_item_id = ?`,
+        )
+        .bind(parentItemId, childItemId)
+        .run();
+    return (result.meta.changes ?? 0) > 0;
 };

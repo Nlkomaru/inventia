@@ -7,6 +7,14 @@ import {
 
 export const itemBaseDimensionSchema = z.enum(["mass", "volume", "count"]);
 
+export const relatedItemSummarySchema = z.object({
+    id: z.string().min(1),
+    name: z.string(),
+    currentQuantity: z.int().min(0),
+    baseUnit: z.string(),
+    label: z.string().nullable(),
+});
+
 export const itemDtoSchema = z.object({
     id: z.string().min(1),
     name: z.string(),
@@ -16,6 +24,10 @@ export const itemDtoSchema = z.object({
     baseDimension: itemBaseDimensionSchema,
     // ロット合計の維持キャッシュ。在庫の正は item_lots である
     currentQuantity: z.int().min(0),
+    // 親子関係にある品目群（親 + 全ての子）の現在庫合計。未紐付け時は currentQuantity と一致
+    familyTotalQuantity: z.int().min(0),
+    parentItem: relatedItemSummarySchema.nullable(),
+    childItems: z.array(relatedItemSummarySchema),
     // 数量 > 0 のロットのうち最も早い期限。期限付きの在庫がなければ null
     earliestExpiryDate: lotExpiryDateOutputSchema,
     // 数量 > 0 のロット件数。内訳表示の有無の判定に使う
@@ -244,5 +256,6 @@ export type ItemSemanticSearchResult = z.infer<
 >;
 
 export type ItemBaseDimension = z.infer<typeof itemBaseDimensionSchema>;
+export type RelatedItemSummary = z.infer<typeof relatedItemSummarySchema>;
 export type ItemDto = z.infer<typeof itemDtoSchema>;
 export type ItemDetailDto = z.infer<typeof itemDetailDtoSchema>;
