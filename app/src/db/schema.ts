@@ -58,6 +58,12 @@ export const receiptApplyActions = [
 
 export const itemAliasSources = ["receipt", "manual"] as const;
 
+export const priceResearchStatuses = [
+    "pending",
+    "completed",
+    "cancelled",
+] as const;
+
 export const storageLocations = sqliteTable(
     "storage_locations",
     {
@@ -846,5 +852,84 @@ export const apiTokens = sqliteTable(
     (t) => [
         uniqueIndex("uq_api_tokens_token_hash").on(t.tokenHash),
         index("idx_api_tokens_created_at").on(t.createdAt),
+    ],
+);
+
+/**
+ * 品目の親子関係（例: 醤油 ~ 醤油予備、さらさ ~ さらさ詰め替え）。
+ * 1 つの子品目は最大 1 つの親品目にのみ紐付き、1 階層のみを許可する（多段ネスト・
+ * 循環は service 層で禁止する）。また、base_unit と base_dimension が一致する
+ * 品目同士のみ紐付けを許可する。
+ */
+export const itemRelations = sqliteTable(
+    "item_relations",
+    {
+        id: text("id").primaryKey(),
+        parentItemId: text("parent_item_id")
+            .notNull()
+            .references(() => items.id, { onDelete: "cascade" }),
+        childItemId: text("child_item_id")
+            .notNull()
+            .references(() => items.id, { onDelete: "cascade" }),
+        // 関係ラベル（例: "詰め替え", "予備" など）。任意
+        label: text("label"),
+        createdAt: text("created_at").notNull(),
+        updatedAt: text("updated_at").notNull(),
+    },
+    (t) => [
+        // 1 つの子品目は最大 1 つの親のみ持てる
+        uniqueIndex("uq_item_relations_child").on(t.childItemId),
+        index("idx_item_relations_parent").on(t.parentItemId),
+        check(
+            "ck_item_relations_not_self",
+            sql`${t.parentItemId} <> ${t.childItemId}`,
+        ),
+    ],
+);
+
+/**
+ * AI 等がユーザーに対して店舗別の価格調査を依頼するためのテーブル。
+ * 既存品目 (item_id) または未登録品目名 (requested_item_name) を指定して作成し、
+ * ユーザーが UI 上で分量・価格・店舗を入力して確定すると price_records へ保存し
+ * status を completed にする。
+ */
+export const priceResearchRequests = sqliteTable(
+    "price_research_requests",
+    {
+        id: text("id").primaryKey(),
+        status: text("status", { enum: priceResearchStatuses })
+            .notNull()
+            .default("pending"),
+        itemId: text("item_id").references(() => items.id, {
+            onDelete: "set null",
+        }),
+        requestedItemName: text("requested_item_name").notNull(),
+        requestedUnit: text("requested_unit"),
+        purpose: text("purpose"),
+        note: text("note"),
+        requestedBy: text("requested_by"),
+        priceRecordId: text("price_record_id").references(
+            () => priceRecords.id,
+            { onDelete: "set null" },
+        ),
+        completedAt: text("completed_at"),
+        createdAt: text("created_at").notNull(),
+        updatedAt: text("updated_at").notNull(),
+    },
+    (t) => [
+        index("idx_price_research_requests_status_created").on(
+            t.status,
+            t.createdAt,
+            t.id,
+        ),
+        index("idx_price_research_requests_item").on(t.itemId),
+        check(
+            "ck_price_research_requests_status",
+            sql`${t.status} in ('pending', 'completed', 'cancelled')`,
+        ),
+        check(
+            "ck_price_research_requests_name_not_empty",
+            sql`length(${t.requestedItemName}) > 0`,
+        ),
     ],
 );
