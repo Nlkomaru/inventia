@@ -128,6 +128,69 @@ function ItemMasterDetailPage() {
                     />
                 </CardContent>
             </Card>
+
+            {item.parentItem !== null || item.childItems.length > 0 ? (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>関連品目（詰め替え・予備）</CardTitle>
+                        <CardDescription>
+                            関連品目が紐付いている間は基準単位と次元を変更できません。編集は
+                            <Link
+                                className="mx-1 underline underline-offset-4"
+                                params={{ itemId: item.id }}
+                                to="/inventory/items/$itemId"
+                            >
+                                在庫詳細ページ
+                            </Link>
+                            から行えます。
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-2 text-sm">
+                        <p>
+                            ファミリー合計在庫:{" "}
+                            <span className="font-mono font-semibold tabular-nums">
+                                {item.familyTotalQuantity.toLocaleString(
+                                    "ja-JP",
+                                )}{" "}
+                                {item.baseUnit}
+                            </span>
+                        </p>
+                        {item.parentItem ? (
+                            <p>
+                                親品目:{" "}
+                                <Link
+                                    className="underline underline-offset-4"
+                                    params={{ itemId: item.parentItem.id }}
+                                    to="/items/$itemId"
+                                >
+                                    {item.parentItem.name}
+                                </Link>
+                                {item.parentItem.label
+                                    ? `（${item.parentItem.label}）`
+                                    : null}
+                            </p>
+                        ) : (
+                            <ul className="flex flex-col gap-1">
+                                {item.childItems.map((child) => (
+                                    <li key={child.id}>
+                                        子品目:{" "}
+                                        <Link
+                                            className="underline underline-offset-4"
+                                            params={{ itemId: child.id }}
+                                            to="/items/$itemId"
+                                        >
+                                            {child.name}
+                                        </Link>
+                                        {child.label
+                                            ? `（${child.label}）`
+                                            : null}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </CardContent>
+                </Card>
+            ) : null}
         </main>
     );
 }

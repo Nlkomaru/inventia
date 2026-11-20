@@ -3,9 +3,23 @@ import { createServerFn } from "@tanstack/react-start";
 /** 価格フォームの店舗選択に必要な最小限。 */
 export type StoreOption = { id: string; name: string };
 
+/** 親子関係の候補品目として表示する最小限。 */
+export type RelationCandidateOption = {
+    id: string;
+    name: string;
+    currentQuantity: number;
+    baseUnit: string;
+};
+
 import { z } from "zod";
 import type { CategoryDto } from "@/domain/category";
 import type { ItemDetailDto } from "@/domain/item";
+import {
+    type ItemRelationDto,
+    type ItemRelationUnlinkResult,
+    itemRelationLinkSchema,
+    itemRelationUnlinkSchema,
+} from "@/domain/itemRelation";
 import type { LocationDto } from "@/domain/location";
 import {
     type PriceRecordDto,
@@ -167,3 +181,110 @@ export const listStoreOptions = createServerFn({ method: "GET" }).handler(
         return options;
     },
 );
+
+/**
+ * 現在の品目に子として紐付けられる候補品目を返す。
+ * 同じ baseUnit / baseDimension を持ち、まだどの親子関係にも属していない品目に絞る。
+ */
+export const listRelationCandidateItems = createServerFn({ method: "GET" })
+    .validator(itemIdInputSchema)
+    .handler(async ({ data }): Promise<RelationCandidateOption[]> => {
+        const [{ env }, { getItem, listItems }] = await Promise.all([
+            import("cloudflare:workers"),
+            import("@/services/itemService"),
+        ]);
+        const target = await getItem(env.DB, data.itemId);
+        const candidates: RelationCandidateOption[] = [];
+        let cursor: string | undefined;
+        do {
+            const page = await listItems(env.DB, { limit: 100, cursor });
+            for (const candidate of page.items) {
+                if (candidate.id === target.id) {
+                    continue;
+                }
+                if (
+                    candidate.baseUnit !== target.baseUnit ||
+                    candidate.baseDimension !== target.baseDimension
+                ) {
+                    continue;
+                }
+                if (
+                    candidate.parentItem !== null ||
+                    candidate.childItems.length > 0
+                ) {
+                    continue;
+                }
+                candidates.push({
+                    id: candidate.id,
+                    name: candidate.name,
+                    currentQuantity: candidate.currentQuantity,
+                    baseUnit: candidate.baseUnit,
+                });
+            }
+            cursor = page.nextCursor ?? undefined;
+        } while (cursor);
+        return candidates;
+    });
+
+const relationErrorMessage = (code: string, fallback: string): string => {
+    switch (code) {
+        case "ITEM_RELATION_UNIT_CONFLICT":
+            return "基準単位と次元が一致する品目のみ関連付けできます。";
+        case "ITEM_RELATION_HIERARCHY_CONFLICT":
+            return "親子関係は 1 階層のみ設定できます（親が既に子である、または子が既に子を持っています）。";
+        case "ITEM_RELATION_CONFLICT":
+            return "選択した品目は既に別の親品目に関連付けられています。";
+        case "ITEM_RELATION_NOT_FOUND":
+            return "対象の親子関係が見つかりません。";
+        case "ITEM_NOT_FOUND":
+            return "対象の品目が見つかりません。";
+        default:
+            return fallback;
+    }
+};
+
+export const linkChildItemRelation = createServerFn({ method: "POST" })
+    .validator(itemRelationLinkSchema)
+    .handler(async ({ data }): Promise<ItemRelationDto> => {
+        const [{ env }, { ItemServiceError, linkItemRelation }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/itemService"),
+            ]);
+        try {
+            return await linkItemRelation(env.DB, data);
+        } catch (error) {
+            if (error instanceof ItemServiceError) {
+                throw new Error(
+                    relationErrorMessage(
+                        error.code,
+                        "関連付けに失敗しました。",
+                    ),
+                );
+            }
+            throw error;
+        }
+    });
+
+export const unlinkChildItemRelation = createServerFn({ method: "POST" })
+    .validator(itemRelationUnlinkSchema)
+    .handler(async ({ data }): Promise<ItemRelationUnlinkResult> => {
+        const [{ env }, { ItemServiceError, unlinkItemRelation }] =
+            await Promise.all([
+                import("cloudflare:workers"),
+                import("@/services/itemService"),
+            ]);
+        try {
+            return await unlinkItemRelation(env.DB, data);
+        } catch (error) {
+            if (error instanceof ItemServiceError) {
+                throw new Error(
+                    relationErrorMessage(
+                        error.code,
+                        "関連付けの解除に失敗しました。",
+                    ),
+                );
+            }
+            throw error;
+        }
+    });

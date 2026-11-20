@@ -9,6 +9,12 @@ import {
     itemUpdateSchema,
 } from "../domain/item";
 import {
+    type ItemRelationDto,
+    type ItemRelationUnlinkResult,
+    itemRelationLinkSchema,
+    itemRelationUnlinkSchema,
+} from "../domain/itemRelation";
+import {
     earliestExpiryDate,
     type ItemLotDto,
     lotExpiryDateSchema,
@@ -19,11 +25,18 @@ import {
     countItemsByLocation as countItemRecordsByLocation,
     createItem as createItemRecord,
     deleteItem as deleteItemRecord,
+    deleteItemRelation,
     getCategoryKind,
     getItem as getItemRecord,
+    getItemRelationsMap,
     getItemsByIds,
+    hasAnyItemRelation,
+    hasChildItemRelations,
+    hasParentItemRelation,
     InvalidItemCursorError,
+    type ItemRelationSummary,
     type ItemRow,
+    insertItemRelation,
     listItems as listItemRecords,
     locationExists,
     updateItem as updateItemRecord,
@@ -86,7 +99,10 @@ const isDocumentCategory = (
 ): boolean => kind === "document";
 
 // 在庫・履歴の他 service でも同じ公開モデルへ変換するため export する
-export const toItemDto = (row: ItemRow): ItemDto => ({
+export const toItemDto = (
+    row: ItemRow,
+    relation?: ItemRelationSummary,
+): ItemDto => ({
     id: row.id,
     name: row.name,
     categoryId: row.categoryId,
@@ -94,6 +110,9 @@ export const toItemDto = (row: ItemRow): ItemDto => ({
     baseUnit: row.baseUnit,
     baseDimension: row.baseDimension,
     currentQuantity: row.currentQuantity,
+    familyTotalQuantity: relation?.familyTotalQuantity ?? row.currentQuantity,
+    parentItem: relation?.parentItem ?? null,
+    childItems: relation?.childItems ?? [],
     earliestExpiryDate: lotExpiryDateSchema.parse(row.earliestExpiryDate),
     lotCount: row.lotCount,
     lowStockThreshold: row.lowStockThreshold,
@@ -101,6 +120,17 @@ export const toItemDto = (row: ItemRow): ItemDto => ({
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
 });
+
+export const enrichItemRowsWithRelations = async (
+    db: D1Database,
+    rows: readonly ItemRow[],
+): Promise<ItemDto[]> => {
+    if (rows.length === 0) {
+        return [];
+    }
+    const relationsMap = await getItemRelationsMap(db, rows);
+    return rows.map((row) => toItemDto(row, relationsMap.get(row.id)));
+};
 
 const toLotDto = (row: ItemLotRow): ItemLotDto => ({
     id: row.id,
@@ -112,8 +142,12 @@ const toLotDto = (row: ItemLotRow): ItemLotDto => ({
 });
 
 // 詳細では同梱したロットから期限集計を導き、内訳と要約が食い違わないようにする
-const toDetailDto = (row: ItemRow, lots: ItemLotRow[]): ItemDetailDto => ({
-    ...toItemDto(row),
+const toDetailDto = (
+    row: ItemRow,
+    lots: ItemLotRow[],
+    relation?: ItemRelationSummary,
+): ItemDetailDto => ({
+    ...toItemDto(row, relation),
     earliestExpiryDate: earliestExpiryDate(lots),
     lotCount: lots.length,
     lots: lots.map(toLotDto),
@@ -126,8 +160,9 @@ export const listItems = async (
     const query = parseOrThrow(itemListQuerySchema.safeParse(input));
     try {
         const result = await listItemRecords(db, query);
+        const items = await enrichItemRowsWithRelations(db, result.items);
         return {
-            items: result.items.map((row) => toItemDto(row)),
+            items,
             nextCursor: result.nextCursor,
         };
     } catch (error) {
@@ -167,8 +202,11 @@ export const getItem = async (
         throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
     }
     // 数量 0 のロットは既定の表示対象外のため詳細にも含めない
-    const lots = await listItemLots(db, id, { includeEmpty: false });
-    return toDetailDto(row, lots);
+    const [lots, relationsMap] = await Promise.all([
+        listItemLots(db, id, { includeEmpty: false }),
+        getItemRelationsMap(db, [row]),
+    ]);
+    return toDetailDto(row, lots, relationsMap.get(row.id));
 };
 
 /**
@@ -194,6 +232,7 @@ export const getItems = async (
             ? listItemLotsByItemIds(db, unique, { includeEmpty: false })
             : Promise.resolve(new Map<string, ItemLotRow[]>()),
     ]);
+    const relationsMap = await getItemRelationsMap(db, rows);
     const rowById = new Map(rows.map((row) => [row.id, row]));
     const items: ItemDetailDto[] = [];
     const notFound: string[] = [];
@@ -203,14 +242,15 @@ export const getItems = async (
             notFound.push(id);
             continue;
         }
+        const relation = relationsMap.get(id);
         if (options.includeLots) {
-            items.push(toDetailDto(row, lotsByItemId.get(id) ?? []));
+            items.push(toDetailDto(row, lotsByItemId.get(id) ?? [], relation));
             continue;
         }
         // ロットを載せない場合も件数と最短期限は行の集計列から返す（`itemColumns` が
         // 数量 > 0 のロットを数えている）。lots だけが空になる
         items.push({
-            ...toItemDto(row),
+            ...toItemDto(row, relation),
             lots: [],
         });
     }
@@ -372,13 +412,124 @@ export const updateItem = async (
         }
     }
     await assertRelabelKeepsPricesReadable(db, id, existing, parsed);
+    const nextUnit = parsed.baseUnit ?? existing.baseUnit;
+    const nextDimension = parsed.baseDimension ?? existing.baseDimension;
+    if (
+        (nextUnit !== existing.baseUnit ||
+            nextDimension !== existing.baseDimension) &&
+        (await hasAnyItemRelation(db, id))
+    ) {
+        throw new ItemServiceError(
+            409,
+            "ITEM_RELATION_UNIT_CONFLICT",
+            "cannot change baseUnit or baseDimension while item has parent or child relations",
+        );
+    }
     // baseUnit / baseDimension を含めて items の 1 行だけを書き換える。
     // 数量を持つテーブルへの換算処理は意図的に行わない
     const row = await updateItemRecord(db, id, parsed);
     if (!row) {
         throw new ItemServiceError(404, "ITEM_NOT_FOUND", "item was not found");
     }
-    return toItemDto(row);
+    const relationsMap = await getItemRelationsMap(db, [row]);
+    return toItemDto(row, relationsMap.get(row.id));
+};
+
+export const linkItemRelation = async (
+    db: D1Database,
+    input: unknown,
+): Promise<ItemRelationDto> => {
+    const parsed = parseOrThrow(itemRelationLinkSchema.safeParse(input));
+    if (parsed.parentItemId === parsed.childItemId) {
+        throw new ItemServiceError(
+            400,
+            "VALIDATION_ERROR",
+            "parentItemId and childItemId must be different",
+        );
+    }
+    const rows = await getItemsByIds(db, [
+        parsed.parentItemId,
+        parsed.childItemId,
+    ]);
+    const rowById = new Map(rows.map((row) => [row.id, row]));
+    const parent = rowById.get(parsed.parentItemId);
+    const child = rowById.get(parsed.childItemId);
+    if (!parent) {
+        throw new ItemServiceError(
+            404,
+            "ITEM_NOT_FOUND",
+            "parent item was not found",
+        );
+    }
+    if (!child) {
+        throw new ItemServiceError(
+            404,
+            "ITEM_NOT_FOUND",
+            "child item was not found",
+        );
+    }
+    if (
+        parent.baseUnit !== child.baseUnit ||
+        parent.baseDimension !== child.baseDimension
+    ) {
+        throw new ItemServiceError(
+            409,
+            "ITEM_RELATION_UNIT_CONFLICT",
+            "parent and child items must have the same baseUnit and baseDimension",
+        );
+    }
+    const [parentHasParent, childHasChildren, childHasParent] =
+        await Promise.all([
+            hasParentItemRelation(db, parent.id),
+            hasChildItemRelations(db, child.id),
+            hasParentItemRelation(db, child.id),
+        ]);
+    if (parentHasParent) {
+        throw new ItemServiceError(
+            409,
+            "ITEM_RELATION_HIERARCHY_CONFLICT",
+            "parent item is already a child of another item",
+        );
+    }
+    if (childHasChildren) {
+        throw new ItemServiceError(
+            409,
+            "ITEM_RELATION_HIERARCHY_CONFLICT",
+            "child item already has children",
+        );
+    }
+    if (childHasParent) {
+        throw new ItemServiceError(
+            409,
+            "ITEM_RELATION_CONFLICT",
+            "child item already has a parent",
+        );
+    }
+    return insertItemRelation(db, {
+        parentItemId: parent.id,
+        childItemId: child.id,
+        label: parsed.label ?? null,
+    });
+};
+
+export const unlinkItemRelation = async (
+    db: D1Database,
+    input: unknown,
+): Promise<ItemRelationUnlinkResult> => {
+    const parsed = parseOrThrow(itemRelationUnlinkSchema.safeParse(input));
+    const deleted = await deleteItemRelation(
+        db,
+        parsed.parentItemId,
+        parsed.childItemId,
+    );
+    if (!deleted) {
+        throw new ItemServiceError(
+            404,
+            "ITEM_RELATION_NOT_FOUND",
+            "item relation was not found",
+        );
+    }
+    return { unlinked: true };
 };
 
 export const deleteItem = async (db: D1Database, id: string): Promise<void> => {

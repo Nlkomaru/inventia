@@ -9,6 +9,11 @@ import {
     itemSemanticSearchResultSchema,
     itemUpdateSchema,
 } from "../../domain/item";
+import {
+    itemRelationAddChildBodySchema,
+    itemRelationDtoSchema,
+    itemRelationUnlinkResultSchema,
+} from "../../domain/itemRelation";
 import { EmbeddingServiceError } from "../../services/embeddingService";
 import {
     indexItem,
@@ -21,7 +26,9 @@ import {
     deleteItem,
     getItem,
     ItemServiceError,
+    linkItemRelation,
     listItems,
+    unlinkItemRelation,
     updateItem,
 } from "../../services/itemService";
 import type { ApiBindings } from "../bindings";
@@ -37,6 +44,13 @@ const itemIdParameter = z
     .openapi({
         param: { name: "id", in: "path" },
         example: "019fecc7-da09-768f-b6e8-45904d46b277",
+    });
+const childItemIdParameter = z
+    .string()
+    .min(1)
+    .openapi({
+        param: { name: "childItemId", in: "path" },
+        example: "019fecc7-da09-768f-b6e8-45904d46b278",
     });
 const itemListSchema = z.object({
     items: z.array(itemDtoSchema),
@@ -229,6 +243,66 @@ itemsApp.openAPIRegistry.registerPath({
         ...serverErrorResponses,
     },
 });
+itemsApp.openAPIRegistry.registerPath({
+    method: "post",
+    path: "/{id}/children",
+    tags: ["Items"],
+    summary: "Link a child item (refill or spare) to a parent item",
+    operationId: "linkItemChild",
+    description:
+        "Links a child item (e.g. a refill or spare) to the parent item named by id. Both items must exist, share the exact same baseUnit and baseDimension, and form at most a 1-level hierarchy (the parent cannot already be a child, and the child cannot already have a parent or children).",
+    request: {
+        params: z.object({ id: itemIdParameter }),
+        body: {
+            required: true,
+            content: responseContent(itemRelationAddChildBodySchema),
+        },
+    },
+    responses: {
+        201: {
+            description: "The created item relation.",
+            content: responseContent(itemRelationDtoSchema),
+        },
+        400: jsonError(
+            "The request is invalid; correct the reported input. Codes: VALIDATION_ERROR, INVALID_JSON.",
+        ),
+        404: jsonError(
+            "One of the referenced items does not exist: ITEM_NOT_FOUND.",
+        ),
+        409: jsonError(
+            "The relation violates hierarchy or unit invariants. Codes: ITEM_RELATION_UNIT_CONFLICT, ITEM_RELATION_HIERARCHY_CONFLICT, ITEM_RELATION_CONFLICT.",
+        ),
+        ...serverErrorResponses,
+    },
+});
+itemsApp.openAPIRegistry.registerPath({
+    method: "delete",
+    path: "/{id}/children/{childItemId}",
+    tags: ["Items"],
+    summary: "Unlink a child item from a parent item",
+    operationId: "unlinkItemChild",
+    description:
+        "Removes the parent-child relation between the parent item named by id and the child item named by childItemId. Neither item is deleted.",
+    request: {
+        params: z.object({
+            id: itemIdParameter,
+            childItemId: childItemIdParameter,
+        }),
+    },
+    responses: {
+        200: {
+            description: "The relation was removed.",
+            content: responseContent(itemRelationUnlinkResultSchema),
+        },
+        400: jsonError(
+            "The request is invalid; correct the reported input. Codes: VALIDATION_ERROR.",
+        ),
+        404: jsonError(
+            "The requested relation does not exist: ITEM_RELATION_NOT_FOUND.",
+        ),
+        ...serverErrorResponses,
+    },
+});
 
 type ItemsContext = Context<ApiBindings>;
 
@@ -389,6 +463,45 @@ itemsApp.delete("/:id", async (c) => {
         await deleteItem(c.env.DB, id);
         await removeItemFromIndex(c.env, id);
         return c.json({ deleted: true }, 200);
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+itemsApp.post("/:id/children", async (c) => {
+    try {
+        const body = await parseJson(c);
+        const bodyParsed = itemRelationAddChildBodySchema.safeParse(body);
+        if (!bodyParsed.success) {
+            throw new ItemServiceError(
+                400,
+                "VALIDATION_ERROR",
+                bodyParsed.error.issues
+                    .map(
+                        (issue) =>
+                            `${issue.path.join(".") || "input"}: ${issue.message}`,
+                    )
+                    .join(", "),
+            );
+        }
+        const relation = await linkItemRelation(c.env.DB, {
+            parentItemId: c.req.param("id"),
+            childItemId: bodyParsed.data.childItemId,
+            label: bodyParsed.data.label,
+        });
+        return c.json(relation, 201);
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+itemsApp.delete("/:id/children/:childItemId", async (c) => {
+    try {
+        const result = await unlinkItemRelation(c.env.DB, {
+            parentItemId: c.req.param("id"),
+            childItemId: c.req.param("childItemId"),
+        });
+        return c.json(result, 200);
     } catch (error) {
         return errorResponse(c, error);
     }
