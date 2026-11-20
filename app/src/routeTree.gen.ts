@@ -31,6 +31,7 @@ import { Route as AppMasterLocationsIndexRouteImport } from './routes/_app/_mast
 import { Route as AppMasterLocationsSplatRouteImport } from './routes/_app/_master/locations/$'
 import { Route as AppMasterProvidersIndexRouteImport } from './routes/_app/_master/providers/index'
 import { Route as AppMasterReferencesIndexRouteImport } from './routes/_app/_master/references/index'
+import { Route as AppPricePriceResearchIndexRouteImport } from './routes/_app/_price/price-research/index'
 import { Route as AppPricePricesIndexRouteImport } from './routes/_app/_price/prices/index'
 import { Route as AppPriceStoresIndexRouteImport } from './routes/_app/_price/stores/index'
 import { Route as AppSettingsIntegrationsIndexRouteImport } from './routes/_app/settings/integrations/index'
@@ -159,6 +160,12 @@ const AppMasterReferencesIndexRoute =
     path: '/references/',
     getParentRoute: () => AppMasterRoute,
   } as any)
+const AppPricePriceResearchIndexRoute =
+  AppPricePriceResearchIndexRouteImport.update({
+    id: '/price-research/',
+    path: '/price-research/',
+    getParentRoute: () => AppPriceRoute,
+  } as any)
 const AppPricePricesIndexRoute = AppPricePricesIndexRouteImport.update({
   id: '/prices/',
   path: '/prices/',
@@ -264,6 +271,7 @@ export interface FileRoutesByFullPath {
   '/locations/': typeof AppMasterLocationsIndexRoute
   '/providers/': typeof AppMasterProvidersIndexRoute
   '/references/': typeof AppMasterReferencesIndexRoute
+  '/price-research/': typeof AppPricePriceResearchIndexRoute
   '/prices/': typeof AppPricePricesIndexRoute
   '/stores/': typeof AppPriceStoresIndexRoute
   '/settings/integrations/': typeof AppSettingsIntegrationsIndexRoute
@@ -294,6 +302,7 @@ export interface FileRoutesByTo {
   '/locations': typeof AppMasterLocationsIndexRoute
   '/providers': typeof AppMasterProvidersIndexRoute
   '/references': typeof AppMasterReferencesIndexRoute
+  '/price-research': typeof AppPricePriceResearchIndexRoute
   '/prices': typeof AppPricePricesIndexRoute
   '/stores': typeof AppPriceStoresIndexRoute
   '/settings/integrations': typeof AppSettingsIntegrationsIndexRoute
@@ -334,6 +343,7 @@ export interface FileRoutesById {
   '/_app/_master/locations/': typeof AppMasterLocationsIndexRoute
   '/_app/_master/providers/': typeof AppMasterProvidersIndexRoute
   '/_app/_master/references/': typeof AppMasterReferencesIndexRoute
+  '/_app/_price/price-research/': typeof AppPricePriceResearchIndexRoute
   '/_app/_price/prices/': typeof AppPricePricesIndexRoute
   '/_app/_price/stores/': typeof AppPriceStoresIndexRoute
   '/_app/settings/integrations/': typeof AppSettingsIntegrationsIndexRoute
@@ -371,6 +381,7 @@ export interface FileRouteTypes {
     | '/locations/'
     | '/providers/'
     | '/references/'
+    | '/price-research/'
     | '/prices/'
     | '/stores/'
     | '/settings/integrations/'
@@ -401,6 +412,7 @@ export interface FileRouteTypes {
     | '/locations'
     | '/providers'
     | '/references'
+    | '/price-research'
     | '/prices'
     | '/stores'
     | '/settings/integrations'
@@ -440,6 +452,7 @@ export interface FileRouteTypes {
     | '/_app/_master/locations/'
     | '/_app/_master/providers/'
     | '/_app/_master/references/'
+    | '/_app/_price/price-research/'
     | '/_app/_price/prices/'
     | '/_app/_price/stores/'
     | '/_app/settings/integrations/'
@@ -617,6 +630,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/references/'
       preLoaderRoute: typeof AppMasterReferencesIndexRouteImport
       parentRoute: typeof AppMasterRoute
+    }
+    '/_app/_price/price-research/': {
+      id: '/_app/_price/price-research/'
+      path: '/price-research'
+      fullPath: '/price-research/'
+      preLoaderRoute: typeof AppPricePriceResearchIndexRouteImport
+      parentRoute: typeof AppPriceRoute
     }
     '/_app/_price/prices/': {
       id: '/_app/_price/prices/'
@@ -847,11 +867,13 @@ const AppMasterRouteWithChildren = AppMasterRoute._addFileChildren(
 )
 
 interface AppPriceRouteChildren {
+  AppPricePriceResearchIndexRoute: typeof AppPricePriceResearchIndexRoute
   AppPricePricesIndexRoute: typeof AppPricePricesIndexRoute
   AppPriceStoresIndexRoute: typeof AppPriceStoresIndexRoute
 }
 
 const AppPriceRouteChildren: AppPriceRouteChildren = {
+  AppPricePriceResearchIndexRoute: AppPricePriceResearchIndexRoute,
   AppPricePricesIndexRoute: AppPricePricesIndexRoute,
   AppPriceStoresIndexRoute: AppPriceStoresIndexRoute,
 }
@@ -905,12 +927,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

@@ -7,6 +7,7 @@ import { registerHealthTool } from "./tools/health";
 import { registerInventoryTools } from "./tools/inventory";
 import { registerInventoryWriteTools } from "./tools/inventory-write";
 import { registerLocationTools } from "./tools/locations";
+import { registerPriceResearchTools } from "./tools/price-research";
 import { registerReceiptTools } from "./tools/receipts";
 import { registerStoreTools } from "./tools/stores";
 
@@ -30,6 +31,7 @@ export const createMcpServer = (
     registerExternalProviderTools(server, env.DB);
     registerInventoryWriteTools(server, env);
     registerStoreTools(server, env);
+    registerPriceResearchTools(server, env);
     registerReceiptTools(server, env.DB);
 
     return server;
