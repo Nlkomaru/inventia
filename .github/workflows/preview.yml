@@ -84,6 +84,16 @@ jobs:
       - name: Build app
         run: pnpm --filter ./app run build
 
+      - name: Build storybook
+        run: pnpm --filter ./storybook run build
+
+      # Storybook は app と同じ Worker の static assets として配信する。
+      # .cloudflare/output/v1/workers/default/assets 配下に置くことで /storybook で公開される。
+      - name: Bundle storybook into app assets
+        run: |
+          rm -rf app/.cloudflare/output/v1/workers/default/assets/storybook
+          cp -r storybook/storybook-static app/.cloudflare/output/v1/workers/default/assets/storybook
+
       - name: Prepare Worker secrets
         run: |
           umask 077
@@ -117,91 +127,8 @@ jobs:
 
           echo "deployment_url=$url" >> "$GITHUB_OUTPUT"
 
-  deploy-storybook-preview:
-    needs: check
-    runs-on: ubuntu-latest
-    name: Deploy Storybook Preview
-    outputs:
-      deployment_url: ${{ steps.resolve-storybook-preview-url.outputs.deployment_url }}
-    steps:
-      - uses: actions/checkout@v4
-
-      # プレビューの置き場所はコミット単位。PR ではマージコミットではなく、
-      # PR のブランチ先頭のコミットを使う(PR のコミットハッシュと一致させるため)。
-      - name: Set short commit SHA
-        id: vars
-        run: |
-          sha="${{ github.event.pull_request.head.sha || github.sha }}"
-          echo "commit_sha=${sha:0:7}" >> "$GITHUB_OUTPUT"
-
-      - uses: pnpm/action-setup@v4
-        name: Install pnpm
-        with:
-          run_install: false
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: ./pnpm-lock.yaml
-
-      - name: Install
-        run: pnpm install
-
-      - name: Build storybook
-        run: pnpm --filter ./storybook run build
-
-      # NIKO_CI_* は secret-manager (SSM Parameter Store) から GITHUB_ENV へ読み込む。
-      - name: Load Preview Secrets
-        uses: nlkomaru/secret-manager@main
-        with:
-          project: "inventia"
-          env: "preview"
-          shared-keys: |
-            NIKO_CI_AWS_ACCESS_KEY_ID
-            NIKO_CI_AWS_SECRET_ACCESS_KEY
-            NIKO_CI_AWS_REGION
-            NIKO_CI_BUCKET_NAME
-            NIKO_CI_S3_URL
-
-      - name: Upload to R2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ env.NIKO_CI_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ env.NIKO_CI_AWS_SECRET_ACCESS_KEY }}
-          AWS_SESSION_TOKEN: ""
-          AWS_REGION: ${{ env.NIKO_CI_AWS_REGION }}
-          BUCKET_NAME: ${{ env.NIKO_CI_BUCKET_NAME }}
-          S3_URL: ${{ env.NIKO_CI_S3_URL }}
-          COMMIT_SHORT_SHA: ${{ steps.vars.outputs.commit_sha }}
-        run: |
-          aws configure set default.s3.max_concurrent_requests 50
-
-          S3_BASE="s3://${BUCKET_NAME}/inventia/${COMMIT_SHORT_SHA}"
-          S3_OPTS="--endpoint-url ${S3_URL} --only-show-errors --recursive"
-
-          aws s3 cp ./storybook/storybook-static "$S3_BASE/storybook" $S3_OPTS
-
-          # 公開ドメインはディレクトリURLから index.html を自動で解決しない。
-          # Storybook はトップページだけ「末尾スラッシュのキー」としても置く
-          # (以降の遷移はクエリ文字列で完結する)。
-          aws s3api put-object \
-            --bucket "${BUCKET_NAME}" \
-            --key "inventia/${COMMIT_SHORT_SHA}/storybook/" \
-            --body ./storybook/storybook-static/index.html \
-            --content-type "text/html" \
-            --endpoint-url "${S3_URL}" > /dev/null
-
-          echo "R2 upload completed"
-
-      - name: Resolve storybook preview URL
-        id: resolve-storybook-preview-url
-        env:
-          COMMIT_SHORT_SHA: ${{ steps.vars.outputs.commit_sha }}
-        run: |
-          echo "deployment_url=${PREVIEW_BASE_URL}/${COMMIT_SHORT_SHA}/storybook/" >> "$GITHUB_OUTPUT"
-
   comment:
-    needs: [check, deploy-app-preview, deploy-storybook-preview]
+    needs: [check, deploy-app-preview]
     if: always()
     runs-on: ubuntu-latest
     name: Comment Preview URLs
@@ -252,8 +179,8 @@ jobs:
           S3_URL: ${{ env.NIKO_CI_S3_URL }}
           COMMIT_SHORT_SHA: ${{ steps.vars.outputs.commit_sha }}
           APP_PREVIEW_URL: ${{ needs.deploy-app-preview.outputs.deployment_url }}
-          STORYBOOK_PREVIEW_URL: ${{ needs.deploy-storybook-preview.outputs.deployment_url }}
         run: |
+          STORYBOOK_PREVIEW_URL="${APP_PREVIEW_URL:+${APP_PREVIEW_URL%/}/storybook/}"
           # QR は補助情報なので、生成や配置に失敗してもコメント投稿までは止めない。
           # URL は -- の後ろへ置き、- で始まる場合でもオプションと解釈されないようにする。
           # -s はモジュール 1 つの辺の px、-q はクワイエットゾーンのモジュール数。
@@ -289,10 +216,10 @@ jobs:
       - name: Create comment file
         env:
           APP_PREVIEW_URL: ${{ needs.deploy-app-preview.outputs.deployment_url }}
-          STORYBOOK_PREVIEW_URL: ${{ needs.deploy-storybook-preview.outputs.deployment_url }}
           APP_QR_URL: ${{ steps.qr.outputs.app_qr_url }}
           STORYBOOK_QR_URL: ${{ steps.qr.outputs.storybook_qr_url }}
         run: |
+          STORYBOOK_PREVIEW_URL="${APP_PREVIEW_URL:+${APP_PREVIEW_URL%/}/storybook/}"
           # 表の1行を組み立てる。URL が無い場合も行は残し、状態が読み取れるようにする。
           row() {
             label="$1"
@@ -322,7 +249,7 @@ jobs:
 
           cat << 'EOF' >> comment.md
 
-          スマートフォンから開く場合は QR を読み取ってください。App プレビューは Cloudflare Access のサインインを求められます。
+          スマートフォンから開く場合は QR を読み取ってください。プレビューは Cloudflare Access のサインインを求められます。
           EOF
 
       # push のたびにコメントが増えないよう、同じコメントを上書きしていく。
