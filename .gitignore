@@ -8,6 +8,7 @@ storybook-static
 .nitro
 .tanstack
 .wrangler
+.cloudflare
 .output
 .vinxi
 __unconfig*

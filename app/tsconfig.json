@@ -10,7 +10,7 @@
     },
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": [
-        "./worker-configuration.d.ts",
+        "./.cloudflare/types/index.d.ts",
         "node",
         "vite/client"
     ],

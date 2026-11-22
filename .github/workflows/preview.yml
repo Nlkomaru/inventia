@@ -60,6 +60,9 @@ jobs:
         with:
           project: "inventia"
           env: "preview"
+          shared-keys: |
+            CLOUDFLARE_API_TOKEN
+            CLOUDFLARE_ACCOUNT_ID
 
       - uses: pnpm/action-setup@v4
         name: Install pnpm
@@ -88,12 +91,13 @@ jobs:
 
       - name: Deploy app preview
         id: deploy-preview
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
-          command: versions upload --secrets-file .secrets.ci --message "Deployed preview by GitHub Actions branch ${{ github.ref_name }}"
-          workingDirectory: app
+        working-directory: app
+        shell: bash
+        run: |
+          output=$(pnpm exec cf workers versions create --prebuilt --secrets-file .secrets.ci --message "Deployed preview by GitHub Actions branch ${{ github.ref_name }}" 2>&1)
+          echo "$output"
+          url=$(echo "$output" | grep -Eo 'https://[^[:space:]]+' | head -n 1 || true)
+          echo "deployment_url=$url" >> "$GITHUB_OUTPUT"
 
       - name: Remove Worker secrets file
         if: always()
@@ -102,19 +106,12 @@ jobs:
       - name: Resolve app preview URL
         id: resolve-app-preview-url
         env:
-          WRANGLER_DEPLOYMENT_URL: ${{ steps.deploy-preview.outputs.deployment-url }}
-          WRANGLER_COMMAND_OUTPUT: ${{ steps.deploy-preview.outputs.command-output }}
-          WRANGLER_COMMAND_STDERR: ${{ steps.deploy-preview.outputs.command-stderr }}
+          CF_DEPLOYMENT_URL: ${{ steps.deploy-preview.outputs.deployment_url }}
         shell: bash
         run: |
-          url="$WRANGLER_DEPLOYMENT_URL"
+          url="$CF_DEPLOYMENT_URL"
           if [ -z "$url" ]; then
-            output="$WRANGLER_COMMAND_OUTPUT"$'\n'"$WRANGLER_COMMAND_STDERR"
-            url=$(echo "$output" | grep -Eo 'https://[^[:space:]]+' | head -n 1 || true)
-          fi
-
-          if [ -z "$url" ]; then
-            echo "Failed to resolve app preview URL from wrangler-action outputs."
+            echo "Failed to resolve app preview URL from cf outputs."
             exit 1
           fi
 
@@ -160,6 +157,12 @@ jobs:
         with:
           project: "inventia"
           env: "preview"
+          shared-keys: |
+            NIKO_CI_AWS_ACCESS_KEY_ID
+            NIKO_CI_AWS_SECRET_ACCESS_KEY
+            NIKO_CI_AWS_REGION
+            NIKO_CI_BUCKET_NAME
+            NIKO_CI_S3_URL
 
       - name: Upload to R2
         env:
@@ -219,6 +222,12 @@ jobs:
         with:
           project: "inventia"
           env: "preview"
+          shared-keys: |
+            NIKO_CI_AWS_ACCESS_KEY_ID
+            NIKO_CI_AWS_SECRET_ACCESS_KEY
+            NIKO_CI_AWS_REGION
+            NIKO_CI_BUCKET_NAME
+            NIKO_CI_S3_URL
 
       # QR の描画は pnpm の qrcode を dlx で取る。このジョブは checkout しないため
       # ワークスペースの依存としては入れられず、バージョンは実行時に固定する。
