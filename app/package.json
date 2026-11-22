@@ -12,8 +12,8 @@
 		"build": "pnpm run generate-licenses && vite build",
 		"preview": "pnpm run build && vite preview",
 		"check": "biome check --write",
-		"deploy": "VITE_DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.000Z) pnpm run build && wrangler deploy",
-		"cf-typegen": "wrangler types",
+		"deploy": "VITE_DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.000Z) pnpm run build && cf deploy --prebuilt",
+		"cf-typegen": "cf workers types",
 		"test": "vitest run"
 	},
 	"dependencies": {
@@ -57,7 +57,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.5",
-		"@cloudflare/vite-plugin": "^1.26.0",
+		"@cloudflare/vite-plugin": "2.0.0-rc.0",
 		"@cloudflare/vitest-pool-workers": "^0.22.0",
 		"@tanstack/devtools-vite": "latest",
 		"@tanstack/react-query-devtools": "^5.101.4",
@@ -66,6 +66,7 @@
 		"@types/react": "^19.2.0",
 		"@types/react-dom": "^19.2.0",
 		"@vitejs/plugin-react": "^6.0.1",
+		"cf": "1.0.0-rc.2",
 		"drizzle-kit": "^0.31.10",
 		"typescript": "^6.0.2",
 		"vite": "^8.0.0",

@@ -20,6 +20,13 @@ const config = defineConfig(({ mode }) => {
 
     return {
         resolve: { tsconfigPaths: true },
+        environments: {
+            ssr: {
+                build: {
+                    sourcemap: true,
+                },
+            },
+        },
         plugins: [
             devtools(),
             cloudflare({

@@ -53,6 +53,9 @@ jobs:
         with:
           project: "inventia"
           env: "production"
+          shared-keys: |
+            CLOUDFLARE_API_TOKEN
+            CLOUDFLARE_ACCOUNT_ID
 
       - uses: pnpm/action-setup@v4
         name: Install pnpm
@@ -75,29 +78,21 @@ jobs:
         run: pnpm run build
 
       # Storybook は app と同じ Worker の static assets として配信する。
-      # dist/client 配下に置くことで inventia.nikomaru.dev/storybook で公開される。
+      # .cloudflare/output/v1/workers/default/assets 配下に置くことで inventia.nikomaru.dev/storybook で公開される。
       - name: Bundle storybook into app assets
         run: |
-          rm -rf app/dist/client/storybook
-          cp -r storybook/storybook-static app/dist/client/storybook
+          rm -rf app/.cloudflare/output/v1/workers/default/assets/storybook
+          cp -r storybook/storybook-static app/.cloudflare/output/v1/workers/default/assets/storybook
+
+      - name: Prepare Worker secrets
+        run: |
+          umask 077
+          printf 'SETTINGS_ENCRYPTION_KEY=%s\nOPENROUTER_MANAGEMENT_KEY=%s\n' "$SETTINGS_ENCRYPTION_KEY" "$OPENROUTER_MANAGEMENT_KEY" > app/.secrets.ci
 
       - name: Deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
-          workingDirectory: app
+        working-directory: app
+        run: pnpm exec cf deploy --prebuilt --secrets-file .secrets.ci
 
-      # Worker Versionsでは未deployの最新versionがあると通常のsecret更新が拒否される。
-      # 先にcodeをdeployし、そのversionに対してsecretを別stepで同期する。
-      - name: Upload Worker secrets
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
-          command: whoami
-          secrets: |
-            SETTINGS_ENCRYPTION_KEY
-            OPENROUTER_MANAGEMENT_KEY
-          workingDirectory: app
+      - name: Remove Worker secrets file
+        if: always()
+        run: rm -f app/.secrets.ci
