@@ -158,8 +158,11 @@ jobs:
           project: "inventia"
           env: "preview"
           shared-keys: |
-            CLOUDFLARE_API_TOKEN
-            CLOUDFLARE_ACCOUNT_ID
+            NIKO_CI_AWS_ACCESS_KEY_ID
+            NIKO_CI_AWS_SECRET_ACCESS_KEY
+            NIKO_CI_AWS_REGION
+            NIKO_CI_BUCKET_NAME
+            NIKO_CI_S3_URL
 
       - name: Upload to R2
         env:
@@ -220,8 +223,11 @@ jobs:
           project: "inventia"
           env: "preview"
           shared-keys: |
-            CLOUDFLARE_API_TOKEN
-            CLOUDFLARE_ACCOUNT_ID
+            NIKO_CI_AWS_ACCESS_KEY_ID
+            NIKO_CI_AWS_SECRET_ACCESS_KEY
+            NIKO_CI_AWS_REGION
+            NIKO_CI_BUCKET_NAME
+            NIKO_CI_S3_URL
 
       # QR の描画は pnpm の qrcode を dlx で取る。このジョブは checkout しないため
       # ワークスペースの依存としては入れられず、バージョンは実行時に固定する。
