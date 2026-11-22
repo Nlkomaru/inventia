@@ -63,7 +63,7 @@ export const getOpenRouterUsage = createServerFn({ method: "GET" }).handler(
 export const updateOpenRouterIntegration = createServerFn({
     method: "POST",
 })
-    .inputValidator((data: OpenRouterIntegrationUpdate) => data)
+    .validator((data: OpenRouterIntegrationUpdate) => data)
     .handler(async ({ data }): Promise<OpenRouterIntegrationStatus> => {
         const [
             { env },

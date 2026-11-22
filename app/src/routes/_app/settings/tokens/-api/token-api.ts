@@ -14,7 +14,7 @@ export const listApiTokens = createServerFn({ method: "GET" }).handler(
 );
 
 export const createApiToken = createServerFn({ method: "POST" })
-    .inputValidator((data: { name: string }) => data)
+    .validator((data: { name: string }) => data)
     .handler(async ({ data }): Promise<IssuedApiToken> => {
         const [{ env }, { createApiToken: issue, ApiTokenServiceError }] =
             await Promise.all([
@@ -32,7 +32,7 @@ export const createApiToken = createServerFn({ method: "POST" })
     });
 
 export const revokeApiToken = createServerFn({ method: "POST" })
-    .inputValidator((data: { id: string }) => data)
+    .validator((data: { id: string }) => data)
     .handler(async ({ data }): Promise<ApiToken> => {
         const [{ env }, { revokeApiToken: revoke, ApiTokenServiceError }] =
             await Promise.all([
