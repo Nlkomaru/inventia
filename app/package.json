@@ -6,11 +6,11 @@
 		"#/*": "./src/*"
 	},
 	"scripts": {
-		"dev": "pnpm run generate-licenses && vite dev --port 3000 --host",
+		"dev": "pnpm run generate-licenses && vp dev --port 3000 --host",
 		"generate-licenses": "pnpm licenses list --prod --json | node scripts/generate-license-data.mjs",
 		"generate-routes": "tsr generate",
-		"build": "pnpm run generate-licenses && vite build",
-		"preview": "pnpm run build && vite preview",
+		"build": "pnpm run generate-licenses && vp build",
+		"preview": "pnpm run build && vp preview",
 		"check": "biome check --write",
 		"deploy": "VITE_DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.000Z) pnpm run build && cf deploy --prebuilt",
 		"cf-typegen": "cf workers types",
@@ -69,7 +69,8 @@
 		"cf": "1.0.0-rc.2",
 		"drizzle-kit": "^0.31.11",
 		"typescript": "^6.0.2",
-		"vite": "^8.3.8",
+		"vite": "catalog:",
+		"vite-plus": "1.8.0",
 		"vitest": "^4.1.12",
 		"wrangler": "^4.166.0"
 	}
