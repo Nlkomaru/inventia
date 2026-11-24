@@ -8,6 +8,7 @@ packages:
 # catalog は直接依存だけを揃えるため、react-start が推移的に引く分も overrides で固定する。
 # react-start を上げて型が合わなくなったときは、この 2 つを同時に上げること
 catalog:
+  vite: npm:@voidzero-dev/vite-plus-core@8.3.8001
   '@tanstack/react-router': 1.170.46
 
 overrides:
@@ -33,3 +34,13 @@ minimumReleaseAgeExclude:
   - '@tanstack/react-query-devtools@5.108.3'
   - '@tanstack/react-query@5.108.3'
   - hono@4.13.20
+  - '@voidzero-dev/vite-plus-core@8.3.8001'
+  - '@voidzero-dev/vite-plus-darwin-arm64@1.8.0'
+  - '@voidzero-dev/vite-plus-darwin-x64@1.8.0'
+  - '@voidzero-dev/vite-plus-linux-arm64-gnu@1.8.0'
+  - '@voidzero-dev/vite-plus-linux-arm64-musl@1.8.0'
+  - '@voidzero-dev/vite-plus-linux-x64-gnu@1.8.0'
+  - '@voidzero-dev/vite-plus-linux-x64-musl@1.8.0'
+  - '@voidzero-dev/vite-plus-win32-arm64-msvc@1.8.0'
+  - '@voidzero-dev/vite-plus-win32-x64-msvc@1.8.0'
+  - vite-plus@1.8.0
